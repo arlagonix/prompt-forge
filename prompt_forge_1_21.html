@@ -1,0 +1,1966 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prompt Forge</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 256 256%22><text y=%22203%22 font-size=%22224%22>🤖</text></svg>"
+    />
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu,
+          sans-serif;
+        background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+        color: #333;
+        line-height: 1.6;
+        padding: 16px;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 1440px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 480px 1fr;
+        gap: 16px;
+        height: calc(100vh - 32px);
+      }
+
+      /* Sidebar */
+      .sidebar {
+        background: #fefefe;
+        border-radius: 12px;
+        padding: 24px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        height: 100%;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .sidebar::-webkit-scrollbar {
+        display: none;
+      }
+
+      .sidebar-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 25px;
+        padding-bottom: 20px;
+        border-bottom: 2px solid #e0e0e0;
+        flex-shrink: 0;
+      }
+
+      .sidebar-header h2 {
+        color: #1a1a1a;
+        font-size: 1.3rem;
+        font-weight: 700;
+      }
+
+      .header-buttons {
+        display: flex;
+        gap: 8px;
+      }
+
+      .btn {
+        padding: 14px 20px;
+        border: none;
+        border-radius: 8px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        justify-content: center;
+      }
+      .btn-icon {
+        padding: 10px 12px;
+        background: #f8f9fa;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+      }
+      .btn-icon:hover {
+        background: #333;
+        border-color: #333;
+        color: white;
+      }
+      .btn-icon:focus-visible {
+        outline: 3px solid rgba(0, 0, 0, 0.25);
+        outline-offset: 2px;
+      }
+
+      .folder-structure {
+        flex: 1;
+        overflow-y: auto;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      .folder-structure::-webkit-scrollbar {
+        display: none;
+      }
+
+      .folder-item {
+        margin-bottom: 8px;
+      }
+
+      .folder-name {
+        font-weight: 600;
+        color: #555;
+        margin-bottom: 8px;
+        padding: 8px 12px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border: 2px solid #e0e0e0;
+        cursor: pointer;
+        font-size: 0.9rem;
+        user-select: none;
+      }
+      .folder-name:hover {
+        border-color: #333;
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+      }
+      .folder-name:focus-visible {
+        outline: 3px solid rgba(0, 0, 0, 0.25);
+        outline-offset: 2px;
+      }
+
+      .folder-name .toggle {
+        font-size: 1rem;
+      }
+
+      .folder-children {
+        margin-left: 15px;
+        padding-left: 10px;
+        border-left: 2px solid #e0e0e0;
+        display: none;
+      }
+
+      .file-item {
+        padding: 6px 12px;
+        margin: 3px 0;
+        border-radius: 6px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        border: 2px solid transparent;
+        font-size: 0.85rem;
+        user-select: none;
+      }
+      .file-item:hover {
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        border-color: #333;
+      }
+      .file-item.active {
+        background: #2c2c2c;
+        color: white;
+        font-weight: 600;
+        border-color: #333;
+      }
+      .file-item:focus-visible {
+        outline: 3px solid rgba(0, 0, 0, 0.25);
+        outline-offset: 2px;
+      }
+
+      .file-item .emoji {
+        font-size: 1rem;
+      }
+      .file-item .name {
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 50px 20px;
+        color: #666;
+        font-size: 1.1rem;
+      }
+
+      .error {
+        color: #1a1a1a;
+        padding: 15px 20px;
+        background: #f0f0f0;
+        border-radius: 8px;
+        margin: 15px 0;
+        border: 2px solid #666;
+        font-weight: 500;
+      }
+
+      /* Main content */
+      .main {
+        background: #fefefe;
+        border-radius: 12px;
+        padding: 32px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        height: 100%;
+        overflow-y: auto;
+      }
+
+      .template-header {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 3px solid #e0e0e0;
+      }
+
+      .template-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .template-title {
+        font-size: 2rem;
+        color: #1a1a1a;
+        margin-bottom: 0;
+        font-weight: 700;
+      }
+
+      .doc-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 10px;
+        border: 2px solid #e0e0e0;
+        background: #f8f9fa;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 14px;
+        user-select: none;
+        white-space: nowrap;
+      }
+      .doc-btn:hover {
+        border-color: #333;
+        background: #333;
+        color: white;
+      }
+      .doc-btn:focus-visible {
+        outline: 3px solid rgba(0, 0, 0, 0.25);
+        outline-offset: 2px;
+      }
+
+      .form-group {
+        margin-bottom: 16px;
+      }
+      .form-group label {
+        display: block;
+        margin-bottom: 12px;
+        font-weight: 600;
+        color: #1a1a1a;
+        font-size: 1.05rem;
+        display: flex;
+        align-items: center;
+      }
+      .form-group label .param-name {
+        background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        padding: 4px 10px;
+        border-radius: 6px;
+        font-family: "Courier New", monospace;
+        font-size: 0.9rem;
+        color: #333;
+        border: 2px solid #333;
+        font-weight: 700;
+        margin-left: 8px;
+        word-break: break-word;
+      }
+
+      textarea {
+        width: 100%;
+        padding: 15px 18px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 15px;
+        resize: vertical;
+        min-height: 120px;
+        line-height: 1.6;
+      }
+      textarea:focus {
+        outline: none;
+        border-color: #333;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+      }
+
+      input[type="text"],
+      input[type="number"],
+      select {
+        width: 100%;
+        padding: 15px 18px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-family: inherit;
+        font-size: 15px;
+        line-height: 1.6;
+        background: white;
+      }
+
+      /* extra right padding for select chevron */
+      select {
+        padding-right: 44px;
+      }
+
+      input[type="text"]:focus,
+      input[type="number"]:focus,
+      select:focus {
+        outline: none;
+        border-color: #333;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 14px;
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+      }
+      .checkbox-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .checkbox-row input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+      }
+      .checkbox-value {
+        font-family: "Courier New", monospace;
+      }
+
+      .radio-group {
+        border: 2px solid #e0e0e0;
+        border-radius: 10px;
+        padding: 12px 14px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        display: grid;
+        gap: 10px;
+      }
+      .radio-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .radio-item input[type="radio"] {
+        margin: 0;
+      }
+      .radio-item .radio-label {
+        font-size: 15px;
+        line-height: 1.35;
+        word-break: break-word;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 15px;
+        margin-top: 30px;
+        flex-wrap: wrap;
+      }
+
+      .btn-copy {
+        background: #2c2c2c;
+        color: white;
+        padding: 16px 32px;
+        border: none;
+        border-radius: 8px;
+        font-size: 17px;
+        font-weight: 700;
+        cursor: pointer;
+        flex: 1;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+      .btn-copy:hover {
+        background: #1f1f1f;
+      }
+      .btn-copy:focus-visible {
+        outline: 3px solid rgba(0, 0, 0, 0.25);
+        outline-offset: 2px;
+      }
+
+      .btn-secondary {
+        background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+        color: #333;
+        padding: 14px 24px;
+        font-weight: 700;
+        cursor: pointer;
+        border: 2px solid #333;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+        border-radius: 10px;
+      }
+      .btn-secondary:hover {
+        background: linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%);
+        color: white;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+      }
+      .btn-secondary:focus-visible {
+        outline: 3px solid rgba(0, 0, 0, 0.25);
+        outline-offset: 2px;
+      }
+
+      .preview {
+        margin-top: 35px;
+        border-top: 3px solid #e0e0e0;
+        padding-top: 25px;
+      }
+      .preview h3 {
+        margin-bottom: 15px;
+        color: #1a1a1a;
+        font-size: 1.4rem;
+        font-weight: 700;
+      }
+
+      .preview-content {
+        background: #2c2c2c;
+        color: #e0e0e0;
+        padding: 25px;
+        border-radius: 10px;
+        border: 2px solid #333;
+        font-family: "Courier New", monospace;
+        white-space: pre-wrap;
+        overflow-y: auto;
+        font-size: 14px;
+        line-height: 1.8;
+        box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.5);
+      }
+
+      .copy-notification {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%);
+        color: white;
+        padding: 18px 30px;
+        border-radius: 10px;
+        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.4);
+        z-index: 1000;
+        font-weight: 600;
+        font-size: 16px;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 80px 30px;
+        color: #666;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+      }
+      .empty-state h3 {
+        font-size: 1.8rem;
+        margin-bottom: 12px;
+        color: #333;
+      }
+      .empty-state p {
+        font-size: 1.1rem;
+        color: #999;
+      }
+
+      .keyboard-hint {
+        font-size: 0.75rem;
+        color: #999;
+        margin-top: 5px;
+        font-style: italic;
+      }
+
+      .search-box {
+        margin-bottom: 20px;
+        flex-shrink: 0;
+      }
+      .search-box input {
+        width: 100%;
+        padding: 12px 15px;
+        border: 2px solid #e0e0e0;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+      .search-box input:focus {
+        outline: none;
+        border-color: #333;
+        box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+      }
+
+      /* Scrollbar styling for main content only */
+      .main::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+      }
+      .main::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+      }
+      .main::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%);
+        border-radius: 10px;
+      }
+      .main::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #333 0%, #1a1a1a 100%);
+      }
+
+      .preview-content::-webkit-scrollbar {
+        width: 8px;
+      }
+      .preview-content::-webkit-scrollbar-track {
+        background: #2a2a2a;
+        border-radius: 10px;
+      }
+      .preview-content::-webkit-scrollbar-thumb {
+        background: #666;
+        border-radius: 10px;
+      }
+
+      /* Spinner */
+      @keyframes spin {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .spinner {
+        border: 3px solid #f3f3f3;
+        border-top: 3px solid #333;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        margin: 0 auto 15px;
+        animation: spin 1s linear infinite;
+      }
+
+      /* Modal */
+      .modal-backdrop {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.55);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        padding: 18px;
+      }
+      .modal-backdrop.open {
+        display: flex;
+      }
+      .modal {
+        width: min(980px, 100%);
+        max-height: min(85vh, 900px);
+        overflow: auto;
+        background: #fefefe;
+        border-radius: 14px;
+        box-shadow: 0 14px 50px rgba(0, 0, 0, 0.45);
+        border: 2px solid #e0e0e0;
+      }
+      .modal-header {
+        position: sticky;
+        top: 0;
+        background: #fefefe;
+        z-index: 1;
+        padding: 16px 18px;
+        border-bottom: 2px solid #e0e0e0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .modal-title {
+        font-weight: 800;
+        font-size: 1.1rem;
+        color: #1a1a1a;
+      }
+      .modal-close {
+        border: 2px solid #e0e0e0;
+        background: #f8f9fa;
+        border-radius: 10px;
+        padding: 10px 12px;
+        cursor: pointer;
+        font-weight: 800;
+      }
+      .modal-close:hover {
+        background: #333;
+        border-color: #333;
+        color: white;
+      }
+      .modal-body {
+        padding: 18px;
+        color: #1a1a1a;
+      }
+      .modal-body h4 {
+        margin-top: 14px;
+        margin-bottom: 8px;
+        font-size: 1.05rem;
+      }
+      .modal-body p {
+        margin: 8px 0;
+        color: #333;
+      }
+      .doc-code {
+        margin: 10px 0 14px;
+        background: #2c2c2c;
+        color: #e0e0e0;
+        padding: 14px;
+        border-radius: 10px;
+        border: 2px solid #333;
+        font-family: "Courier New", monospace;
+        white-space: pre-wrap;
+        line-height: 1.7;
+        font-size: 13px;
+      }
+
+      /* Responsive */
+      @media (max-width: 1024px) {
+        .container {
+          grid-template-columns: 1fr;
+          height: auto;
+        }
+        .sidebar {
+          max-height: 400px;
+        }
+        .main {
+          height: auto;
+          max-height: none;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="container">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-header">
+          <h2>🤖 Prompt Forge</h2>
+          <div class="header-buttons">
+            <button
+              type="button"
+              class="btn-icon"
+              id="refreshBtn"
+              title="Refresh (Alt+R)"
+            >
+              🔄
+            </button>
+            <button
+              type="button"
+              class="btn-icon"
+              id="selectFolderBtn"
+              title="Choose Folder (Ctrl+O)"
+            >
+              📂
+            </button>
+          </div>
+        </div>
+
+        <div id="searchContainer"></div>
+
+        <div
+          id="fileBrowser"
+          class="folder-structure"
+          aria-label="Template browser"
+        >
+          <div class="empty-state">
+            <p>Press 📂 to select a folder</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main -->
+      <div class="main" id="mainContent">
+        <div class="empty-state">
+          <h3>👈 Select a template to start</h3>
+          <p>Choose a markdown template from the sidebar</p>
+          <div class="keyboard-hint">
+            Shortcuts: Ctrl+O (Open), Ctrl+Enter (Generate), Esc (Clear)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documentation Modal -->
+    <div
+      class="modal-backdrop"
+      id="docModalBackdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="docModalTitle"
+    >
+      <div class="modal" tabindex="-1">
+        <div class="modal-header">
+          <div class="modal-title" id="docModalTitle">📖 Examples</div>
+          <button type="button" class="modal-close" id="docModalClose">
+            ✕ Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <h4>Common</h4>
+          <div class="doc-code">
+{{message}}
+{{message | label=Your message}}
+{{message | default=Hello}}
+{{message | label=Your message | default=Hello}}
+{{message | label=Multiline default | default=Line 1
+Line 2
+Line 3}}
+          </div>
+
+          <h4>Textarea (default)</h4>
+          <div class="doc-code">
+{{bio}}
+{{bio | type=textarea}}
+{{bio | type=textarea | label=Bio}}
+{{bio | type=textarea | default=Write something...}}
+{{bio | type=textarea | label=Bio | default=Line 1
+Line 2}}
+{{bio | type=textarea | height=10}}
+{{description | type=textarea | label=Long description | height=15 | default=Enter detailed text here...}}
+          </div>
+
+          <h4>Text</h4>
+          <div class="doc-code">
+{{title | type=text}}
+{{title | type=text | label=Title}}
+{{title | type=text | default=Hello}}
+{{title | type=text | label=Title | default=Hello}}
+          </div>
+
+          <h4>Number</h4>
+          <div class="doc-code">
+{{age | type=number}}
+{{age | type=number | label=Age}}
+{{age | type=number | default=42}}
+{{age | type=number | label=Age | default=42}}
+          </div>
+
+          <h4>Checkbox</h4>
+          <div class="doc-code">
+{{agree | type=checkbox}}
+{{agree | type=checkbox | label=I agree}}
+{{agree | type=checkbox | default=true}}
+{{agree | type=checkbox | default=false}}
+{{agree | type=checkbox | label=I agree | default=true}}
+          </div>
+
+          <h4>Select</h4>
+          <div class="doc-code">
+{{color | type=select | value=Red | value=Green | value=Blue}}
+{{color | type=select | label=Pick a color | value=Red | value=Green | value=Blue}}
+{{color | type=select | value=One | value=Two | value=Three | default=Two}}
+{{mode | type=select | label=Mode | value=Variant with commas, like: A, B, C | value=Another variant | default=Variant with commas, like: A, B, C }}
+          </div>
+
+          <h4>Radio</h4>
+          <div class="doc-code">
+{{choice | type=radio | value=A | value=B | value=C}}
+{{choice | type=radio | label=Choose one | value=A | value=B | value=C}}
+{{choice | type=radio | value=One | value=Two | value=Three | default=Three}}
+          </div>
+
+          <h4>Height Parameter (Textarea only)</h4>
+          <p>The <code>height</code> parameter controls the number of rows displayed in a textarea. Default is 4 rows.</p>
+          <div class="doc-code">
+{{short | height=3}}
+{{medium | height=8}}
+{{long | height=20}}
+{{description | type=textarea | label=Details | height=12 | default=Enter long text...}}
+          </div>
+
+          <p style="margin-top: 12px; color: #666">
+            Tip: Press <b>Esc</b> to close this modal.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ==================== STATE ====================
+      const State = {
+        currentFolderHandle: null,
+        folderTree: null,
+        currentFile: null,
+        fileMap: new Map(),
+        fileIdCounter: 0,
+        activeNotification: null,
+        loadingAbortController: null,
+        currentParams: [],
+        searchTimer: null,
+        searchQuery: "",
+      };
+
+      // ==================== LOCALSTORAGE ====================
+      const STORAGE_KEY_PREFIX = 'prompt-forge-values-';
+      
+      function getStorageKey(filePath) {
+        return STORAGE_KEY_PREFIX + filePath;
+      }
+      
+      function saveFormValues(filePath, params, form) {
+        if (!filePath || !form) return;
+        
+        try {
+          const values = {};
+          
+          for (const p of params) {
+            if (!p?.name) continue;
+            
+            const el = form.elements.namedItem(p.name);
+            if (!el) continue;
+            
+            if (p.type === 'checkbox') {
+              values[p.name] = el.checked;
+            } else if (p.type === 'radio') {
+              values[p.name] = el.value;
+            } else {
+              values[p.name] = el.value;
+            }
+          }
+          
+          localStorage.setItem(getStorageKey(filePath), JSON.stringify(values));
+        } catch (err) {
+          console.warn('Failed to save form values to localStorage:', err);
+        }
+      }
+      
+      function loadFormValues(filePath, params, form) {
+        if (!filePath || !form) return false;
+        
+        try {
+          const stored = localStorage.getItem(getStorageKey(filePath));
+          if (!stored) return false;
+          
+          const values = JSON.parse(stored);
+          let hasValues = false;
+          
+          for (const p of params) {
+            if (!p?.name) continue;
+            if (!(p.name in values)) continue;
+            
+            const el = form.elements.namedItem(p.name);
+            if (!el) continue;
+            
+            hasValues = true;
+            
+            if (p.type === 'checkbox') {
+              el.checked = Boolean(values[p.name]);
+            } else if (p.type === 'radio') {
+              el.value = values[p.name];
+            } else {
+              el.value = values[p.name];
+            }
+          }
+          
+          if (hasValues) {
+            form.querySelectorAll('.checkbox-row').forEach((row) => {
+              const cb = row.querySelector('input[type="checkbox"]');
+              const pill = row.querySelector('.checkbox-value');
+              if (cb && pill) {
+                pill.textContent = cb.checked ? 'true' : 'false';
+              }
+            });
+          }
+          
+          return hasValues;
+        } catch (err) {
+          console.warn('Failed to load form values from localStorage:', err);
+          return false;
+        }
+      }
+      
+      function setupAutoSave(filePath, params, form) {
+        if (!filePath || !form) return;
+        
+        const saveHandler = () => {
+          saveFormValues(filePath, params, form);
+        };
+        
+        form.addEventListener('input', saveHandler);
+        form.addEventListener('change', saveHandler);
+      }
+
+      // ==================== DOM ====================
+      const DOM = {
+        fileBrowser: document.getElementById("fileBrowser"),
+        mainContent: document.getElementById("mainContent"),
+        searchContainer: document.getElementById("searchContainer"),
+        selectFolderBtn: document.getElementById("selectFolderBtn"),
+        refreshBtn: document.getElementById("refreshBtn"),
+        docModalBackdrop: document.getElementById("docModalBackdrop"),
+        docModalClose: document.getElementById("docModalClose"),
+      };
+
+      // ==================== UTILITIES ====================
+      function showNotification(message, type = "success") {
+        if (State.activeNotification) State.activeNotification.remove();
+
+        const el = document.createElement("div");
+        el.className = "copy-notification";
+        el.setAttribute("role", "status");
+        el.setAttribute("aria-live", "polite");
+
+        el.style.background =
+          type === "success"
+            ? "linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%)"
+            : type === "error"
+              ? "linear-gradient(135deg, #666 0%, #444 100%)"
+              : "linear-gradient(135deg, #555 0%, #333 100%)";
+
+        el.textContent = message;
+
+        document.body.appendChild(el);
+        State.activeNotification = el;
+
+        setTimeout(() => {
+          if (State.activeNotification === el) {
+            el.remove();
+            State.activeNotification = null;
+          }
+        }, 2000);
+      }
+
+      function showError(message) {
+        console.error("Error:", message);
+
+        const errorDiv = document.createElement("div");
+        errorDiv.className = "error";
+        errorDiv.textContent = message;
+        errorDiv.style.cssText = `
+        position: fixed;
+        top: 30px;
+        right: 30px;
+        z-index: 1000;
+        padding: 18px 24px;
+        background: #f0f0f0;
+        border: 2px solid #666;
+        border-radius: 10px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        font-weight: 600;
+        max-width: 420px;
+        color: #1a1a1a;
+      `;
+
+        document.body.appendChild(errorDiv);
+        setTimeout(() => errorDiv.remove(), 5000);
+      }
+
+      async function copyToClipboard(text) {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (_) {
+          try {
+            const ta = document.createElement("textarea");
+            ta.value = text;
+            ta.setAttribute("readonly", "");
+            ta.style.position = "fixed";
+            ta.style.top = "-1000px";
+            ta.style.left = "-1000px";
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand("copy");
+            ta.remove();
+            return ok;
+          } catch (err) {
+            console.error("Clipboard fallback failed:", err);
+            return false;
+          }
+        }
+      }
+
+      function normalizeBool(v) {
+        if (v == null) return false;
+        const s = String(v).trim().toLowerCase();
+        return (
+          s === "true" || s === "1" || s === "yes" || s === "y" || s === "on"
+        );
+      }
+
+      function openDocsModal() {
+        DOM.docModalBackdrop.classList.add("open");
+        DOM.docModalClose?.focus?.();
+      }
+
+      function closeDocsModal() {
+        DOM.docModalBackdrop.classList.remove("open");
+      }
+
+      // ==================== INIT ====================
+      function init() {
+        if (!("showDirectoryPicker" in window)) {
+          showError(
+            "File System Access API is not supported. Use Chrome, Edge, or Opera.",
+          );
+          return;
+        }
+        setupEventListeners();
+      }
+
+      function setupEventListeners() {
+        DOM.selectFolderBtn.addEventListener("click", selectFolder);
+        DOM.refreshBtn.addEventListener("click", refreshCurrentFolder);
+
+        DOM.fileBrowser.addEventListener("click", handleFileBrowserClick);
+
+        DOM.fileBrowser.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          const target = e.target;
+          if (
+            target.classList.contains("file-item") ||
+            target.classList.contains("folder-name")
+          ) {
+            e.preventDefault();
+            target.click();
+          }
+        });
+
+        DOM.docModalClose.addEventListener("click", closeDocsModal);
+        DOM.docModalBackdrop.addEventListener("click", (e) => {
+          if (e.target === DOM.docModalBackdrop) closeDocsModal();
+        });
+
+        document.addEventListener("keydown", handleKeyboardShortcuts);
+      }
+
+      function handleKeyboardShortcuts(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "o") {
+          e.preventDefault();
+          selectFolder();
+          return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          e.preventDefault();
+          if (State.currentFile) generateAndCopy();
+          return;
+        }
+
+        if (e.key === "Escape") {
+          if (DOM.docModalBackdrop.classList.contains("open")) {
+            closeDocsModal();
+            return;
+          }
+          const form = document.getElementById("promptForm");
+          if (form) clearForm();
+          return;
+        }
+
+        if (
+          e.altKey &&
+          e.key.toLowerCase() === "r" &&
+          State.currentFolderHandle
+        ) {
+          e.preventDefault();
+          refreshCurrentFolder();
+        }
+      }
+
+      function handleFileBrowserClick(e) {
+        const fileItem = e.target.closest(".file-item");
+        if (fileItem) {
+          const fileId = Number(fileItem.dataset.fileId);
+          loadFile(fileId);
+          return;
+        }
+
+        const folderName = e.target.closest(".folder-name");
+        if (folderName) {
+          const children = folderName.nextElementSibling;
+          const toggle = folderName.querySelector(".toggle");
+          if (!children) return;
+
+          const isHidden =
+            children.style.display === "none" || children.style.display === "";
+          children.style.display = isHidden ? "block" : "none";
+          if (toggle) toggle.textContent = isHidden ? "📂" : "📁";
+        }
+      }
+
+      // ==================== FOLDER OPERATIONS ====================
+      async function selectFolder() {
+        try {
+          if (State.loadingAbortController)
+            State.loadingAbortController.abort();
+          State.loadingAbortController = new AbortController();
+
+          State.currentFolderHandle = await window.showDirectoryPicker();
+
+          await loadFolderStructure(
+            State.currentFolderHandle,
+            State.loadingAbortController.signal,
+          );
+          addSearchBox();
+
+          State.loadingAbortController = null;
+        } catch (err) {
+          if (err?.name === "AbortError") return;
+          console.error("Folder selection error:", err);
+
+          let message = "Failed to select folder";
+          if (err?.name === "NotAllowedError")
+            message = "Permission denied. Please grant folder access.";
+          else if (err?.message) message += ": " + err.message;
+          showError(message);
+        }
+      }
+
+      async function refreshCurrentFolder() {
+        if (!State.currentFolderHandle) return;
+
+        const selected = State.currentFile
+          ? { name: State.currentFile.name, path: State.currentFile.path }
+          : null;
+
+        State.fileMap.clear();
+        State.fileIdCounter = 0;
+        State.currentFile = null;
+        State.currentParams = [];
+
+        await loadFolderStructure(State.currentFolderHandle);
+
+        if (selected) {
+          for (const [fileId, f] of State.fileMap.entries()) {
+            if (f.name === selected.name && f.path === selected.path) {
+              await loadFile(fileId);
+              break;
+            }
+          }
+        }
+      }
+
+      async function loadFolderStructure(dirHandle, signal) {
+        if (signal?.aborted) return;
+
+        DOM.fileBrowser.innerHTML = "";
+        DOM.fileBrowser.appendChild(makeLoading("Loading templates..."));
+
+        try {
+          const root = {
+            name: dirHandle.name,
+            handle: dirHandle,
+            path: "/" + dirHandle.name,
+            type: "directory",
+            children: [],
+          };
+
+          await readDirectoryRecursive(dirHandle, root.children, "", signal);
+
+          if (signal?.aborted) return;
+
+          State.folderTree = root;
+          renderFileBrowser(root);
+        } catch (err) {
+          console.error("Folder loading error:", err);
+          DOM.fileBrowser.innerHTML =
+            '<div class="error">Failed to load folder</div>';
+          showError("Error loading folder: " + (err?.message || String(err)));
+        }
+      }
+
+      async function readDirectoryRecursive(
+        dirHandle,
+        childrenArray,
+        currentPath,
+        signal,
+      ) {
+        if (signal?.aborted) return;
+
+        const directories = [];
+        const files = [];
+
+        for await (const entry of dirHandle.values()) {
+          if (signal?.aborted) return;
+
+          if (entry.kind === "directory") {
+            const dir = {
+              name: entry.name,
+              handle: entry,
+              path: currentPath + "/" + entry.name,
+              type: "directory",
+              children: [],
+            };
+
+            await readDirectoryRecursive(entry, dir.children, dir.path, signal);
+
+            if (directoryHasAnyFiles(dir)) directories.push(dir);
+          } else {
+            const lower = entry.name.toLowerCase();
+            if (lower.endsWith(".md") || lower.endsWith(".markdown")) {
+              const id = State.fileIdCounter++;
+              const file = {
+                id,
+                name: entry.name,
+                handle: entry,
+                path: currentPath + "/" + entry.name,
+                type: "file",
+                content: null,
+                modified: null,
+              };
+              State.fileMap.set(id, file);
+              files.push(file);
+            }
+          }
+        }
+
+        directories.sort((a, b) => a.name.localeCompare(b.name));
+        files.sort((a, b) => a.name.localeCompare(b.name));
+        childrenArray.push(...directories, ...files);
+      }
+
+      function directoryHasAnyFiles(dir) {
+        for (const child of dir.children) {
+          if (child.type === "file") return true;
+          if (child.type === "directory" && directoryHasAnyFiles(child))
+            return true;
+        }
+        return false;
+      }
+
+      function makeLoading(text) {
+        const wrap = document.createElement("div");
+        wrap.className = "loading";
+        wrap.innerHTML = `<div class="spinner"></div><p></p>`;
+        wrap.querySelector("p").textContent = text;
+        return wrap;
+      }
+
+      // ==================== RENDERING ====================
+      function renderFileBrowser(structure) {
+        DOM.fileBrowser.innerHTML = "";
+
+        const rootWrap = document.createElement("div");
+        rootWrap.className = "folder-structure";
+
+        const frag = document.createDocumentFragment();
+
+        const sorted = [...structure.children].sort((a, b) => {
+          if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        for (const node of sorted) {
+          frag.appendChild(
+            node.type === "directory"
+              ? renderDirectoryNode(node, 0)
+              : renderFileNode(node),
+          );
+        }
+
+        rootWrap.appendChild(frag);
+        DOM.fileBrowser.appendChild(rootWrap);
+
+        if (State.searchQuery) filterFiles(State.searchQuery);
+      }
+
+      function renderDirectoryNode(dir, level) {
+        const folderItem = document.createElement("div");
+        folderItem.className = "folder-item";
+        folderItem.style.marginLeft = `${level * 15}px`;
+
+        const folderName = document.createElement("div");
+        folderName.className = "folder-name";
+        folderName.tabIndex = 0;
+        folderName.dataset.path = dir.path;
+
+        const toggle = document.createElement("span");
+        toggle.className = "toggle";
+        toggle.textContent = "📁";
+
+        const label = document.createElement("span");
+        label.textContent = dir.name;
+
+        folderName.appendChild(toggle);
+        folderName.appendChild(label);
+
+        const children = document.createElement("div");
+        children.className = "folder-children";
+        children.style.display = "none";
+
+        const sorted = [...dir.children].sort((a, b) => {
+          if (a.type !== b.type) return a.type === "directory" ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        for (const child of sorted) {
+          children.appendChild(
+            child.type === "directory"
+              ? renderDirectoryNode(child, level + 1)
+              : renderFileNode(child),
+          );
+        }
+
+        folderItem.appendChild(folderName);
+        folderItem.appendChild(children);
+        return folderItem;
+      }
+
+      function renderFileNode(file) {
+        const item = document.createElement("div");
+        item.className =
+          "file-item" + (State.currentFile?.id === file.id ? " active" : "");
+        item.dataset.fileId = String(file.id);
+        item.tabIndex = 0;
+
+        const emoji = document.createElement("span");
+        emoji.className = "emoji";
+        emoji.textContent = "📄";
+
+        const name = document.createElement("span");
+        name.className = "name";
+        name.textContent = file.name;
+
+        item.appendChild(emoji);
+        item.appendChild(name);
+        return item;
+      }
+
+      // ==================== FILE OPERATIONS ====================
+      async function loadFile(fileId) {
+        try {
+          DOM.mainContent.innerHTML = "";
+          DOM.mainContent.appendChild(makeLoading("Loading template..."));
+
+          const file = State.fileMap.get(fileId);
+          if (!file) throw new Error("File not found");
+
+          const fileHandle = await file.handle.getFile();
+          file.content = await fileHandle.text();
+          file.modified = fileHandle.lastModified;
+
+          State.currentFile = file;
+
+          DOM.fileBrowser.querySelectorAll(".file-item").forEach((el) => {
+            el.classList.toggle("active", Number(el.dataset.fileId) === fileId);
+          });
+
+          const params = extractParameters(file.content);
+          State.currentParams = params;
+          renderTemplateForm(file, params);
+        } catch (err) {
+          console.error("File loading error:", err);
+
+          let message = "Failed to load template";
+          if (err?.name === "NotAllowedError")
+            message =
+              "Permission denied. File may have been moved or access revoked.";
+          else if (err?.name === "NotFoundError")
+            message = "File not found. It may have been moved or deleted.";
+          else if (err?.message) message += ": " + err.message;
+
+          showError(message);
+          DOM.mainContent.innerHTML = `
+          <div class="empty-state">
+            <h3>❌ Error Loading Template</h3>
+            <p>${message}</p>
+          </div>
+        `;
+        }
+      }
+
+      // ==================== PARAMS / PROMPT ====================
+      function extractPlaceholders(template) {
+        if (typeof template !== "string") return [];
+
+        const out = [];
+        const seen = new Set();
+
+        let i = 0;
+        while (i < template.length) {
+          const start = template.indexOf("{{", i);
+          if (start === -1) break;
+
+          const end = template.indexOf("}}", start + 2);
+          if (end === -1) break;
+
+          const rawInner = template.slice(start + 2, end);
+          const parsed = parsePlaceholderInner(rawInner);
+
+          if (parsed?.name && !seen.has(parsed.name)) {
+            out.push(parsed);
+            seen.add(parsed.name);
+          }
+
+          i = end + 2;
+        }
+
+        return out;
+      }
+
+      function parsePlaceholderInner(inner) {
+        const s = String(inner);
+
+        const defaultIdx = s.indexOf("default=");
+        let beforeDefault = s;
+        let defaultValue = null;
+
+        if (defaultIdx !== -1) {
+          beforeDefault = s.slice(0, defaultIdx);
+          defaultValue = s.slice(defaultIdx + "default=".length);
+        }
+
+        const parts = beforeDefault
+          .split("|")
+          .map((p) => p.trim())
+          .filter((p) => p.length > 0);
+
+        if (parts.length === 0) return null;
+
+        const name = parts[0];
+        if (!/^[a-zA-Z0-9_-]+$/.test(name)) return null;
+
+        let type = "textarea";
+        let label = null;
+        let height = null;
+        const values = [];
+
+        for (let idx = 1; idx < parts.length; idx++) {
+          const token = parts[idx];
+
+          const mType = token.match(
+            /^type\s*=\s*(textarea|text|number|checkbox|select|radio)\s*$/,
+          );
+          if (mType) {
+            type = mType[1];
+            continue;
+          }
+
+          const mLabel = token.match(/^label\s*=\s*(.+)$/);
+          if (mLabel) {
+            label = mLabel[1].trim();
+            continue;
+          }
+
+          const mHeight = token.match(/^height\s*=\s*(\d+)\s*$/);
+          if (mHeight) {
+            height = parseInt(mHeight[1], 10);
+            continue;
+          }
+
+          const mValue = token.match(/^value\s*=\s*(.+)$/);
+          if (mValue) {
+            values.push(mValue[1].trim());
+            continue;
+          }
+        }
+
+        let effectiveDefault = defaultValue;
+
+        if (type === "checkbox") {
+          if (effectiveDefault == null) effectiveDefault = "false";
+        }
+
+        if (type === "select" || type === "radio") {
+          if (effectiveDefault == null && values.length > 0) {
+            effectiveDefault = values[0];
+          }
+        }
+
+        return {
+          name,
+          type,
+          label: label || formatParamName(name),
+          defaultValue: effectiveDefault,
+          height: height,
+          values,
+        };
+      }
+
+      function formatParamName(param) {
+        return param
+          .replace(/[_-]+/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+
+      function renderTemplateForm(file, params) {
+        const wrap = document.createElement("div");
+
+        const header = document.createElement("div");
+        header.className = "template-header";
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "template-title-row";
+
+        const title = document.createElement("h1");
+        title.className = "template-title";
+        title.textContent = file.name;
+
+        const docBtn = document.createElement("button");
+        docBtn.type = "button";
+        docBtn.className = "doc-btn";
+        docBtn.id = "docBtn";
+        docBtn.title = "Examples";
+        docBtn.innerHTML = "📖 <span>Docs</span>";
+
+        titleRow.appendChild(title);
+        titleRow.appendChild(docBtn);
+
+        header.appendChild(titleRow);
+        wrap.appendChild(header);
+
+        const form = document.createElement("form");
+        form.id = "promptForm";
+
+        if (params.length === 0) {
+          const grp = document.createElement("div");
+          grp.className = "form-group";
+          const p = document.createElement("p");
+          p.textContent =
+            "This template has no parameters. The content will be used as-is.";
+          grp.appendChild(p);
+          form.appendChild(grp);
+        } else {
+          for (const p of params) {
+            const grp = document.createElement("div");
+            grp.className = "form-group";
+
+            const labelEl = document.createElement("label");
+            labelEl.textContent = p.label + " ";
+
+            const code = document.createElement("span");
+            code.className = "param-name";
+            code.textContent = `{{${p.name}}}`;
+
+            labelEl.appendChild(code);
+
+            let field;
+
+            if (p.type === "text") {
+              field = document.createElement("input");
+              field.type = "text";
+              field.name = p.name;
+              field.placeholder = `Enter ${p.label.toLowerCase()}...`;
+              field.value = p.defaultValue ?? "";
+            } else if (p.type === "number") {
+              field = document.createElement("input");
+              field.type = "number";
+              field.name = p.name;
+              field.placeholder = `Enter ${p.label.toLowerCase()}...`;
+              field.value = p.defaultValue ?? "";
+            } else if (p.type === "checkbox") {
+              const row = document.createElement("div");
+              row.className = "checkbox-row";
+
+              const left = document.createElement("div");
+              left.className = "checkbox-left";
+
+              field = document.createElement("input");
+              field.type = "checkbox";
+              field.name = p.name;
+              field.checked = normalizeBool(p.defaultValue);
+
+              const pill = document.createElement("span");
+              pill.className = "checkbox-value";
+              pill.textContent = field.checked ? "true" : "false";
+
+              field.addEventListener("change", () => {
+                pill.textContent = field.checked ? "true" : "false";
+              });
+
+              left.appendChild(field);
+
+              row.appendChild(left);
+              row.appendChild(pill);
+
+              grp.appendChild(labelEl);
+              grp.appendChild(row);
+              form.appendChild(grp);
+              continue;
+            } else if (p.type === "select") {
+              field = document.createElement("select");
+              field.name = p.name;
+
+              const values = Array.isArray(p.values) ? p.values : [];
+              for (const v of values) {
+                const opt = document.createElement("option");
+                opt.value = v;
+                opt.textContent = v;
+                field.appendChild(opt);
+              }
+
+              const def = p.defaultValue;
+              if (def != null && values.includes(def)) {
+                field.value = def;
+              } else if (values.length > 0) {
+                field.value = values[0];
+              }
+            } else if (p.type === "radio") {
+              const box = document.createElement("div");
+              box.className = "radio-group";
+
+              const values = Array.isArray(p.values) ? p.values : [];
+              const def = p.defaultValue != null ? p.defaultValue : values[0];
+
+              for (const v of values) {
+                const item = document.createElement("label");
+                item.className = "radio-item";
+
+                const input = document.createElement("input");
+                input.type = "radio";
+                input.name = p.name;
+                input.value = v;
+                input.checked = v === def;
+
+                const txt = document.createElement("div");
+                txt.className = "radio-label";
+                txt.textContent = v;
+
+                item.appendChild(input);
+                item.appendChild(txt);
+                box.appendChild(item);
+              }
+
+              grp.appendChild(labelEl);
+              grp.appendChild(box);
+              form.appendChild(grp);
+              continue;
+            } else {
+              // textarea default
+              field = document.createElement("textarea");
+              field.name = p.name;
+              field.placeholder = `Enter ${p.label.toLowerCase()}...`;
+              
+              // Apply height if specified
+              if (p.height != null && p.height > 0) {
+                field.rows = p.height;
+              } else {
+                field.rows = 4;
+              }
+              
+              field.value = p.defaultValue ?? "";
+            }
+
+            grp.appendChild(labelEl);
+            grp.appendChild(field);
+            form.appendChild(grp);
+          }
+        }
+
+        const buttons = document.createElement("div");
+        buttons.className = "button-group";
+
+        const generateBtn = document.createElement("button");
+        generateBtn.type = "button";
+        generateBtn.className = "btn-copy";
+        generateBtn.id = "generateBtn";
+        generateBtn.textContent = "📋 Generate & Copy";
+
+        const previewBtn = document.createElement("button");
+        previewBtn.type = "button";
+        previewBtn.className = "btn-secondary";
+        previewBtn.id = "previewBtn";
+        previewBtn.textContent = "👁️ Preview";
+
+        const clearBtn = document.createElement("button");
+        clearBtn.type = "button";
+        clearBtn.className = "btn-secondary";
+        clearBtn.id = "clearBtn";
+        clearBtn.textContent = "🗑️ Clear";
+
+        buttons.appendChild(generateBtn);
+        buttons.appendChild(previewBtn);
+        buttons.appendChild(clearBtn);
+
+        form.appendChild(buttons);
+
+        const hint = document.createElement("div");
+        hint.className = "keyboard-hint";
+        hint.style.textAlign = "center";
+        hint.style.marginTop = "10px";
+        hint.textContent = "Ctrl+Enter to generate, Esc to clear";
+
+        wrap.appendChild(form);
+        wrap.appendChild(hint);
+
+        const preview = document.createElement("div");
+        preview.className = "preview";
+        preview.id = "preview";
+
+        const h3 = document.createElement("h3");
+        h3.textContent = "Preview";
+
+        const previewContent = document.createElement("div");
+        previewContent.className = "preview-content";
+        previewContent.id = "previewContent";
+        previewContent.textContent = file.content;
+
+        preview.appendChild(h3);
+        preview.appendChild(previewContent);
+
+        wrap.appendChild(preview);
+
+        DOM.mainContent.innerHTML = "";
+        DOM.mainContent.appendChild(wrap);
+
+        const hadSavedValues = loadFormValues(file.path, params, form);
+        
+        if (!hadSavedValues) {
+          applyDefaults(form, params);
+        }
+
+        setupAutoSave(file.path, params, form);
+
+        generateBtn.addEventListener("click", generateAndCopy);
+        previewBtn.addEventListener("click", previewPrompt);
+        clearBtn.addEventListener("click", clearForm);
+        docBtn.addEventListener("click", openDocsModal);
+      }
+
+      function readReplacementsFromForm(form, params) {
+        const replacements = new Map();
+
+        for (const p of params) {
+          if (!p?.name) continue;
+
+          const el = form.elements.namedItem(p.name);
+          if (!el) continue;
+
+          if (p.type === "checkbox") {
+            replacements.set(p.name, el.checked ? "true" : "false");
+            continue;
+          }
+
+          if (p.type === "radio") {
+            const v = el.value ?? "";
+            replacements.set(p.name, v);
+            continue;
+          }
+
+          replacements.set(p.name, el.value ?? "");
+        }
+
+        return replacements;
+      }
+
+      function buildPrompt() {
+        if (!State.currentFile) return null;
+
+        const form = document.getElementById("promptForm");
+        if (!form) return null;
+
+        const params = Array.isArray(State.currentParams)
+          ? State.currentParams
+          : [];
+        const replacements = readReplacementsFromForm(form, params);
+
+        const template = State.currentFile.content;
+        let out = "";
+        let i = 0;
+
+        while (i < template.length) {
+          const start = template.indexOf("{{", i);
+          if (start === -1) {
+            out += template.slice(i);
+            break;
+          }
+
+          out += template.slice(i, start);
+
+          const end = template.indexOf("}}", start + 2);
+          if (end === -1) {
+            out += template.slice(start);
+            break;
+          }
+
+          const inner = template.slice(start + 2, end);
+          const parsed = parsePlaceholderInner(inner);
+
+          if (parsed?.name && replacements.has(parsed.name)) {
+            out += replacements.get(parsed.name) || "";
+          } else {
+            out += template.slice(start, end + 2);
+          }
+
+          i = end + 2;
+        }
+
+        return out.replace(/\n\s*\n\s*\n/g, "\n\n").trim();
+      }
+
+      async function generateAndCopy() {
+        const prompt = buildPrompt();
+        if (prompt == null) {
+          showError("Failed to generate prompt");
+          return;
+        }
+
+        const ok = await copyToClipboard(prompt);
+        if (ok) {
+          showNotification("✓ Copied to clipboard!");
+          previewPrompt();
+        } else {
+          showNotification("❌ Failed to copy", "error");
+        }
+      }
+
+      function previewPrompt() {
+        const prompt = buildPrompt();
+        if (prompt == null) return;
+        const div = document.getElementById("previewContent");
+        if (div) div.textContent = prompt;
+      }
+
+      function applyDefaults(form, params) {
+        for (const p of params) {
+          const el = form.elements.namedItem(p.name);
+          if (!el) continue;
+
+          if (p.type === "checkbox") {
+            el.checked = normalizeBool(p.defaultValue);
+            continue;
+          }
+
+          if (p.type === "radio") {
+            const values = Array.isArray(p.values) ? p.values : [];
+            const def =
+              p.defaultValue != null ? p.defaultValue : (values[0] ?? "");
+            el.value = def;
+            continue;
+          }
+
+          if (p.type === "select") {
+            const values = Array.isArray(p.values) ? p.values : [];
+            const def =
+              p.defaultValue != null ? p.defaultValue : (values[0] ?? "");
+            el.value = def;
+            continue;
+          }
+
+          el.value = p.defaultValue ?? "";
+        }
+
+        form.querySelectorAll(".checkbox-row").forEach((row) => {
+          const cb = row.querySelector('input[type="checkbox"]');
+          const pill = row.querySelector(".checkbox-value");
+          if (cb && pill) pill.textContent = cb.checked ? "true" : "false";
+        });
+      }
+
+      function clearForm() {
+        const form = document.getElementById("promptForm");
+        if (!form) return;
+
+        form.reset();
+
+        if (State.currentFile?.content) {
+          const params = extractPlaceholders(State.currentFile.content);
+          State.currentParams = params;
+          applyDefaults(form, params);
+          
+          if (State.currentFile?.path) {
+            saveFormValues(State.currentFile.path, params, form);
+          }
+        }
+
+        const div = document.getElementById("previewContent");
+        if (div)
+          div.textContent = State.currentFile ? State.currentFile.content : "";
+      }
+
+      // ==================== SEARCH ====================
+      function addSearchBox() {
+        if (document.getElementById("templateSearch")) return;
+
+        const wrap = document.createElement("div");
+        wrap.className = "search-box";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.id = "templateSearch";
+        input.placeholder = "🔍 Search templates...";
+
+        wrap.appendChild(input);
+        DOM.searchContainer.innerHTML = "";
+        DOM.searchContainer.appendChild(wrap);
+
+        input.addEventListener("input", (e) => {
+          const q = (e.target.value || "").toLowerCase();
+          State.searchQuery = q;
+
+          if (State.searchTimer) clearTimeout(State.searchTimer);
+          State.searchTimer = setTimeout(() => filterFiles(q), 120);
+        });
+      }
+
+      function filterFiles(query) {
+        const fileItems = DOM.fileBrowser.querySelectorAll(".file-item");
+        const folderItems = DOM.fileBrowser.querySelectorAll(".folder-item");
+        const folderChildren =
+          DOM.fileBrowser.querySelectorAll(".folder-children");
+
+        if (!query) {
+          fileItems.forEach((i) => (i.style.display = "flex"));
+          folderItems.forEach((f) => (f.style.display = "block"));
+          folderChildren.forEach((c) => (c.style.display = "none"));
+          DOM.fileBrowser
+            .querySelectorAll(".folder-name .toggle")
+            .forEach((t) => (t.textContent = "📁"));
+          return;
+        }
+
+        folderItems.forEach((f) => (f.style.display = "none"));
+        folderChildren.forEach((c) => (c.style.display = "none"));
+
+        fileItems.forEach((item) => {
+          const nameEl = item.querySelector(".name");
+          const name = (nameEl?.textContent || "").toLowerCase();
+          const ok = name.includes(query);
+          item.style.display = ok ? "flex" : "none";
+
+          if (ok) {
+            let parentChildren = item.closest(".folder-children");
+            while (parentChildren) {
+              parentChildren.style.display = "block";
+              const parentFolderItem = parentChildren.closest(".folder-item");
+              if (parentFolderItem) parentFolderItem.style.display = "block";
+
+              const folderName = parentFolderItem?.querySelector(
+                ":scope > .folder-name",
+              );
+              const toggle = folderName?.querySelector(".toggle");
+              if (toggle) toggle.textContent = "📂";
+
+              parentChildren =
+                parentFolderItem?.parentElement?.closest(".folder-children");
+            }
+          }
+        });
+
+        folderItems.forEach((folderItem) => {
+          const anyVisible = Array.from(
+            folderItem.querySelectorAll(".file-item"),
+          ).some((f) => f.style.display !== "none");
+          if (anyVisible) folderItem.style.display = "block";
+        });
+      }
+
+      // ==================== START ====================
+      function extractParameters(content) {
+        return extractPlaceholders(content);
+      }
+
+      init();
+    </script>
+  </body>
+</html>
