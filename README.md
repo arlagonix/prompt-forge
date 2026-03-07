@@ -10,6 +10,9 @@ Use the .html file with the latest version.
 
 The code and documentation are AI-generated. 
 
+Why are there such strange versions? 15, 21, 24, where are the others?  
+24 is the latest, I was too lazy to go and find the previous 20 or so versions.
+
 ## UI
 
 <img width="1854" height="1264" alt="image" src="https://github.com/user-attachments/assets/1b8f7d7c-0451-4818-b6a7-f8d9b72eacba" />
