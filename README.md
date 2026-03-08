@@ -11,7 +11,7 @@ Use the .html file with the latest version.
 The code and documentation are AI-generated. 
 
 Why are there such strange versions? 15, 21, 24, where are the others?  
-24 is the latest, I was too lazy to go and find the previous 20 or so versions.
+I was too lazy to go and find the previous 20 or so versions.
 
 ## UI
 
