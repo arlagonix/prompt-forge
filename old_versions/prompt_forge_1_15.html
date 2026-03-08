@@ -1,0 +1,1257 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Prompt Forge</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 256 256%22><text y=%22203%22 font-size=%22224%22>🤖</text></svg>"
+    />
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #2c2c2c 0%, #1a1a1a 100%);
+            color: #333;
+            line-height: 1.6;
+            padding: 16px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1440px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 480px 1fr;
+            gap: 16px;
+            height: calc(100vh - 32px);
+        }
+        
+        /* Sidebar */
+        .sidebar {
+            background: #FEFEFE;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            height: 100%;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+        
+        .sidebar::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+        
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-header h2 {
+            color: #1a1a1a;
+            font-size: 1.3rem;
+            font-weight: 700;
+        }
+
+        .header-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn {
+            padding: 14px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%);
+            color: white;
+            width: 100%;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+            background: linear-gradient(135deg, #333 0%, #1a1a1a 100%);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            color: #333;
+            padding: 14px 24px;
+            font-weight: 700;
+            cursor: pointer;
+            border: 2px solid #333;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+        }
+        
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-icon {
+            padding: 10px 12px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        .btn-icon:hover {
+            background: #333;
+            border-color: #333;
+            color: white;
+        }
+        
+        .folder-structure {
+            flex: 1;
+            overflow-y: auto;
+            scrollbar-width: none; /* Firefox */
+            -ms-overflow-style: none; /* IE and Edge */
+        }
+        
+        .folder-structure::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+        
+        .folder-item {
+            margin-bottom: 8px;
+        }
+        
+        .folder-name {
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 2px solid #e0e0e0;
+            cursor: pointer;
+            font-size: 0.9rem;
+            user-select: none;
+        }
+        
+        .folder-name:hover {
+            border-color: #333;
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+        }
+        
+        .folder-name .toggle {
+            cursor: pointer;
+            user-select: none;
+            font-size: 1rem;
+        }
+        
+        .folder-children {
+            margin-left: 15px;
+            padding-left: 10px;
+            border-left: 2px solid #e0e0e0;
+        }
+        
+        .file-item {
+            padding: 6px 12px;
+            margin: 3px 0;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            border: 2px solid transparent;
+            font-size: 0.85rem;
+            user-select: none;
+        }
+        
+        .file-item:hover {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+            border-color: #333;
+        }
+        
+        .file-item.active {
+            background: #2c2c2c;
+            color: white;
+            font-weight: 600;
+            border-color: #333;
+        }
+        
+        .file-item .emoji {
+            font-size: 1rem;
+        }
+        
+        .file-item .name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px 20px;
+            color: #666;
+            font-size: 1.1rem;
+        }
+        
+        .error {
+            color: #1a1a1a;
+            padding: 15px 20px;
+            background: #f0f0f0;
+            border-radius: 8px;
+            margin: 15px 0;
+            border: 2px solid #666;
+            font-weight: 500;
+        }
+        
+        /* Main content */
+        .main {
+            background: #FEFEFE;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            height: 100%;
+            overflow-y: auto;
+        }
+        
+        .template-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #e0e0e0;
+        }
+        
+        .template-title {
+            font-size: 2rem;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        
+        .template-path {
+            color: #666;
+            font-size: 0.95rem;
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 6px;
+            display: inline-block;
+            margin-top: 5px;
+        }
+        
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 12px;
+            font-weight: 600;
+            color: #1a1a1a;
+            font-size: 1.05rem;
+        }
+        
+        .form-group label .param-name {
+            background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #333;
+            border: 2px solid #333;
+            font-weight: 700;
+            margin-left: 8px;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 15px 18px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 15px;
+            resize: vertical;
+            min-height: 120px;
+            line-height: 1.6;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #333;
+            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-copy {
+            background: #2c2c2c;
+            color: white;
+            padding: 16px 32px;
+            border: none;
+            border-radius: 8px;
+            font-size: 17px;
+            font-weight: 700;
+            cursor: pointer;
+            flex: 1;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+        
+        
+        .preview {
+            margin-top: 35px;
+            border-top: 3px solid #e0e0e0;
+            padding-top: 25px;
+        }
+        
+        .preview h3 {
+            margin-bottom: 15px;
+            color: #1a1a1a;
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        
+        .preview-content {
+            background: #2c2c2c;
+            color: #e0e0e0;
+            padding: 25px;
+            border-radius: 10px;
+            border: 2px solid #333;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            /* max-height: 500px; */
+            overflow-y: auto;
+            font-size: 14px;
+            line-height: 1.8;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+        
+        .copy-notification {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%);
+            color: white;
+            padding: 18px 30px;
+            border-radius: 10px;
+            box-shadow: 0 6px 25px rgba(0,0,0,0.4);
+            z-index: 1000;
+            font-weight: 600;
+            font-size: 16px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 80px 30px;
+            color: #666;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.8rem;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        
+        .empty-state p {
+            font-size: 1.1rem;
+            color: #999;
+        }
+        
+        .param-hint {
+            font-size: 0.9rem;
+            color: #666;
+            margin-top: 8px;
+            padding-left: 5px;
+        }
+        
+        .badge {
+            background: #e0e0e0;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .refresh-btn {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        
+        .refresh-btn:hover {
+            background: #e0e0e0;
+        }
+
+        /* Scrollbar styling for main content only */
+        .main::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        .main::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+
+        .main::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%);
+            border-radius: 10px;
+        }
+
+        .main::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, #333 0%, #1a1a1a 100%);
+        }
+
+        .preview-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .preview-content::-webkit-scrollbar-track {
+            background: #2a2a2a;
+            border-radius: 10px;
+        }
+
+        .preview-content::-webkit-scrollbar-thumb {
+            background: #666;
+            border-radius: 10px;
+        }
+
+        /* New styles for enhanced features */
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #333;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 15px;
+        }
+        
+        .search-box {
+            margin-bottom: 20px;
+            flex-shrink: 0;
+        }
+        
+        .search-box input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .search-box input:focus {
+            outline: none;
+            border-color: #333;
+            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .keyboard-hint {
+            font-size: 0.75rem;
+            color: #999;
+            margin-top: 5px;
+            font-style: italic;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            
+            .sidebar {
+                max-height: 400px;
+            }
+            
+            .main {
+                height: auto;
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Sidebar with file browser -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>🤖 Prompt Forge</h2>
+                <div class="header-buttons">
+                  <button class="btn-icon" id="refreshBtn" title="Refresh (Ctrl+R)">
+                    🔄
+                  </button>
+                  <button class="btn-icon" id="selectFolderBtn" title="Choose Folder (Ctrl+O)">
+                      📂
+                  </button>
+                </div>
+            </div>
+            
+            <div id="searchContainer"></div>
+            
+            <div id="fileBrowser" class="folder-structure">
+                <div class="empty-state">
+                    <p>Press 📂 to select a folder</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main content area -->
+        <div class="main" id="mainContent">
+            <div class="empty-state">
+                <h3>👈 Select a template to start</h3>
+                <p>Choose a markdown template from the sidebar</p>
+                <div class="keyboard-hint">
+                    Shortcuts: Ctrl+O (Open), Ctrl+Enter (Generate), Esc (Clear)
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // ==================== STATE MANAGEMENT ====================
+        const State = {
+            currentFolderHandle: null,
+            currentFolderPath: '',
+            folderStructure: null,
+            currentFile: null,
+            fileMap: new Map(),
+            fileIdCounter: 0,
+            activeNotification: null,
+            loadingAbortController: null
+        };
+        
+        // ==================== DOM REFERENCES ====================
+        const DOM = {
+            fileBrowser: document.getElementById('fileBrowser'),
+            mainContent: document.getElementById('mainContent'),
+            searchContainer: document.getElementById('searchContainer'),
+            selectFolderBtn: document.getElementById('selectFolderBtn'),
+            refreshBtn: document.getElementById('refreshBtn')
+        };
+        
+        // ==================== INITIALIZATION ====================
+        function init() {
+            if (!('showDirectoryPicker' in window)) {
+                showError('File System Access API is not supported. Use Chrome, Edge, or Opera.');
+                return;
+            }
+            
+            setupEventListeners();
+        }
+        
+        function setupEventListeners() {
+            DOM.selectFolderBtn.addEventListener('click', selectFolder);
+            DOM.refreshBtn.addEventListener('click', refreshCurrentFolder);
+            
+            // Event delegation for file browser
+            DOM.fileBrowser.addEventListener('click', handleFileBrowserClick);
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', handleKeyboardShortcuts);
+        }
+        
+        function handleFileBrowserClick(e) {
+            const fileItem = e.target.closest('.file-item');
+            if (fileItem) {
+                const fileId = parseInt(fileItem.dataset.fileId);
+                loadFile(fileId);
+                return;
+            }
+            
+            const folderName = e.target.closest('.folder-name');
+            if (folderName) {
+                e.stopPropagation();
+                const path = folderName.dataset.path;
+                toggleFolder(path);
+            }
+        }
+        
+        function handleKeyboardShortcuts(e) {
+            // Ctrl/Cmd + O - Open folder
+            if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
+                e.preventDefault();
+                selectFolder();
+            }
+            
+            // Ctrl/Cmd + Enter - Generate and copy
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                if (State.currentFile) {
+                    generateAndCopy();
+                }
+            }
+            
+            // Escape - Clear form
+            if (e.key === 'Escape') {
+                const form = document.getElementById('promptForm');
+                if (form) {
+                    clearForm();
+                }
+            }
+            
+            // Ctrl/Cmd + R - Refresh (in file browser)
+            if ((e.ctrlKey || e.metaKey) && e.key === 'r' && State.currentFolderHandle) {
+                e.preventDefault();
+                refreshCurrentFolder();
+            }
+        }
+        
+        // ==================== FOLDER OPERATIONS ====================
+        async function selectFolder() {
+            try {
+                // Abort previous loading
+                if (State.loadingAbortController) {
+                    State.loadingAbortController.abort();
+                }
+                
+                State.loadingAbortController = new AbortController();
+                
+                State.currentFolderHandle = await window.showDirectoryPicker();
+                State.currentFolderPath = State.currentFolderHandle.name;
+                
+                await loadFolderStructure(State.currentFolderHandle, State.loadingAbortController.signal);
+                
+                addSearchBox();
+                
+                State.loadingAbortController = null;
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error('Folder selection error:', err);
+                
+                let message = 'Failed to select folder';
+                if (err.name === 'NotAllowedError') {
+                    message = 'Permission denied. Please grant folder access.';
+                } else if (err.message) {
+                    message += ': ' + err.message;
+                }
+                showError(message);
+            }
+        }
+        
+        async function loadFolderStructure(dirHandle, signal) {
+            if (signal?.aborted) return;
+            
+            DOM.fileBrowser.innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Loading templates...</p>
+                </div>
+            `;
+            
+            try {
+                const structure = {
+                    name: dirHandle.name,
+                    handle: dirHandle,
+                    path: '/' + dirHandle.name,
+                    type: 'directory',
+                    children: [],
+                    loaded: false,
+                    level: 0
+                };
+                
+                await readDirectoryRecursive(dirHandle, structure.children, '', signal, 0);
+                
+                if (signal?.aborted) return;
+                
+                structure.loaded = true;
+                State.folderStructure = structure;
+                renderFileBrowser(structure);
+                
+            } catch (err) {
+                console.error('Folder loading error:', err);
+                showError('Error loading folder: ' + err.message);
+                DOM.fileBrowser.innerHTML = '<div class="error">Failed to load folder</div>';
+            }
+        }
+        
+        async function readDirectoryRecursive(dirHandle, childrenArray, currentPath, signal, level) {
+            if (signal?.aborted) return;
+            
+            const directories = [];
+            const files = [];
+            
+            for await (const entry of dirHandle.values()) {
+                if (signal?.aborted) return;
+                
+                if (entry.kind === 'directory') {
+                    const dir = {
+                        name: entry.name,
+                        handle: entry,
+                        path: currentPath + '/' + entry.name,
+                        type: 'directory',
+                        children: [],
+                        loaded: true,
+                        level: level + 1
+                    };
+                    
+                    // Recursively read subdirectories
+                    await readDirectoryRecursive(entry, dir.children, dir.path, signal, level + 1);
+                    
+                    // Only add directory if it contains .md files (directly or in subdirectories)
+                    if (hasMarkdownFiles(dir)) {
+                        directories.push(dir);
+                    }
+                } else if (entry.name.endsWith('.md') || entry.name.endsWith('.markdown')) {
+                    const fileId = State.fileIdCounter++;
+                    const fileData = {
+                        id: fileId,
+                        name: entry.name,
+                        handle: entry,
+                        path: currentPath + '/' + entry.name,
+                        type: 'file',
+                        content: null,
+                        modified: null
+                    };
+                    
+                    State.fileMap.set(fileId, fileData);
+                    files.push(fileData);
+                }
+            }
+            
+            // Sort
+            directories.sort((a, b) => a.name.localeCompare(b.name));
+            files.sort((a, b) => a.name.localeCompare(b.name));
+            
+            // Add directories first, then files
+            childrenArray.push(...directories, ...files);
+        }
+        
+        function hasMarkdownFiles(dir) {
+            // Check if directory has any .md files directly
+            const hasDirectFiles = dir.children.some(child => child.type === 'file');
+            if (hasDirectFiles) return true;
+            
+            // Check subdirectories recursively
+            for (const child of dir.children) {
+                if (child.type === 'directory' && hasMarkdownFiles(child)) {
+                    return true;
+                }
+            }
+            
+            return false;
+        }
+        
+        async function toggleFolder(path) {
+            const folderDiv = document.getElementById(`folder-${encodeURIComponent(path)}`);
+            if (!folderDiv) return;
+            
+            const isHidden = folderDiv.style.display === 'none';
+            folderDiv.style.display = isHidden ? 'block' : 'none';
+            
+            // Update folder icon
+            const toggle = document.querySelector(`[data-path="${CSS.escape(path)}"] .toggle`);
+            if (toggle) {
+                toggle.textContent = isHidden ? '📂' : '📁';
+            }
+        }
+        
+        function findFolderByPath(structure, path) {
+            if (!structure) return null;
+            if (structure.path === path) return structure;
+            
+            for (const child of structure.children) {
+                if (child.type === 'directory') {
+                    const found = findFolderByPath(child, path);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
+        async function refreshCurrentFolder() {
+            if (State.currentFolderHandle) {
+                State.fileMap.clear();
+                State.fileIdCounter = 0;
+                await loadFolderStructure(State.currentFolderHandle);
+                
+                // Reload current file if one is selected
+                if (State.currentFile) {
+                    const currentFileName = State.currentFile.name;
+                    const currentFilePath = State.currentFile.path;
+                    
+                    // Find the file in the new structure
+                    for (const [fileId, fileData] of State.fileMap.entries()) {
+                        if (fileData.name === currentFileName && fileData.path === currentFilePath) {
+                            await loadFile(fileId);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // ==================== RENDERING ====================
+        function renderFileBrowser(structure) {
+            if (!structure) return;
+            
+            let html = '<div class="folder-structure">';
+            html += renderDirectoryChildren(structure);
+            html += '</div>';
+            DOM.fileBrowser.innerHTML = html;
+        }
+        
+        function renderDirectoryChildren(dir) {
+            let html = '';
+            
+            const sortedChildren = [...dir.children].sort((a, b) => {
+                if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+            
+            for (const child of sortedChildren) {
+                if (child.type === 'directory') {
+                    html += renderDirectory(child, 0);
+                } else {
+                    const isActive = State.currentFile?.id === child.id;
+                    html += `
+                        <div class="file-item ${isActive ? 'active' : ''}" data-file-id="${child.id}">
+                            <span class="emoji">📄</span>
+                            <span class="name">${escapeHtml(child.name)}</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            return html;
+        }
+        
+        function renderDirectory(dir, level) {
+            let html = `<div class="folder-item" style="margin-left: ${level * 15}px">`;
+            html += `<div class="folder-name" data-path="${escapeHtml(dir.path)}">`;
+            html += `<span class="toggle">📁</span>`;
+            html += `<span>${escapeHtml(dir.name)}</span>`;
+            html += `</div>`;
+            html += `<div class="folder-children" id="folder-${encodeURIComponent(dir.path)}" style="display:none;">`;
+            
+            const sortedChildren = [...dir.children].sort((a, b) => {
+                if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+            
+            for (const child of sortedChildren) {
+                if (child.type === 'directory') {
+                    html += renderDirectory(child, level + 1);
+                } else {
+                    const isActive = State.currentFile?.id === child.id;
+                    html += `
+                        <div class="file-item ${isActive ? 'active' : ''}" data-file-id="${child.id}">
+                            <span class="emoji">📄</span>
+                            <span class="name">${escapeHtml(child.name)}</span>
+                        </div>
+                    `;
+                }
+            }
+            
+            html += `</div></div>`;
+            return html;
+        }
+        
+        // ==================== FILE OPERATIONS ====================
+        async function loadFile(fileId) {
+            try {
+                // Show loading
+                DOM.mainContent.innerHTML = `
+                    <div class="loading">
+                        <div class="spinner"></div>
+                        <p>Loading template...</p>
+                    </div>
+                `;
+                
+                const file = State.fileMap.get(fileId);
+                if (!file) {
+                    throw new Error('File not found');
+                }
+                
+                // Always reload content from disk
+                const fileHandle = await file.handle.getFile();
+                file.content = await fileHandle.text();
+                file.modified = fileHandle.lastModified;
+                
+                State.currentFile = file;
+                
+                // Update active state in sidebar
+                document.querySelectorAll('.file-item').forEach(el => {
+                    el.classList.toggle('active', parseInt(el.dataset.fileId) === fileId);
+                });
+                
+                // Extract parameters and render form
+                const params = extractParameters(file.content);
+                renderTemplateForm(file, params);
+                
+            } catch (err) {
+                console.error('File loading error:', err);
+                
+                let message = 'Failed to load template';
+                if (err.name === 'NotAllowedError') {
+                    message = 'Permission denied. File may have been moved or access revoked.';
+                } else if (err.name === 'NotFoundError') {
+                    message = 'File not found. It may have been moved or deleted.';
+                } else if (err.message) {
+                    message += ': ' + err.message;
+                }
+                
+                showError(message);
+                DOM.mainContent.innerHTML = `
+                    <div class="empty-state">
+                        <h3>❌ Error Loading Template</h3>
+                        <p>${escapeHtml(message)}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function extractParameters(content) {
+            if (!content || typeof content !== 'string') {
+                return [];
+            }
+            
+            const params = [];
+            const regex = /{([a-zA-Z0-9_:]+)}/g;
+            const seen = new Set();
+            let match;
+            
+            while ((match = regex.exec(content)) !== null) {
+                const param = match[1].trim();
+                
+                if (param.includes(':')) {
+                    const [name, label] = param.split(':').map(s => s.trim());
+                    if (name && !seen.has(name)) {
+                        params.push({ name, label: label || formatParamName(name) });
+                        seen.add(name);
+                    }
+                } else if (!seen.has(param)) {
+                    params.push({ 
+                        name: param, 
+                        label: formatParamName(param)
+                    });
+                    seen.add(param);
+                }
+            }
+            
+            return params;
+        }
+        
+        function formatParamName(param) {
+            return param
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
+        }
+        
+        function renderTemplateForm(file, params) {
+            let html = `
+                <div class="template-header">
+                  <h1 class="template-title">${escapeHtml(file.name)}</h1>
+                </div>
+                <form id="promptForm">
+            `;
+            
+            if (params.length === 0) {
+                html += `
+                    <div class="form-group">
+                        <p>This template has no parameters. The content will be used as-is.</p>
+                    </div>
+                `;
+            } else {
+                params.forEach(param => {
+                    html += `
+                        <div class="form-group">
+                            <label>
+                                ${escapeHtml(param.label)} 
+                                <span class="param-name">{${escapeHtml(param.name)}}</span>
+                            </label>
+                            <textarea 
+                                name="${escapeHtml(param.name)}" 
+                                placeholder="Enter ${escapeHtml(param.label.toLowerCase())}..."
+                                rows="4"
+                            ></textarea>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += `
+                    <div class="button-group">
+                        <button type="button" class="btn-copy" id="generateBtn">
+                            📋 Generate & Copy
+                        </button>
+                        <button type="button" class="btn-secondary" id="previewBtn">
+                            👁️ Preview
+                        </button>
+                        <button type="button" class="btn-secondary" id="clearBtn">
+                            🗑️ Clear
+                        </button>
+                    </div>
+                    <div class="keyboard-hint" style="text-align:center; margin-top:10px;">
+                        Ctrl+Enter to generate, Esc to clear
+                    </div>
+                </form>
+                <div class="preview" id="preview">
+                    <h3>Preview</h3>
+                    <div class="preview-content" id="previewContent">${escapeHtml(file.content)}</div>
+                </div>
+            `;
+            
+            DOM.mainContent.innerHTML = html;
+            
+            // Add event listeners
+            document.getElementById('generateBtn').addEventListener('click', generateAndCopy);
+            document.getElementById('previewBtn').addEventListener('click', previewPrompt);
+            document.getElementById('clearBtn').addEventListener('click', clearForm);
+        }
+        
+        // ==================== PROMPT GENERATION ====================
+        function buildPrompt() {
+            if (!State.currentFile) return null;
+            
+            const form = document.getElementById('promptForm');
+            if (!form) return null;
+            
+            const formData = new FormData(form);
+            let prompt = State.currentFile.content;
+            
+            // Replace parameters
+            for (const [key, value] of formData.entries()) {
+                const regex = new RegExp(`{${escapeRegex(key)}(:[^}]*)?}`, 'g');
+                prompt = prompt.replace(regex, value || '');
+            }
+            
+            // Clean up remaining parameters
+            prompt = prompt.replace(/{[^}]+}/g, '');
+            
+            // Clean up excessive blank lines
+            prompt = prompt.replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+            
+            return prompt;
+        }
+        
+        function generateAndCopy() {
+            const prompt = buildPrompt();
+            if (!prompt) {
+                showError('Failed to generate prompt');
+                return;
+            }
+            
+            navigator.clipboard.writeText(prompt)
+                .then(() => {
+                    showNotification('✓ Copied to clipboard!');
+                    previewPrompt();
+                })
+                .catch(err => {
+                    console.error('Copy failed:', err);
+                    showNotification('❌ Failed to copy', 'error');
+                });
+        }
+        
+        function previewPrompt() {
+            const prompt = buildPrompt();
+            if (!prompt) return;
+            
+            const previewDiv = document.getElementById('previewContent');
+            if (previewDiv) {
+                previewDiv.textContent = prompt;
+            }
+        }
+        
+        function clearForm() {
+            const form = document.getElementById('promptForm');
+            if (form) {
+                form.reset();
+                // Reset preview to original template content
+                document.getElementById('previewContent').textContent = State.currentFile ? State.currentFile.content : '';
+            }
+        }
+        
+        // ==================== SEARCH ====================
+        function addSearchBox() {
+            // Only add once
+            if (document.getElementById('templateSearch')) return;
+            
+            const searchHTML = `
+                <div class="search-box">
+                    <input 
+                        type="text" 
+                        id="templateSearch" 
+                        placeholder="🔍 Search templates..." 
+                    >
+                </div>
+            `;
+            
+            DOM.searchContainer.innerHTML = searchHTML;
+            
+            document.getElementById('templateSearch').addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                filterFiles(query);
+            });
+        }
+        
+        function filterFiles(query) {
+            // If empty query, show everything
+            if (!query) {
+                document.querySelectorAll('.file-item').forEach(item => {
+                    item.style.display = 'flex';
+                });
+                document.querySelectorAll('.folder-item').forEach(folder => {
+                    folder.style.display = 'block';
+                });
+                document.querySelectorAll('.folder-children').forEach(folder => {
+                    folder.style.display = 'none';
+                });
+                return;
+            }
+            
+            // First pass: show/hide files based on search
+            const visibleFiles = new Set();
+            document.querySelectorAll('.file-item').forEach(item => {
+                const name = item.querySelector('.name').textContent.toLowerCase();
+                const shouldShow = name.includes(query);
+                item.style.display = shouldShow ? 'flex' : 'none';
+                
+                if (shouldShow) {
+                    visibleFiles.add(item);
+                }
+            });
+            
+            // Second pass: show parent folders of visible files
+            visibleFiles.forEach(fileItem => {
+                let parent = fileItem.closest('.folder-children');
+                while (parent) {
+                    parent.style.display = 'block';
+                    
+                    // Also show the folder-item that contains this folder-children
+                    const folderItem = parent.closest('.folder-item');
+                    if (folderItem) {
+                        folderItem.style.display = 'block';
+                    }
+                    
+                    parent = parent.parentElement?.closest('.folder-children');
+                }
+            });
+            
+            // Third pass: hide folders that have no visible files
+            document.querySelectorAll('.folder-item').forEach(folderItem => {
+                const folderChildren = folderItem.querySelector('.folder-children');
+                if (folderChildren) {
+                    const hasVisibleFiles = Array.from(folderChildren.querySelectorAll('.file-item'))
+                        .some(file => file.style.display !== 'none');
+                    
+                    const hasVisibleSubfolders = Array.from(folderChildren.querySelectorAll('.folder-item'))
+                        .some(folder => folder.style.display !== 'none');
+                    
+                    if (!hasVisibleFiles && !hasVisibleSubfolders) {
+                        folderItem.style.display = 'none';
+                    }
+                }
+            });
+        }
+        
+        // ==================== NOTIFICATIONS ====================
+        function showNotification(message, type = 'success') {
+            // Remove existing notification
+            if (State.activeNotification) {
+                State.activeNotification.remove();
+            }
+            
+            const notification = document.createElement('div');
+            notification.className = 'copy-notification';
+            notification.style.background = type === 'success' 
+                ? 'linear-gradient(135deg, #4a4a4a 0%, #2c2c2c 100%)' 
+                : type === 'error'
+                ? 'linear-gradient(135deg, #666 0%, #444 100%)'
+                : 'linear-gradient(135deg, #555 0%, #333 100%)';
+            notification.textContent = message;
+            
+            document.body.appendChild(notification);
+            State.activeNotification = notification;
+            
+            setTimeout(() => {
+                if (State.activeNotification === notification) {
+                    notification.remove();
+                    State.activeNotification = null;
+                }
+            }, 2000);
+        }
+        
+        function showError(message) {
+            console.error('Error:', message);
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            errorDiv.style.cssText = `
+                position: fixed;
+                top: 30px;
+                right: 30px;
+                z-index: 1000;
+                padding: 18px 24px;
+                background: #f0f0f0;
+                border: 2px solid #666;
+                border-radius: 10px;
+                box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+                font-weight: 600;
+                max-width: 400px;
+                color: #1a1a1a;
+            `;
+            
+            document.body.appendChild(errorDiv);
+            
+            setTimeout(() => {
+                errorDiv.remove();
+            }, 5000);
+        }
+        
+        // ==================== UTILITIES ====================
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+        
+        // ==================== START APPLICATION ====================
+        init();
+    </script>
+</body>
+</html>
