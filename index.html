@@ -64,7 +64,7 @@
         align-items: center;
         margin-bottom: 25px;
         padding-bottom: 20px;
-        border-bottom: 2px solid #e0e0e0;
+        border-bottom: 1px solid #e0e0e0;
         flex-shrink: 0;
       }
 
@@ -215,8 +215,6 @@
 
       .template-header {
         margin-bottom: 30px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid #e0e0e0;
       }
 
       .template-title-row {
@@ -224,6 +222,8 @@
         align-items: center;
         justify-content: space-between;
         gap: 12px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid #e0e0e0;
       }
 
       .template-title {
@@ -236,10 +236,9 @@
       .metadata-table-wrap {
         margin-top: 16px;
         overflow-x: auto;
-        border: 2px solid #cfd4da;
+        border: 2px solid #eee;
         border-radius: 8px;
         background: #fff;
-        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03);
       }
 
       .metadata-table {
@@ -280,19 +279,19 @@
       }
 
       .metadata-table tr:first-child th {
-        border-top-left-radius: 12px;
+        border-top-left-radius: 6px;
       }
 
       .metadata-table tr:first-child td {
-        border-top-right-radius: 12px;
+        border-top-right-radius: 6px;
       }
 
       .metadata-table tr:last-child th {
-        border-bottom-left-radius: 12px;
+        border-bottom-left-radius: 6px;
       }
 
       .metadata-table tr:last-child td {
-        border-bottom-right-radius: 12px;
+        border-bottom-right-radius: 6px;
       }
 
       .doc-btn {
@@ -314,6 +313,13 @@
         border-color: #333;
         background: #333;
         color: white;
+      }
+
+      .form-title {
+        margin-bottom: 20px;
+        color: #1a1a1a;
+        font-size: 1.4rem;
+        font-weight: 700;
       }
 
       .form-group {
@@ -470,8 +476,7 @@
 
       .preview {
         margin-top: 35px;
-        border-top: 3px solid #e0e0e0;
-        padding-top: 25px;
+        padding-top: 0;
       }
       .preview h3 {
         margin-bottom: 15px;
@@ -1010,11 +1015,11 @@
 
         .preview {
           margin-top: 24px;
-          border-top-width: 2px;
-          padding-top: 20px;
+          padding-top: 0;
         }
 
-        .preview h3 {
+        .preview h3,
+        .form-title {
           font-size: 1.1rem;
           margin-bottom: 12px;
         }
@@ -2741,6 +2746,11 @@
         const form = document.createElement("form");
         form.id = "promptForm";
         form.addEventListener("submit", (e) => e.preventDefault());
+
+        const formTitle = document.createElement("h3");
+        formTitle.className = "form-title";
+        formTitle.textContent = "Prompt Form";
+        form.appendChild(formTitle);
 
         if (!params.length) {
           const g = document.createElement("div");
