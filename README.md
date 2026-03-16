@@ -22,59 +22,77 @@ I was too lazy to go and find the previous 20 or so versions.
 
 ## Short description
 
-Prompt Forge is a browser-based tool for working with local Markdown prompt templates. It lets you open a folder of `.md` files, browse templates in a sidebar, detect placeholders like `{{name}}`, generate a form for filling those placeholders, preview the final rendered prompt, and copy it to the clipboard. It also includes recent files, autosave of entered values, template search, and a quick-open command palette.
+Prompt Forge is a local-first browser app for filling Markdown prompt templates with structured inputs. It opens a folder of `.md` or `.markdown` files, detects placeholders such as `{{task}}` or `{{tone | type=select | value=Formal}}`, builds a form automatically, previews the rendered result, and copies the final prompt to the clipboard. It also supports autosave, recent files, quick file search, folder restore, last-file restore, mobile-friendly UI, and installable PWA behavior.
 
 ---
 
 ## Overview
 
-Prompt Forge is a single-page web application that runs entirely in the browser. It uses the File System Access API to read template files from a user-selected local folder.
+Prompt Forge is a single-page web app that runs entirely in the browser. It uses the File System Access API to read local template files, `localStorage` to persist recent files and form values, and IndexedDB to remember the last selected folder handle. The current version shown in the UI and manifest is `v1.27`.
 
-Main features:
+Main capabilities:
 
-- open a local folder with Markdown templates
-- browse templates in a folder tree
-- parse placeholders from template text
-- automatically generate form controls from placeholder metadata
-- preview the rendered prompt
-- copy the generated prompt to the clipboard
-- save entered values in `localStorage`
-- remember recently opened files
+- open a local folder containing Markdown templates
+- browse templates in a collapsible folder tree
 - search templates in the sidebar
 - open templates quickly through a command palette
-- use keyboard shortcuts for common actions
+- parse placeholder definitions from template text
+- generate form controls from placeholder metadata
+- preview the rendered prompt
+- copy the rendered prompt to the clipboard
+- autosave entered values per template
+- remember recent files
+- restore the last opened file after reloading
+- restore the previously selected folder when permission is still available
+- work on desktop and mobile layouts
+- install as a Progressive Web App
 
 ---
 
 ## How it works
 
-The application has three main layers:
+The app has four main parts.
 
 ### 1. UI layer
-The HTML defines the app structure:
+The HTML defines:
 
 - sidebar
 - main content area
 - command palette
 - documentation modal
+- install button
 
 The CSS provides:
 
-- responsive layout
-- component styling for form controls, modals, buttons, and preview area
+- two-column desktop layout
+- responsive mobile layout
+- collapsible mobile sidebar
+- styled controls, buttons, modals, notifications, and preview panel
 
 ### 2. State layer
-A global `State` object stores runtime data such as:
+A global `State` object stores runtime values such as:
 
 - current folder handle
 - folder tree
-- selected file
+- current file
+- file map
 - parsed parameters
-- notification state
-- search state
+- active notification
+- search query and debounce timer
+- preview debounce timer
+- IndexedDB connection
+- current abort controller for folder loading
 
-### 3. Template processing layer
-JavaScript reads Markdown templates, extracts placeholders, builds input controls dynamically, replaces placeholders with user-provided values, and produces the final prompt.
+### 3. Persistence layer
+The app stores different kinds of data in different places:
+
+- `localStorage` for recent files
+- `localStorage` for form values per template
+- `localStorage` for the last opened file
+- IndexedDB for the selected folder handle
+
+### 4. Template processing layer
+JavaScript reads the selected Markdown file, extracts placeholders, builds the matching form fields, collects entered values, replaces placeholders in the template, and renders the final prompt.
 
 ---
 
@@ -83,13 +101,15 @@ JavaScript reads Markdown templates, extracts placeholders, builds input control
 ### Sidebar
 The left panel contains:
 
-- app title
+- app title and version
 - refresh button
 - folder picker button
-- search area
-- file/folder tree of templates
+- sidebar toggle button on mobile
+- install button when PWA installation is available
+- search box
+- file and folder tree
 
-The sidebar is used to browse and select Markdown templates.
+The sidebar is used to browse and select templates.
 
 ### Main content area
 The right panel shows either:
@@ -106,7 +126,8 @@ For a loaded template it displays:
   - Generate & Copy
   - Preview
   - Clear
-- preview of the generated prompt
+- keyboard shortcut hint
+- live preview panel
 
 ### Command palette
 A quick-open overlay for finding templates faster.
@@ -114,18 +135,22 @@ A quick-open overlay for finding templates faster.
 Features:
 
 - opens with `Ctrl+K`
-- shows recent files when search is empty
+- shows recent files when the search field is empty
 - filters templates by file name
 - supports keyboard navigation with arrow keys and Enter
+- closes with `Esc`, backdrop click, or `Ctrl+K`
 
 ### Documentation modal
-A built-in help dialog showing example placeholder syntax and supported options.
+A built-in help dialog that shows example placeholder syntax for all supported field types.
+
+### Notifications and errors
+The app shows temporary toast-style notifications for successful actions and temporary popups for errors.
 
 ---
 
-## Template syntax
+## Supported template syntax
 
-Templates use placeholders wrapped in double curly braces:
+Templates use placeholders wrapped in double curly braces.
 
 ```txt
 {{name}}
@@ -135,7 +160,7 @@ Templates use placeholders wrapped in double curly braces:
 {{color | type=select | value=Red | value=Green | default=Green}}
 ```
 
-Each placeholder defines one input field in the generated form.
+Each placeholder becomes one input field in the generated form.
 
 ---
 
@@ -144,18 +169,22 @@ Each placeholder defines one input field in the generated form.
 ### `name`
 The parameter identifier.
 
-Example:
-
 ```txt
 {{message}}
 ```
 
+Valid names match:
+
+```txt
+[a-zA-Z0-9_-]+
+```
+
 ### `type`
-Specifies what kind of input control should be rendered.
+Controls which form field is created.
 
 Supported values:
 
-- `textarea` (default)
+- `textarea`
 - `text`
 - `number`
 - `checkbox`
@@ -169,24 +198,20 @@ Example:
 ```
 
 ### `label`
-Custom label shown in the form.
-
-Example:
+Overrides the human-readable field label.
 
 ```txt
 {{title | type=text | label=Prompt title}}
 ```
 
 ### `default`
-Default value for the field.
-
-Example:
+Sets the default value.
 
 ```txt
 {{message | default=Hello}}
 ```
 
-Multiline defaults are supported for textareas:
+Multiline defaults are supported:
 
 ```txt
 {{bio | type=textarea | default=Line 1
@@ -195,18 +220,14 @@ Line 3}}
 ```
 
 ### `height`
-Used only for textarea fields. Controls the number of rows.
-
-Example:
+Applies to textareas and controls the number of visible rows.
 
 ```txt
 {{description | type=textarea | height=10}}
 ```
 
 ### `value`
-Defines options for `select` and `radio`.
-
-Example:
+Defines available options for `select` and `radio` fields.
 
 ```txt
 {{color | type=select | value=Red | value=Green | value=Blue}}
@@ -217,9 +238,7 @@ Example:
 ## Supported input types
 
 ### Textarea
-Default type when `type` is not specified.
-
-Example:
+Default type when `type` is omitted.
 
 ```txt
 {{bio}}
@@ -244,10 +263,7 @@ Example:
 {{agree | type=checkbox | default=true}}
 ```
 
-Checkbox values are inserted into the final prompt as:
-
-- `true`
-- `false`
+Checkbox values are inserted into the rendered prompt as `true` or `false`.
 
 ### Select
 
@@ -281,7 +297,7 @@ Include examples:
 {{examples | type=checkbox | default=true}}
 ```
 
-This template generates:
+This produces:
 
 - a textarea for `task`
 - a text input for `audience`
@@ -295,62 +311,70 @@ This template generates:
 ### 1. Initialization
 The `init()` function:
 
-- checks whether `showDirectoryPicker` is supported
-- attaches event listeners
-- enables keyboard shortcuts
-- initializes modal and command palette behavior
+- checks File System Access API support
+- opens IndexedDB
+- tries to restore the previously saved folder handle
+- requests permission to that folder if needed
+- restores the last opened file when possible
+- attaches global event listeners
+- sets up keyboard shortcuts, modal behavior, palette behavior, install behavior, and mobile sidebar behavior
 
 ### 2. Folder selection
 The `selectFolder()` function:
 
-- opens the native folder picker
-- stores the selected folder handle
-- loads the folder structure recursively
-- renders the sidebar browser
-- adds the search input
+- opens the native directory picker
+- saves the selected folder handle
+- clears the previously remembered last file
+- scans the folder recursively
+- renders the sidebar tree
+- adds the search box
 
 ### 3. Folder scanning
 The `readDirectoryRecursive()` function:
 
-- traverses the selected folder and subfolders
+- traverses subfolders recursively
 - keeps only `.md` and `.markdown` files
-- builds a hierarchical folder tree
+- discards empty directories from the rendered tree
+- builds the tree used by the sidebar
 - stores file metadata in `State.fileMap`
 
 ### 4. File loading
 The `loadFile(fileId)` function:
 
-- reads file content
-- stores it in state
-- highlights the active file in the sidebar
-- parses placeholders
-- renders a form based on extracted parameters
+- reads file content from the selected handle
+- stores file metadata in state
+- updates recent files
+- optionally saves the file as the last opened one
+- highlights and reveals the active file in the sidebar
+- extracts placeholders
+- renders the form and preview
 
 ### 5. Form generation
 The `renderTemplateForm(file, params)` function:
 
-- creates inputs dynamically from placeholder definitions
-- restores saved values from local storage if available
+- creates input controls dynamically from placeholder definitions
+- restores saved values when available
 - otherwise applies defaults
-- connects buttons for generate, preview, clear, and docs
+- enables autosave
+- enables auto-preview with debounce
+- wires buttons for generate, preview, clear, and docs
 
 ### 6. Prompt generation
 The `buildPrompt()` function:
 
 - reads current values from the form
-- scans the template again
-- replaces placeholders with entered values
-- removes excessive empty lines
-- returns the final prompt string
+- scans the template content again
+- replaces placeholders with current values
+- keeps unknown or invalid placeholders unchanged
+- removes excessive blank lines
+- returns the final prompt text
 
-### 7. Clipboard copy
-The `generateAndCopy()` function:
+### 7. Preview and clipboard copy
+The app supports both manual and automatic preview updates.
 
-- generates the prompt
-- copies it using `navigator.clipboard`
-- falls back to `document.execCommand("copy")` if needed
-- shows a notification
-- refreshes the preview on success
+- `previewPrompt()` refreshes the preview panel
+- `setupAutoPreview()` updates preview after a short debounce
+- `generateAndCopy()` builds the prompt, copies it to the clipboard, shows a notification, and refreshes preview on success
 
 ---
 
@@ -361,70 +385,93 @@ Central runtime state container.
 
 Important fields:
 
-- `currentFolderHandle` — selected folder handle
-- `folderTree` — parsed folder/file structure
-- `currentFile` — active file metadata
-- `fileMap` — map of file IDs to file objects
-- `currentParams` — parsed placeholder parameters
-- `searchQuery` — current sidebar search query
-- `activeNotification` — current toast notification
-- `loadingAbortController` — controller for canceling folder loads
+- `currentFolderHandle`
+- `folderTree`
+- `currentFile`
+- `fileMap`
+- `fileIdCounter`
+- `currentParams`
+- `searchQuery`
+- `searchTimer`
+- `previewTimer`
+- `activeNotification`
+- `loadingAbortController`
+- `db`
 
 ### `DOM`
-Caches frequently used DOM references such as:
+Caches frequently used DOM nodes such as:
 
 - `fileBrowser`
 - `mainContent`
 - `searchContainer`
 - `selectFolderBtn`
 - `refreshBtn`
-- palette and modal elements
+- documentation modal elements
+- command palette elements
+
+### `Palette`
+Stores command palette state:
+
+- whether it is open
+- focused item index
+- current result items
+- just-closed guard state for shortcut handling
 
 ---
 
 ## Important functions
 
-### Recent files and storage
+### Folder persistence and restore
+- `openDatabase()` — opens IndexedDB for folder handle persistence
+- `saveFolderHandle(handle)` — stores the currently selected folder handle
+- `loadFolderHandle()` — restores the saved folder handle
+- `clearFolderHandle()` — removes the saved folder handle
+- `saveLastFile(file)` — remembers the last opened file
+- `loadLastFile()` — restores the last opened file metadata
+- `clearLastFile()` — clears the remembered last file
+
+### Recent files and form value storage
 - `getRecentFiles()` — reads recent files from `localStorage`
 - `pushRecentFile(file)` — adds a file to the recent list
-- `saveFormValues(filePath, params, form)` — stores current input values
-- `loadFormValues(filePath, params, form)` — restores saved input values
-- `setupAutoSave(filePath, params, form)` — enables autosave on input/change
+- `saveFormValues(filePath, params, form)` — stores current form values
+- `loadFormValues(filePath, params, form)` — restores stored form values
+- `setupAutoSave(filePath, params, form)` — saves values on input and change
 
 ### UI helpers
-- `showNotification(message, type)` — shows a temporary status notification
+- `showNotification(message, type)` — shows a temporary toast notification
 - `showError(message)` — shows a temporary error popup
-- `copyToClipboard(text)` — copies text with modern API and fallback support
+- `copyToClipboard(text)` — copies text using the modern API with a fallback
 - `openDocsModal()` / `closeDocsModal()` — controls the docs modal
+- `revealActiveFileInSidebar(fileId)` — expands parent folders so the current file stays visible
 
 ### Sidebar and file browser
-- `renderFileBrowser(structure)` — renders the folder/file tree
-- `renderDirectoryNode(dir, level)` — renders a directory node
-- `renderFileNode(file)` — renders a file item
-- `revealActiveFileInSidebar(fileId)` — opens parent folders of the active file
+- `renderFileBrowser(structure)` — renders the folder and file tree
+- `renderDirectoryNode(dir, level)` — renders one directory node
+- `renderFileNode(file)` — renders one file node
+- `handleFileBrowserClick(e)` — handles folder expand and file selection
+- `addSearchBox()` — injects the sidebar search input
+- `filterFiles(query)` — filters visible files and expands matching folder branches
 
 ### Command palette
-- `openPalette()` / `closePalette()` — open or close quick-open panel
-- `renderPaletteItems(query)` — render recent or matched files
-- `setPaletteFocus(idx)` — update keyboard/mouse focus in palette
-- `selectPaletteItem(idx)` — open the selected template
+- `openPalette()` / `closePalette()` — opens or closes the quick-open panel
+- `renderPaletteItems(query)` — renders recent or matched files
+- `setPaletteFocus(idx)` — updates keyboard and mouse focus state
+- `selectPaletteItem(idx)` — opens the selected file
+- `scrollPaletteItemIntoView(idx)` — keeps focused item visible
+- `scoreMatch(name, query)` — scores fuzzy-ish filename matches
+- `highlightMatch(name, query)` — highlights matched characters or substrings
 
-### Template parsing
-- `extractParameters(content)` — extracts placeholders from template content
-- `parsePlaceholderInner(inner)` — parses one placeholder definition
-- `formatParamName(p)` — converts a parameter name into a human-readable label
-
-### Prompt building
-- `readReplacementsFromForm(form, params)` — reads current form values
-- `buildPrompt()` — replaces placeholders and returns final text
-- `previewPrompt()` — updates preview area
-- `generateAndCopy()` — generates prompt and copies it
-- `applyDefaults(form, params)` — applies default values to fields
-- `clearForm()` — resets the form to defaults
-
-### Search
-- `addSearchBox()` — adds the sidebar search input
-- `filterFiles(query)` — filters visible file and folder items
+### Template parsing and prompt building
+- `extractParameters(content)` — extracts placeholders from template text
+- `parsePlaceholderInner(inner)` — parses a single placeholder definition
+- `formatParamName(name)` — converts a parameter name into a readable label
+- `readReplacementsFromForm(form, params)` — collects current values from the form
+- `buildPrompt()` — replaces placeholders with current values
+- `previewPrompt()` — refreshes preview content
+- `generateAndCopy()` — builds and copies the final prompt
+- `applyDefaults(form, params)` — resets fields to default values
+- `clearForm()` — reapplies defaults, saves them, and refreshes preview
+- `setupAutoPreview(form)` — updates preview after a 250 ms debounce
 
 ---
 
@@ -434,23 +481,25 @@ Global shortcuts:
 
 - `Ctrl+O` — choose folder
 - `Alt+R` — refresh current folder
-- `Ctrl+K` — open or close command palette
+- `Ctrl+K` — open or close the command palette
 - `Ctrl+Enter` — generate and copy prompt
-- `Esc` — close docs modal, close palette, or clear form
+- `Esc` — close docs modal, close palette, or clear the current form
+- `Alt+C` — clear the saved folder handle and last-file state
 
 Notes:
 
-- shortcut handling uses `e.code`
-- this makes shortcuts work more reliably across different keyboard layouts
+- shortcut handling primarily uses `e.code`
+- this makes shortcuts more reliable across keyboard layouts
+- pressing `Enter` in single-line text or number fields also triggers prompt generation
 
 ---
 
 ## Data persistence
 
-The app uses `localStorage` for two types of persistence.
+Prompt Forge persists data in several places.
 
 ### Recent files
-Stored under:
+Stored in `localStorage` under:
 
 ```txt
 prompt-forge-recent-files
@@ -459,33 +508,70 @@ prompt-forge-recent-files
 Keeps up to 10 recently opened templates.
 
 ### Form values
-Stored per template path under keys like:
+Stored in `localStorage` per template path under keys like:
 
 ```txt
 prompt-forge-values-/folder/template.md
 ```
 
-This allows a template to restore previously entered values when reopened.
+This lets a template restore previously entered values when reopened.
+
+### Last opened file
+Stored in `localStorage` under:
+
+```txt
+prompt-forge-last-file
+```
+
+Used to reopen the last active template after the folder is restored.
+
+### Folder handle
+Stored in IndexedDB database `prompt-forge-db`, object store `folder-handles`.
+
+This allows the app to remember the selected folder between sessions, subject to browser permission rules.
+
+---
+
+## PWA support
+
+Prompt Forge can be installed as a Progressive Web App.
+
+Current implementation includes:
+
+- a web app manifest
+- an install button that appears when `beforeinstallprompt` fires
+- service worker registration through `sw.js`
+- cached app shell assets for offline startup fallback
+- standalone display mode in supporting browsers
+
+The manifest currently identifies the app as `Prompt Forge v1.27`.
 
 ---
 
 ## Browser requirements
 
-Prompt Forge depends on the File System Access API.
+Prompt Forge depends on browser APIs that are not universally available.
 
-Supported browsers generally include:
+Required or important APIs:
+
+- File System Access API for opening local folders
+- IndexedDB for folder persistence
+- Clipboard API, with a fallback for older copy behavior
+- Service workers for install and offline PWA features
+
+Browsers with the best support are Chromium-based browsers such as:
 
 - Chrome
 - Edge
 - Opera
 
-If the API is not available, the application shows an error and local folder browsing will not work.
+If the File System Access API is unavailable, local folder browsing will not work.
 
 ---
 
 ## Error handling
 
-The code includes basic handling for:
+The app includes basic handling for:
 
 - unsupported browser features
 - folder picker failure
@@ -493,9 +579,10 @@ The code includes basic handling for:
 - missing files
 - folder loading errors
 - clipboard copy failures
-- invalid or missing template data
+- template parsing issues
+- PWA registration failures in console output
 
-Errors are displayed through temporary popups or fallback UI states.
+Errors are shown through temporary popups or fallback empty-state content.
 
 ---
 
@@ -507,17 +594,14 @@ Behavior:
 
 - placeholders are found by scanning for `{{` and `}}`
 - duplicate parameter names are ignored after the first occurrence
-- valid parameter names must match:
-
-```txt
-[a-zA-Z0-9_-]+
-```
-
+- invalid parameter names are ignored
 - `textarea` is the default type
-- checkbox defaults to `false` if omitted
-- select and radio default to the first option if omitted
+- checkbox defaults to `false` when omitted
+- select and radio default to the first option when omitted
+- multiline `default=` values are supported
+- placeholder metadata after `default=` is still parsed for supported options like `height` and `value`
 
-The parser supports multiline `default=` values, which is especially useful for textarea fields.
+This is a pragmatic parser for structured prompt templates, not a full templating engine.
 
 ---
 
@@ -525,31 +609,38 @@ The parser supports multiline `default=` values, which is especially useful for 
 
 Current limitations of this implementation:
 
-- only Markdown files are loaded
+- only `.md` and `.markdown` files are loaded
 - templates are read-only
-- there is no write-back to files
+- there is no save-back to template files
+- there is no template editor inside the app
 - the parser is custom and not a full templating engine
 - only one field per unique parameter name is supported
-- invalid placeholders are ignored
-- local folder access depends on browser permissions
-- there is no import/export for saved form data
-- malformed placeholder syntax is only handled in a basic way
+- malformed placeholders are handled only in a basic way
+- local folder access depends on browser support and permissions
+- PWA behavior depends on browser support
+- import and export of saved values is not implemented
 
 ---
 
 ## Summary
 
-Prompt Forge is a local-first prompt template tool that provides:
+Prompt Forge is a local-first prompt template utility for people who keep reusable prompts as Markdown files and want a faster way to fill them out.
+
+It provides:
 
 - folder-based Markdown template browsing
-- placeholder parsing
-- dynamic form generation
-- prompt preview
-- clipboard copy
-- autosave
-- recent file memory
+- collapsible tree navigation
 - sidebar search
 - command palette quick-open
+- placeholder parsing
+- dynamic form generation
+- live preview
+- clipboard copy
+- autosave
+- recent files
+- last-file restore
+- saved folder restore
+- mobile-friendly layout
+- installable PWA support
 
-It is useful for users who keep reusable prompt templates and want a fast interface for filling them in and generating final prompts.
-
+See source code in the repository files.
