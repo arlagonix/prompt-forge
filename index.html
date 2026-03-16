@@ -294,6 +294,13 @@
         border-bottom-right-radius: 6px;
       }
 
+      .header-action-buttons {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
       .doc-btn {
         display: inline-flex;
         align-items: center;
@@ -315,8 +322,16 @@
         color: white;
       }
 
-      .form-title {
+      .form-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
         margin-bottom: 20px;
+      }
+
+      .form-title {
+        margin-bottom: 0;
         color: #1a1a1a;
         font-size: 1.4rem;
         font-weight: 700;
@@ -335,12 +350,11 @@
       }
       .form-group label .param-name {
         background: linear-gradient(135deg, #e9ecef 0%, #dee2e6 100%);
-        padding: 4px 10px;
-        border-radius: 6px;
+        padding: 4px 8px;
+        border-radius: 8px;
         font-family: "Courier New", monospace;
-        font-size: 0.9rem;
+        font-size: 0.8rem;
         color: #333;
-        border: 2px solid #333;
         font-weight: 700;
         margin-left: 8px;
         word-break: break-word;
@@ -570,14 +584,21 @@
         border-radius: 10px;
       }
 
-      .preview-content::-webkit-scrollbar {
+      .preview-content::-webkit-scrollbar,
+      .template-code::-webkit-scrollbar,
+      .doc-code::-webkit-scrollbar {
         width: 8px;
+        height: 8px;
       }
-      .preview-content::-webkit-scrollbar-track {
+      .preview-content::-webkit-scrollbar-track,
+      .template-code::-webkit-scrollbar-track,
+      .doc-code::-webkit-scrollbar-track {
         background: #2a2a2a;
         border-radius: 10px;
       }
-      .preview-content::-webkit-scrollbar-thumb {
+      .preview-content::-webkit-scrollbar-thumb,
+      .template-code::-webkit-scrollbar-thumb,
+      .doc-code::-webkit-scrollbar-thumb {
         background: #666;
         border-radius: 10px;
       }
@@ -665,7 +686,8 @@
         margin: 8px 0;
         color: #333;
       }
-      .doc-code {
+      .doc-code,
+      .template-code {
         margin: 10px 0 14px;
         background: #2c2c2c;
         color: #e0e0e0;
@@ -676,6 +698,7 @@
         white-space: pre-wrap;
         line-height: 1.7;
         font-size: 13px;
+        overflow: auto;
       }
 
       .palette-backdrop {
@@ -921,6 +944,11 @@
           min-width: 0;
         }
 
+        .header-action-buttons {
+          width: 100%;
+          justify-content: flex-start;
+        }
+
         .metadata-table th,
         .metadata-table td {
           padding: 9px 10px;
@@ -936,6 +964,16 @@
           padding: 8px 10px;
           font-size: 13px;
           white-space: normal;
+        }
+
+        .form-header {
+          flex-wrap: wrap;
+          margin-bottom: 16px;
+        }
+
+        .form-title {
+          font-size: 1.1rem;
+          margin-bottom: 0;
         }
 
         .form-group {
@@ -1018,8 +1056,7 @@
           padding-top: 0;
         }
 
-        .preview h3,
-        .form-title {
+        .preview h3 {
           font-size: 1.1rem;
           margin-bottom: 12px;
         }
@@ -1089,7 +1126,8 @@
           font-size: 13px;
         }
 
-        .doc-code {
+        .doc-code,
+        .template-code {
           padding: 12px;
           font-size: 12px;
           line-height: 1.6;
@@ -1228,7 +1266,8 @@
           font-size: 0.9rem;
         }
 
-        .doc-code {
+        .doc-code,
+        .template-code {
           font-size: 11px;
           padding: 10px;
         }
@@ -1297,7 +1336,7 @@
                 font-weight: 400;
                 margin-left: 8px;
               "
-              >v1.28</span
+              >v1.29</span
             >
           </h2>
           <div class="header-buttons">
@@ -1351,7 +1390,7 @@
           <p>Choose a markdown template from the sidebar</p>
           <div class="keyboard-hint">
             Shortcuts: Ctrl+O (Open folder), Ctrl+K (Quick open), Ctrl+Enter
-            (Generate), Esc (Clear)
+            (Copy), Esc (Clear)
           </div>
         </div>
       </div>
@@ -1390,9 +1429,9 @@
     >
       <div class="modal" tabindex="-1">
         <div class="modal-header">
-          <div class="modal-title" id="docModalTitle">📖 Examples</div>
-          <button type="button" class="modal-close" id="docModalClose">
-            ✕ Close
+          <div class="form-title" id="docModalTitle">Examples</div>
+          <button type="button" class="doc-btn" id="docModalClose">
+            Close
           </button>
         </div>
         <div class="modal-body">
@@ -1471,6 +1510,29 @@
             default=Enter long text here...}}
           </div>
 
+          <p style="margin-top: 12px; color: #666">
+            Tip: Press <b>Esc</b> to close this modal.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="modal-backdrop"
+      id="templateModalBackdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="templateModalTitle"
+    >
+      <div class="modal" tabindex="-1">
+        <div class="modal-header">
+          <div class="form-title" id="templateModalTitle">Template</div>
+          <button type="button" class="doc-btn" id="templateModalClose">
+            Close
+          </button>
+        </div>
+        <div class="modal-body">
+          <div class="template-code" id="templateModalContent"></div>
           <p style="margin-top: 12px; color: #666">
             Tip: Press <b>Esc</b> to close this modal.
           </p>
@@ -1670,6 +1732,9 @@
         refreshBtn: document.getElementById("refreshBtn"),
         docModalBackdrop: document.getElementById("docModalBackdrop"),
         docModalClose: document.getElementById("docModalClose"),
+        templateModalBackdrop: document.getElementById("templateModalBackdrop"),
+        templateModalClose: document.getElementById("templateModalClose"),
+        templateModalContent: document.getElementById("templateModalContent"),
         paletteBackdrop: document.getElementById("paletteBackdrop"),
         paletteInput: document.getElementById("paletteInput"),
         paletteList: document.getElementById("paletteList"),
@@ -1742,6 +1807,19 @@
       };
       const closeDocsModal = () =>
         DOM.docModalBackdrop.classList.remove("open");
+
+      function openTemplateModal() {
+        const file = State.currentFile;
+        if (!file) return;
+        DOM.templateModalContent.textContent =
+          file.content ?? file.bodyContent ?? "";
+        DOM.templateModalBackdrop.classList.add("open");
+        DOM.templateModalClose?.focus();
+      }
+
+      function closeTemplateModal() {
+        DOM.templateModalBackdrop.classList.remove("open");
+      }
 
       function stringifyMetadataValue(value) {
         if (Array.isArray(value)) return value.join(", ");
@@ -2096,6 +2174,11 @@
         }
 
         if (e.key === "Escape") {
+          if (DOM.templateModalBackdrop.classList.contains("open")) {
+            e.preventDefault();
+            closeTemplateModal();
+            return;
+          }
           if (DOM.docModalBackdrop.classList.contains("open")) {
             e.preventDefault();
             closeDocsModal();
@@ -2173,6 +2256,11 @@
           if (e.target === DOM.docModalBackdrop) closeDocsModal();
         });
 
+        DOM.templateModalClose.addEventListener("click", closeTemplateModal);
+        DOM.templateModalBackdrop.addEventListener("click", (e) => {
+          if (e.target === DOM.templateModalBackdrop) closeTemplateModal();
+        });
+
         DOM.paletteInput.addEventListener("keydown", (e) => {
           const count = Palette.currentItems.length;
 
@@ -2235,7 +2323,7 @@
                 <h3>👈 Select a template to start</h3>
                 <p>Choose a markdown template from the sidebar</p>
                 <div class="keyboard-hint">
-                  Shortcuts: Ctrl+O (Open folder), Ctrl+K (Quick open), Ctrl+Enter (Generate), Esc (Clear)
+                  Shortcuts: Ctrl+O (Open folder), Ctrl+K (Quick open), Ctrl+Enter (Copy), Esc (Clear)
                 </div>
               </div>`;
             DOM.searchContainer.innerHTML = "";
@@ -2729,13 +2817,24 @@
         title.className = "template-title";
         title.textContent = file.name;
 
+        const actionButtons = document.createElement("div");
+        actionButtons.className = "header-action-buttons";
+
+        const templateBtn = document.createElement("button");
+        templateBtn.type = "button";
+        templateBtn.className = "doc-btn";
+        templateBtn.innerHTML = "<span>Template</span>";
+
         const docBtn = document.createElement("button");
         docBtn.type = "button";
         docBtn.className = "doc-btn";
-        docBtn.innerHTML = "📖 <span>Docs</span>";
+        docBtn.innerHTML = "<span>Docs</span>";
+
+        actionButtons.appendChild(templateBtn);
+        actionButtons.appendChild(docBtn);
 
         titleRow.appendChild(title);
-        titleRow.appendChild(docBtn);
+        titleRow.appendChild(actionButtons);
         header.appendChild(titleRow);
 
         const metadataTable = renderMetadataTable(file.metadata);
@@ -2747,10 +2846,21 @@
         form.id = "promptForm";
         form.addEventListener("submit", (e) => e.preventDefault());
 
+        const formHeader = document.createElement("div");
+        formHeader.className = "form-header";
+
         const formTitle = document.createElement("h3");
         formTitle.className = "form-title";
         formTitle.textContent = "Prompt Form";
-        form.appendChild(formTitle);
+
+        const clrBtn = document.createElement("button");
+        clrBtn.type = "button";
+        clrBtn.className = "doc-btn";
+        clrBtn.textContent = "Clear";
+
+        formHeader.appendChild(formTitle);
+        formHeader.appendChild(clrBtn);
+        form.appendChild(formHeader);
 
         if (!params.length) {
           const g = document.createElement("div");
@@ -2878,18 +2988,8 @@
         const genBtn = document.createElement("button");
         genBtn.type = "button";
         genBtn.className = "btn-copy";
-        genBtn.textContent = "📋 Generate & Copy";
-        const prevBtn = document.createElement("button");
-        prevBtn.type = "button";
-        prevBtn.className = "btn-secondary";
-        prevBtn.textContent = "👁️ Preview";
-        const clrBtn = document.createElement("button");
-        clrBtn.type = "button";
-        clrBtn.className = "btn-secondary";
-        clrBtn.textContent = "🗑️ Clear";
+        genBtn.textContent = "Copy";
         btns.appendChild(genBtn);
-        btns.appendChild(prevBtn);
-        btns.appendChild(clrBtn);
         form.appendChild(btns);
 
         const hint = document.createElement("div");
@@ -2898,20 +2998,24 @@
         hint.style.marginTop = "10px";
         const isMobile = window.innerWidth <= 768;
         hint.textContent = isMobile
-          ? "Tap 📋 to toggle sidebar · Ctrl+Enter to generate"
-          : "Ctrl+Enter to generate · Ctrl+K to search files · Esc to clear";
+          ? "Tap 📋 to toggle sidebar · Ctrl+Enter to copy"
+          : "Ctrl+Enter to copy · Ctrl+K to search files · Esc to clear";
         wrap.appendChild(form);
         wrap.appendChild(hint);
 
         const pv = document.createElement("div");
         pv.className = "preview";
         pv.id = "preview";
+        pv.style.display = "none";
+
         const pvh = document.createElement("h3");
         pvh.textContent = "Preview";
+
         const pvc = document.createElement("div");
         pvc.className = "preview-content";
         pvc.id = "previewContent";
-        pvc.textContent = file.bodyContent ?? file.content ?? "";
+        pvc.textContent = "";
+
         pv.appendChild(pvh);
         pv.appendChild(pvc);
         wrap.appendChild(pv);
@@ -2925,9 +3029,9 @@
         setupAutoPreview(form);
 
         genBtn.addEventListener("click", generateAndCopy);
-        prevBtn.addEventListener("click", previewPrompt);
         clrBtn.addEventListener("click", clearForm);
         docBtn.addEventListener("click", openDocsModal);
+        templateBtn.addEventListener("click", openTemplateModal);
 
         previewPrompt();
       }
@@ -2995,11 +3099,52 @@
         if (ok) previewPrompt();
       }
 
+      function hasUserInput(form, params) {
+        if (!form || !params?.length) return false;
+
+        for (const p of params) {
+          const el = form.elements.namedItem(p.name);
+          if (!el) continue;
+
+          if (p.type === "checkbox") {
+            const current = el.checked;
+            const def = normalizeBool(p.defaultValue);
+            if (current !== def) return true;
+            continue;
+          }
+
+          const currentValue = String(el.value ?? "").trim();
+          const defaultValue = String(p.defaultValue ?? "").trim();
+
+          if (currentValue !== defaultValue && currentValue !== "") return true;
+        }
+
+        return false;
+      }
+
+      function updatePreviewVisibility(prompt) {
+        const previewSection = document.getElementById("preview");
+        const previewContent = document.getElementById("previewContent");
+        const form = document.getElementById("promptForm");
+
+        if (!previewSection || !previewContent || !form) return;
+
+        const hasInput = hasUserInput(form, State.currentParams ?? []);
+        const hasContent =
+          typeof prompt === "string" && prompt.trim().length > 0;
+
+        if (hasInput && hasContent) {
+          previewContent.textContent = prompt;
+          previewSection.style.display = "block";
+        } else {
+          previewContent.textContent = "";
+          previewSection.style.display = "none";
+        }
+      }
+
       function previewPrompt() {
         const prompt = buildPrompt();
-        if (prompt == null) return;
-        const d = document.getElementById("previewContent");
-        if (d) d.textContent = prompt;
+        updatePreviewVisibility(prompt ?? "");
       }
 
       function applyDefaults(form, params) {
