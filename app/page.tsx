@@ -575,8 +575,33 @@ export default function PromptForge() {
         if (!lastFile) return;
 
         for (const [id, file] of restoredFileMap) {
-          if (file.path === lastFile.path && file.name === lastFile.name) {
-            await loadFile(id);
+          if (
+            file.path === lastFile.path &&
+            file.name === lastFile.name &&
+            file.handle
+          ) {
+            const fh = await file.handle.getFile();
+            const content = await fh.text();
+            const frontMatter = parseFrontMatter(content);
+
+            const updatedFile: ParsedFile = {
+              ...file,
+              content,
+              metadata: frontMatter.metadata,
+              bodyContent: frontMatter.body,
+              rawFrontMatter: frontMatter.rawFrontMatter,
+              hasFrontMatter: frontMatter.hasFrontMatter,
+            };
+
+            setFileMap((prev) => {
+              const next = new Map(prev);
+              next.set(id, updatedFile);
+              return next;
+            });
+
+            setCurrentFile(updatedFile);
+            setCurrentParams(extractParameters(frontMatter.body));
+            saveLastFile(updatedFile);
             break;
           }
         }
@@ -593,8 +618,8 @@ export default function PromptForge() {
     clearSavedFolderHandle,
     loadLastFile,
     clearLastFile,
-    loadFile,
     showNotification,
+    saveLastFile,
   ]);
 
   useEffect(() => {
