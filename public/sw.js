@@ -1,4 +1,4 @@
-const CACHE_NAME = "prompt-forge-v1.29";
+const CACHE_NAME = "prompt-forge-v2.0";
 const BASE_PATH = "/prompt-forge";
 const APP_SHELL = [
   `${BASE_PATH}/`,
