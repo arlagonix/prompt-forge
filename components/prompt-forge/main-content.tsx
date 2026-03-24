@@ -120,15 +120,6 @@ export function MainContent({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentFile, handleCopy]);
 
-  const hasUserInput =
-    formValues.size > 0 &&
-    Array.from(formValues.entries()).some(([name, value]) => {
-      const param = currentParams.find((p) => p.name === name);
-      if (!param) return false;
-      const defaultVal = param.defaultValue ?? "";
-      return value !== defaultVal && value !== "";
-    });
-
   return (
     <main className="flex-1 flex flex-col h-full overflow-hidden">
       {/* Header */}
