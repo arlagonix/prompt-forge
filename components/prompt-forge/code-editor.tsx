@@ -158,7 +158,7 @@ export function CodeEditor({
           showCloseButton={false}
           className="w-full max-w-5xl h-[92vh] p-0 overflow-hidden"
         >
-          <DialogHeader className="sr-only">
+          <DialogHeader className="sr-only border-b border-border">
             <DialogTitle>
               {isNew ? "Create markdown file" : `Edit ${fileName}`}
             </DialogTitle>
@@ -166,7 +166,7 @@ export function CodeEditor({
               Markdown editor dialog for editing template content.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex h-full flex-col bg-background">
+          <div className="flex h-full min-h-0 flex-col bg-background">
             <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -224,7 +224,7 @@ export function CodeEditor({
               </div>
             </header>
 
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 min-h-0 flex overflow-hidden">
               <div
                 ref={lineNumbersRef}
                 className="w-12 bg-muted/50 border-r border-border overflow-hidden shrink-0 select-none"
@@ -245,7 +245,7 @@ export function CodeEditor({
                 onKeyDown={handleKeyDownTextarea}
                 spellCheck={false}
                 className={cn(
-                  "flex-1 p-3 font-mono text-sm leading-6 resize-none",
+                  "flex-1 min-h-0 overflow-auto p-3 font-mono text-sm leading-6 resize-none",
                   "bg-background text-foreground",
                   "focus:outline-none",
                   "placeholder:text-muted-foreground",
