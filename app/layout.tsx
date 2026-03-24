@@ -16,6 +16,7 @@ export const metadata: Metadata = {
   description:
     "Generate prompts from markdown templates with dynamic parameters",
   generator: "v0.app",
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       {
