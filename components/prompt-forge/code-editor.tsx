@@ -1,11 +1,6 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, useCallback } from "react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Kbd } from "@/components/ui/kbd"
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,22 +8,22 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import {
-  Save,
-  X,
-  FileText,
-  AlertTriangle,
-} from "lucide-react"
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Kbd } from "@/components/ui/kbd";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { AlertTriangle, FileText, Save, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface CodeEditorProps {
-  content: string
-  fileName: string
-  isNew: boolean
-  onSave: (content: string, newFileName?: string) => Promise<void>
-  onClose: () => void
-  onDelete?: () => void
-  showNotification: (message: string, type?: "success" | "error") => void
+  content: string;
+  fileName: string;
+  isNew: boolean;
+  onSave: (content: string, newFileName?: string) => Promise<void>;
+  onClose: () => void;
+  onDelete?: () => void;
+  showNotification: (message: string, type?: "success" | "error") => void;
 }
 
 export function CodeEditor({
@@ -40,222 +35,245 @@ export function CodeEditor({
   onDelete,
   showNotification,
 }: CodeEditorProps) {
-  const [content, setContent] = useState(initialContent)
-  const [newFileName, setNewFileName] = useState(isNew ? "" : fileName)
-  const [hasChanges, setHasChanges] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [showConfirmClose, setShowConfirmClose] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const lineNumbersRef = useRef<HTMLDivElement>(null)
+  const [content, setContent] = useState(initialContent);
+  const [newFileName, setNewFileName] = useState(isNew ? "" : fileName);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmClose, setShowConfirmClose] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setHasChanges(content !== initialContent || (isNew && newFileName !== ""))
-  }, [content, initialContent, isNew, newFileName])
+    setHasChanges(content !== initialContent || (isNew && newFileName !== ""));
+  }, [content, initialContent, isNew, newFileName]);
 
-  // Auto-focus textarea
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus()
-      if (isNew) {
-        // Focus filename input for new files
-        const filenameInput = document.getElementById("editor-filename")
-        if (filenameInput) filenameInput.focus()
+    if (isNew) {
+      const filenameInput = document.getElementById("editor-filename");
+      if (filenameInput) {
+        filenameInput.focus();
+        return;
       }
     }
-  }, [isNew])
 
-  // Sync scroll between textarea and line numbers
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isNew]);
+
   const handleScroll = useCallback(() => {
     if (textareaRef.current && lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop
+      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
     }
-  }, [])
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (isNew && !newFileName.trim()) {
-      showNotification("Please enter a file name", "error")
-      return
+      showNotification("Please enter a file name", "error");
+      return;
     }
 
-    const finalFileName = isNew ? newFileName.trim() : fileName
-    if (isNew && !finalFileName.toLowerCase().endsWith(".md") && !finalFileName.toLowerCase().endsWith(".markdown")) {
-      showNotification("File name must end with .md or .markdown", "error")
-      return
+    const finalFileName = isNew ? newFileName.trim() : fileName;
+    if (
+      isNew &&
+      !finalFileName.toLowerCase().endsWith(".md") &&
+      !finalFileName.toLowerCase().endsWith(".markdown")
+    ) {
+      showNotification("File name must end with .md or .markdown", "error");
+      return;
     }
 
-    setIsSaving(true)
+    setIsSaving(true);
     try {
-      await onSave(content, isNew ? finalFileName : undefined)
-      setHasChanges(false)
-    } catch (error) {
-      // Error handling is done in parent
+      await onSave(content, isNew ? finalFileName : undefined);
+      setHasChanges(false);
     } finally {
-      setIsSaving(false)
+      setIsSaving(false);
     }
-  }, [content, fileName, isNew, newFileName, onSave, showNotification])
+  }, [content, fileName, isNew, newFileName, onSave, showNotification]);
 
   const handleClose = useCallback(() => {
     if (hasChanges) {
-      setShowConfirmClose(true)
+      setShowConfirmClose(true);
     } else {
-      onClose()
+      onClose();
     }
-  }, [hasChanges, onClose])
+  }, [hasChanges, onClose]);
 
-  const handleDelete = useCallback(async () => {
+  const handleDelete = useCallback(() => {
     if (onDelete) {
-      setShowDeleteConfirm(false)
-      onDelete()
+      setShowDeleteConfirm(false);
+      onDelete();
     }
-  }, [onDelete])
+  }, [onDelete]);
 
-  // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const ctrl = e.ctrlKey || e.metaKey
+      const ctrl = e.ctrlKey || e.metaKey;
 
-      if (ctrl && e.key === "s") {
-        e.preventDefault()
-        handleSave()
-        return
+      if (ctrl && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSave();
+        return;
       }
 
       if (e.key === "Escape") {
-        e.preventDefault()
-        handleClose()
-        return
+        e.preventDefault();
+        handleClose();
       }
-    }
+    };
 
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [handleSave, handleClose])
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSave, handleClose]);
 
-  // Handle tab key for indentation
-  const handleKeyDownTextarea = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleKeyDownTextarea = (
+    e: React.KeyboardEvent<HTMLTextAreaElement>,
+  ) => {
     if (e.key === "Tab") {
-      e.preventDefault()
-      const textarea = textareaRef.current
-      if (!textarea) return
+      e.preventDefault();
+      const textarea = textareaRef.current;
+      if (!textarea) return;
 
-      const start = textarea.selectionStart
-      const end = textarea.selectionEnd
-      const newContent = content.substring(0, start) + "  " + content.substring(end)
-      setContent(newContent)
-      
-      // Set cursor position after tab
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+      const newContent =
+        content.substring(0, start) + "  " + content.substring(end);
+
+      setContent(newContent);
+
       setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 2
-      }, 0)
+        textarea.selectionStart = textarea.selectionEnd = start + 2;
+      }, 0);
     }
-  }
+  };
 
-  const lineCount = content.split("\n").length
+  const lineCount = content.split("\n").length;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
-        <div className="flex items-center gap-3">
-          <FileText className="h-5 w-5 text-muted-foreground" />
-          {isNew ? (
-            <div className="flex items-center gap-2">
-              <Label htmlFor="editor-filename" className="sr-only">File name</Label>
-              <Input
-                id="editor-filename"
-                type="text"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                placeholder="filename.md"
-                className="w-64 h-8 font-mono text-sm"
+    <>
+      <Dialog open={true} onOpenChange={(open) => !open && handleClose()}>
+        <DialogContent
+          showCloseButton={false}
+          className="w-full max-w-5xl h-[92vh] p-0 overflow-hidden"
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>
+              {isNew ? "Create markdown file" : `Edit ${fileName}`}
+            </DialogTitle>
+            <DialogDescription>
+              Markdown editor dialog for editing template content.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex h-full flex-col bg-background">
+            <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                {isNew ? (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="editor-filename" className="sr-only">
+                      File name
+                    </Label>
+                    <Input
+                      id="editor-filename"
+                      type="text"
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      placeholder="filename.md"
+                      className="w-64 h-8 font-mono text-sm"
+                    />
+                  </div>
+                ) : (
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-medium text-foreground truncate">
+                      {fileName}
+                    </h2>
+                    {hasChanges && (
+                      <span className="text-xs text-muted-foreground">
+                        Unsaved changes
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {!isNew && onDelete && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    Delete
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={handleClose}>
+                  <X className="h-4 w-4 mr-1.5" />
+                  Close
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSave}
+                  disabled={isSaving || (!hasChanges && !isNew)}
+                >
+                  <Save className="h-4 w-4 mr-1.5" />
+                  {isSaving ? "Saving..." : "Save"}
+                </Button>
+              </div>
+            </header>
+
+            <div className="flex-1 flex overflow-hidden">
+              <div
+                ref={lineNumbersRef}
+                className="w-12 bg-muted/50 border-r border-border overflow-hidden shrink-0 select-none"
+                aria-hidden="true"
+              >
+                <div className="py-3 px-2 font-mono text-xs text-muted-foreground text-right leading-6">
+                  {Array.from({ length: lineCount }, (_, i) => (
+                    <div key={i + 1}>{i + 1}</div>
+                  ))}
+                </div>
+              </div>
+
+              <textarea
+                ref={textareaRef}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onScroll={handleScroll}
+                onKeyDown={handleKeyDownTextarea}
+                spellCheck={false}
+                className={cn(
+                  "flex-1 p-3 font-mono text-sm leading-6 resize-none",
+                  "bg-background text-foreground",
+                  "focus:outline-none",
+                  "placeholder:text-muted-foreground",
+                )}
+                placeholder={
+                  isNew ? "Enter your markdown template content here..." : ""
+                }
               />
             </div>
-          ) : (
-            <div>
-              <h2 className="text-sm font-medium text-foreground">{fileName}</h2>
-              {hasChanges && (
-                <span className="text-xs text-muted-foreground">Unsaved changes</span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {!isNew && onDelete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDeleteConfirm(true)}
-              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            >
-              Delete
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClose}
-          >
-            <X className="h-4 w-4 mr-1.5" />
-            Close
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={isSaving || (!hasChanges && !isNew)}
-          >
-            <Save className="h-4 w-4 mr-1.5" />
-            {isSaving ? "Saving..." : "Save"}
-          </Button>
-        </div>
-      </header>
 
-      {/* Editor */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Line numbers */}
-        <div
-          ref={lineNumbersRef}
-          className="w-12 bg-muted/50 border-r border-border overflow-hidden shrink-0 select-none"
-          aria-hidden="true"
-        >
-          <div className="py-3 px-2 font-mono text-xs text-muted-foreground text-right leading-6">
-            {Array.from({ length: lineCount }, (_, i) => (
-              <div key={i + 1}>{i + 1}</div>
-            ))}
+            <footer className="flex items-center justify-between px-4 py-2 border-t border-border bg-card text-xs text-muted-foreground shrink-0">
+              <div className="flex items-center gap-4">
+                <span>{lineCount} lines</span>
+                <span>{content.length} characters</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span>
+                  <Kbd>Ctrl</Kbd>+<Kbd>S</Kbd> Save
+                </span>
+                <span>
+                  <Kbd>Esc</Kbd> Close
+                </span>
+              </div>
+            </footer>
           </div>
-        </div>
+        </DialogContent>
+      </Dialog>
 
-        {/* Textarea */}
-        <textarea
-          ref={textareaRef}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          onScroll={handleScroll}
-          onKeyDown={handleKeyDownTextarea}
-          spellCheck={false}
-          className={cn(
-            "flex-1 p-3 font-mono text-sm leading-6 resize-none",
-            "bg-background text-foreground",
-            "focus:outline-none",
-            "placeholder:text-muted-foreground"
-          )}
-          placeholder={isNew ? "Enter your markdown template content here..." : ""}
-        />
-      </div>
-
-      {/* Footer */}
-      <footer className="flex items-center justify-between px-4 py-2 border-t border-border bg-card text-xs text-muted-foreground shrink-0">
-        <div className="flex items-center gap-4">
-          <span>{lineCount} lines</span>
-          <span>{content.length} characters</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <span><Kbd>Ctrl</Kbd>+<Kbd>S</Kbd> Save</span>
-          <span><Kbd>Esc</Kbd> Close</span>
-        </div>
-      </footer>
-
-      {/* Confirm Close Dialog */}
       <Dialog open={showConfirmClose} onOpenChange={setShowConfirmClose}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
@@ -264,11 +282,15 @@ export function CodeEditor({
               Unsaved Changes
             </DialogTitle>
             <DialogDescription>
-              You have unsaved changes. Are you sure you want to close the editor? Your changes will be lost.
+              You have unsaved changes. Are you sure you want to close the
+              editor? Your changes will be lost.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowConfirmClose(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowConfirmClose(false)}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={onClose}>
@@ -278,7 +300,6 @@ export function CodeEditor({
         </DialogContent>
       </Dialog>
 
-      {/* Confirm Delete Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
@@ -287,11 +308,15 @@ export function CodeEditor({
               Delete File
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &quot;{fileName}&quot;? This action cannot be undone.
+              Are you sure you want to delete &quot;{fileName}&quot;? This
+              action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+            >
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
@@ -300,6 +325,6 @@ export function CodeEditor({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
+    </>
+  );
 }
