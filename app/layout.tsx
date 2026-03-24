@@ -11,14 +11,15 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
 });
 
+const basePath = process.env.NODE_ENV === "production" ? "/prompt-forge" : "";
+
 export const metadata: Metadata = {
   title: "Prompt Forge",
   description:
     "Generate prompts from markdown templates with dynamic parameters",
-  generator: "v0.app",
-  manifest: "/manifest.webmanifest",
+  manifest: `${basePath}/manifest.webmanifest`,
   icons: {
-    icon: "/icon.svg",
+    icon: `${basePath}/icon.svg`,
   },
 };
 
