@@ -33,6 +33,7 @@ Example: Hello, {{name}}! How can I help you today?
 const DB_NAME = "prompt-forge-db";
 const DB_VERSION = 1;
 const STORE_NAME = "folder-handles";
+const LAST_FILE_KEY = "prompt-forge-last-file";
 
 export default function PromptForge() {
   const [folderHandle, setFolderHandle] =
@@ -140,6 +141,37 @@ export default function PromptForge() {
     });
   }, [openDatabase]);
 
+  const saveLastFile = useCallback((file: ParsedFile) => {
+    try {
+      localStorage.setItem(
+        LAST_FILE_KEY,
+        JSON.stringify({
+          name: file.name,
+          path: file.path,
+          ts: Date.now(),
+        }),
+      );
+    } catch {}
+  }, []);
+
+  const loadLastFile = useCallback((): {
+    name: string;
+    path: string;
+  } | null => {
+    try {
+      const raw = localStorage.getItem(LAST_FILE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const clearLastFile = useCallback(() => {
+    try {
+      localStorage.removeItem(LAST_FILE_KEY);
+    } catch {}
+  }, []);
+
   const directoryHasFiles = useCallback((dir: FolderNode): boolean => {
     return dir.children.some(
       (c) =>
@@ -229,6 +261,8 @@ export default function PromptForge() {
         setFileMap(newFileMap);
         setCurrentFile(null);
         setCurrentParams([]);
+
+        return newFileMap;
       } finally {
         setIsLoading(false);
       }
@@ -248,6 +282,7 @@ export default function PromptForge() {
     try {
       const handle = await window.showDirectoryPicker();
       await saveFolderHandle(handle);
+      clearLastFile();
       await loadFolderFromHandle(handle);
       showNotification(`Folder loaded: ${handle.name}`);
     } catch (err) {
@@ -255,7 +290,7 @@ export default function PromptForge() {
         showNotification("Failed to select folder", "error");
       }
     }
-  }, [showNotification, saveFolderHandle, loadFolderFromHandle]);
+  }, [showNotification, saveFolderHandle, clearLastFile, loadFolderFromHandle]);
 
   const loadFile = useCallback(
     async (fileId: number) => {
@@ -285,6 +320,7 @@ export default function PromptForge() {
 
         const params = extractParameters(frontMatter.body);
         setCurrentFile(updatedFile);
+        saveLastFile(updatedFile);
         setCurrentParams(params);
       } catch {
         showNotification("Failed to load template", "error");
@@ -292,7 +328,7 @@ export default function PromptForge() {
         setIsLoading(false);
       }
     },
-    [fileMap, showNotification],
+    [fileMap, showNotification, saveLastFile],
   );
 
   const refreshFolder = useCallback(async () => {
@@ -343,6 +379,7 @@ export default function PromptForge() {
 
             setCurrentFile(updatedFile);
             setCurrentParams(extractParameters(frontMatter.body));
+            saveLastFile(updatedFile);
             break;
           }
         }
@@ -352,7 +389,13 @@ export default function PromptForge() {
     } finally {
       setIsLoading(false);
     }
-  }, [folderHandle, currentFile, readDirectoryRecursive, showNotification]);
+  }, [
+    folderHandle,
+    currentFile,
+    readDirectoryRecursive,
+    showNotification,
+    saveLastFile,
+  ]);
 
   const openEditor = useCallback(
     async (fileId: number) => {
@@ -444,6 +487,7 @@ export default function PromptForge() {
           if (currentFile?.id === file.id) {
             setCurrentFile(updatedFile);
             setCurrentParams(extractParameters(frontMatter.body));
+            saveLastFile(updatedFile);
           }
 
           setEditorState((prev) => ({ ...prev, content, isOpen: false }));
@@ -456,7 +500,14 @@ export default function PromptForge() {
         throw err;
       }
     },
-    [editorState, fileMap, currentFile, showNotification, refreshFolder],
+    [
+      editorState,
+      fileMap,
+      currentFile,
+      showNotification,
+      refreshFolder,
+      saveLastFile,
+    ],
   );
 
   const deleteFile = useCallback(
@@ -474,6 +525,7 @@ export default function PromptForge() {
         if (currentFile?.id === fileId) {
           setCurrentFile(null);
           setCurrentParams([]);
+          clearLastFile();
         }
 
         if (editorState.fileId === fileId) {
@@ -488,7 +540,14 @@ export default function PromptForge() {
         );
       }
     },
-    [fileMap, currentFile, editorState, showNotification, refreshFolder],
+    [
+      fileMap,
+      currentFile,
+      editorState,
+      showNotification,
+      refreshFolder,
+      clearLastFile,
+    ],
   );
 
   const closeEditor = useCallback(() => {
@@ -509,10 +568,21 @@ export default function PromptForge() {
           if (requested !== "granted") return;
         }
 
-        await loadFolderFromHandle(handle);
+        const restoredFileMap = await loadFolderFromHandle(handle);
         showNotification(`Folder restored: ${handle.name}`);
+
+        const lastFile = loadLastFile();
+        if (!lastFile) return;
+
+        for (const [id, file] of restoredFileMap) {
+          if (file.path === lastFile.path && file.name === lastFile.name) {
+            await loadFile(id);
+            break;
+          }
+        }
       } catch {
         await clearSavedFolderHandle().catch(() => {});
+        clearLastFile();
       }
     };
 
@@ -521,6 +591,9 @@ export default function PromptForge() {
     loadSavedFolderHandle,
     loadFolderFromHandle,
     clearSavedFolderHandle,
+    loadLastFile,
+    clearLastFile,
+    loadFile,
     showNotification,
   ]);
 
