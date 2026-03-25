@@ -140,9 +140,9 @@ export function MainContent({
               <h2 className="text-lg font-semibold text-foreground">
                 {currentFile.name}
               </h2>
-              <p className="text-xs text-muted-foreground">
+              {/* <p className="text-xs text-muted-foreground">
                 {currentFile.path}
-              </p>
+              </p> */}
             </div>
           ) : (
             <h2 className="text-lg font-semibold text-foreground">

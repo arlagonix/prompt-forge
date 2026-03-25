@@ -1,6 +1,5 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useMemo } from "react"
 import {
   Command,
   CommandDialog,
@@ -9,15 +8,16 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command"
-import { FileText } from "lucide-react"
-import type { ParsedFile } from "@/lib/prompt-forge/types"
+} from "@/components/ui/command";
+import type { ParsedFile } from "@/lib/prompt-forge/types";
+import { FileText } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 interface CommandPaletteProps {
-  isOpen: boolean
-  onClose: () => void
-  fileMap: Map<number, ParsedFile>
-  onFileSelect: (fileId: number) => void
+  isOpen: boolean;
+  onClose: () => void;
+  fileMap: Map<number, ParsedFile>;
+  onFileSelect: (fileId: number) => void;
 }
 
 export function CommandPalette({
@@ -26,30 +26,36 @@ export function CommandPalette({
   fileMap,
   onFileSelect,
 }: CommandPaletteProps) {
-  const [search, setSearch] = useState("")
+  const [search, setSearch] = useState("");
 
   // Reset search when opening
   useEffect(() => {
     if (isOpen) {
-      setSearch("")
+      setSearch("");
     }
-  }, [isOpen])
+  }, [isOpen]);
 
   const files = useMemo(() => {
-    return Array.from(fileMap.values()).sort((a, b) => a.name.localeCompare(b.name))
-  }, [fileMap])
+    return Array.from(fileMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
+  }, [fileMap]);
 
   const filteredFiles = useMemo(() => {
-    if (!search.trim()) return files.slice(0, 20)
-    
-    const query = search.toLowerCase()
+    if (!search.trim()) return files.slice(0, 20);
+
+    const query = search.toLowerCase();
     return files
       .filter((file) => file.name.toLowerCase().includes(query))
-      .slice(0, 20)
-  }, [files, search])
+      .slice(0, 20);
+  }, [files, search]);
 
   return (
-    <CommandDialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <CommandDialog
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      className="top-20 translate-y-0 sm:top-24"
+    >
       <Command className="rounded-lg border border-border shadow-lg">
         <CommandInput
           placeholder="Search templates..."
@@ -83,5 +89,5 @@ export function CommandPalette({
         </CommandList>
       </Command>
     </CommandDialog>
-  )
+  );
 }

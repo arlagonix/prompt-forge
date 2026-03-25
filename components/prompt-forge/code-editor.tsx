@@ -187,13 +187,13 @@ export function CodeEditor({
                 ) : (
                   <div className="min-w-0">
                     <h2 className="text-sm font-medium text-foreground truncate">
-                      {fileName}
+                      {fileName}{" "}
+                      {hasChanges && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          Unsaved changes
+                        </span>
+                      )}
                     </h2>
-                    {hasChanges && (
-                      <span className="text-xs text-muted-foreground">
-                        Unsaved changes
-                      </span>
-                    )}
                   </div>
                 )}
               </div>
