@@ -52,7 +52,6 @@ export function MainContent({
   const [formValues, setFormValues] = useState<Map<string, string>>(new Map());
   const [preview, setPreview] = useState<string>("");
 
-  // Initialize form values when file changes
   useEffect(() => {
     if (currentFile && currentParams.length > 0) {
       const initialValues = new Map<string, string>();
@@ -65,7 +64,6 @@ export function MainContent({
     }
   }, [currentFile, currentParams]);
 
-  // Update preview when form values change
   useEffect(() => {
     if (currentFile) {
       const prompt = buildPrompt(
@@ -108,7 +106,6 @@ export function MainContent({
     setFormValues(initialValues);
   }, [currentParams]);
 
-  // Global Ctrl+Enter to copy
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && currentFile) {
@@ -121,163 +118,152 @@ export function MainContent({
   }, [currentFile, handleCopy]);
 
   return (
-    <main className="flex-1 flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-        <div className="flex items-center gap-3">
-          {!isSidebarOpen && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onToggleSidebar}
-              className="h-8 w-8"
-            >
-              <PanelLeft className="h-4 w-4" />
-            </Button>
-          )}
-          {currentFile ? (
-            <div>
-              <h2 className="text-lg font-semibold text-foreground">
-                {currentFile.name}
-              </h2>
-              {/* <p className="text-xs text-muted-foreground">
-                {currentFile.path}
-              </p> */}
-            </div>
-          ) : (
-            <h2 className="text-lg font-semibold text-foreground">
-              Prompt Forge
-            </h2>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onOpenDocs}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <BookOpen className="h-4 w-4 mr-2" />
-            Docs
-          </Button>
-          {currentFile && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onOpenTemplate}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <Code className="h-4 w-4 mr-2" />
-              Template
-            </Button>
-          )}
-        </div>
-      </header>
-
+    <main className="flex-1 min-h-0 overflow-hidden">
       {isLoading ? (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex h-full items-center justify-center">
           <div className="text-center">
             <Spinner className="h-8 w-8 mx-auto mb-3" />
             <p className="text-muted-foreground">Loading template...</p>
           </div>
         </div>
       ) : currentFile ? (
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          {/* Form Section */}
-          <div className="flex-1 flex flex-col overflow-hidden lg:border-r border-border">
-            <ScrollArea className="flex-1">
-              <div className="p-4 md:p-6 space-y-6">
-                {/* Metadata */}
-                {Object.keys(currentFile.metadata).length > 0 && (
-                  <div className="rounded-lg border border-border overflow-hidden">
-                    <div className="bg-secondary px-4 py-2 border-b border-border">
-                      <h3 className="text-sm font-medium text-foreground">
-                        Metadata
-                      </h3>
-                    </div>
-                    <div className="divide-y divide-border">
-                      {Object.entries(currentFile.metadata).map(
-                        ([key, value]) => (
-                          <div key={key} className="flex">
-                            <div className="w-32 shrink-0 px-4 py-2 bg-secondary/50 text-sm font-mono text-muted-foreground">
-                              {key}
-                            </div>
-                            <div className="flex-1 px-4 py-2 text-sm text-foreground">
-                              {Array.isArray(value)
-                                ? value.join(", ")
-                                : String(value)}
-                            </div>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Form Fields */}
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-foreground">
-                      Parameters
-                    </h3>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleClear}
-                      className="h-8 text-muted-foreground hover:text-foreground"
-                    >
-                      <RotateCcw className="h-3 w-3 mr-1.5" />
-                      Reset
-                    </Button>
-                  </div>
-
-                  {currentParams.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4">
-                      This template has no parameters. The content will be used
-                      as-is.
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {currentParams.map((param) => (
-                        <ParameterField
-                          key={param.name}
-                          param={param}
-                          value={
-                            formValues.get(param.name) ??
-                            param.defaultValue ??
-                            ""
-                          }
-                          onChange={(value) =>
-                            updateFormValue(param.name, value)
-                          }
-                          onCopy={handleCopy}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Copy Button */}
-                <div className="pt-2">
-                  <Button onClick={handleCopy} className="w-full" size="lg">
-                    <Copy className="h-4 w-4 mr-2" />
-                    Copy Prompt
+        <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2">
+          {/* Left column: header + form */}
+          <section className="min-w-0 min-h-0 flex flex-col lg:border-r border-border">
+            <header className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 ">
+              <div className="flex items-center gap-3">
+                {!isSidebarOpen && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={onToggleSidebar}
+                    className="h-8 w-8"
+                  >
+                    <PanelLeft className="h-4 w-4" />
                   </Button>
-                  <p className="text-center text-xs text-muted-foreground mt-2">
-                    <Kbd>Ctrl</Kbd> + <Kbd>Enter</Kbd> to copy
-                  </p>
+                )}
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {currentFile.name}
+                  </h2>
                 </div>
               </div>
-            </ScrollArea>
-          </div>
 
-          {/* Preview Section */}
-          <div className="hidden lg:flex w-1/2 flex-col overflow-hidden max-w-xl border-t lg:border-t-0 border-border bg-muted/30">
-            <div className="px-4 py-3 border-b border-border shrink-0 bg-card">
-              <h3 className="text-sm font-medium text-foreground">Preview</h3>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onOpenDocs}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Docs
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onOpenTemplate}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  Template
+                </Button>
+              </div>
+            </header>
+
+            <div className="min-h-0 flex-1 overflow-hidden">
+              <ScrollArea className="h-full">
+                <div className="p-4 md:p-6 space-y-6">
+                  {Object.keys(currentFile.metadata).length > 0 && (
+                    <div className="rounded-lg border border-border overflow-hidden">
+                      <div className="bg-secondary px-4 py-2 border-b border-border">
+                        <h3 className="text-sm font-medium text-foreground">
+                          Metadata
+                        </h3>
+                      </div>
+                      <div className="divide-y divide-border">
+                        {Object.entries(currentFile.metadata).map(
+                          ([key, value]) => (
+                            <div key={key} className="flex">
+                              <div className="w-32 shrink-0 px-4 py-2 bg-secondary/50 text-sm font-mono text-muted-foreground">
+                                {key}
+                              </div>
+                              <div className="flex-1 px-4 py-2 text-sm text-foreground">
+                                {Array.isArray(value)
+                                  ? value.join(", ")
+                                  : String(value)}
+                              </div>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-foreground">
+                        Parameters
+                      </h3>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClear}
+                        className="h-8 text-muted-foreground hover:text-foreground"
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1.5" />
+                        Reset
+                      </Button>
+                    </div>
+
+                    {currentParams.length === 0 ? (
+                      <p className="text-sm text-muted-foreground py-4">
+                        This template has no parameters. The content will be
+                        used as-is.
+                      </p>
+                    ) : (
+                      <div className="space-y-4">
+                        {currentParams.map((param) => (
+                          <ParameterField
+                            key={param.name}
+                            param={param}
+                            value={
+                              formValues.get(param.name) ??
+                              param.defaultValue ??
+                              ""
+                            }
+                            onChange={(value) =>
+                              updateFormValue(param.name, value)
+                            }
+                            onCopy={handleCopy}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2">
+                    <Button onClick={handleCopy} className="w-full" size="lg">
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Prompt
+                    </Button>
+                    <p className="text-center text-xs text-muted-foreground mt-2">
+                      <Kbd>Ctrl</Kbd> + <Kbd>Enter</Kbd> to copy
+                    </p>
+                  </div>
+                </div>
+              </ScrollArea>
             </div>
-            <div className="flex-1 overflow-auto">
-              <div className="p-4 min-h-full">
+          </section>
+
+          {/* Right column: preview only */}
+          <aside className="hidden lg:flex min-w-0 min-h-0 flex-col bg-muted/30">
+            <div className="px-6 py-4.5 border-b border-border shrink-0">
+              <h2 className="text-lg font-semibold text-foreground">Preview</h2>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto">
+              <div className="p-6 min-h-full">
                 {preview ? (
                   <pre className="text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed break-words">
                     {preview}
@@ -289,10 +275,10 @@ export function MainContent({
                 )}
               </div>
             </div>
-          </div>
+          </aside>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex h-full items-center justify-center">
           <div className="text-center max-w-sm">
             <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium text-foreground mb-2">
