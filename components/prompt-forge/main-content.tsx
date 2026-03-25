@@ -52,17 +52,73 @@ export function MainContent({
   const [formValues, setFormValues] = useState<Map<string, string>>(new Map());
   const [preview, setPreview] = useState<string>("");
 
-  useEffect(() => {
-    if (currentFile && currentParams.length > 0) {
-      const initialValues = new Map<string, string>();
-      for (const param of currentParams) {
-        initialValues.set(param.name, param.defaultValue ?? "");
+  const getFormStorageKey = useCallback((file: ParsedFile | null) => {
+    if (!file?.path) return null;
+    return `prompt-forge-form-values:${file.path}`;
+  }, []);
+
+  const saveFormValues = useCallback(
+    (file: ParsedFile | null, values: Map<string, string>) => {
+      const key = getFormStorageKey(file);
+      if (!key) return;
+
+      try {
+        localStorage.setItem(key, JSON.stringify(Object.fromEntries(values)));
+      } catch {}
+    },
+    [getFormStorageKey],
+  );
+
+  const loadFormValues = useCallback(
+    (file: ParsedFile | null): Map<string, string> | null => {
+      const key = getFormStorageKey(file);
+      if (!key) return null;
+
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as Record<string, string>;
+        return new Map(Object.entries(parsed));
+      } catch {
+        return null;
       }
-      setFormValues(initialValues);
-    } else {
+    },
+    [getFormStorageKey],
+  );
+
+  useEffect(() => {
+    if (!currentFile) {
       setFormValues(new Map());
+      return;
     }
-  }, [currentFile, currentParams]);
+
+    const defaultValues = new Map<string, string>();
+    for (const param of currentParams) {
+      defaultValues.set(param.name, param.defaultValue ?? "");
+    }
+
+    const savedValues = loadFormValues(currentFile);
+
+    if (!savedValues) {
+      setFormValues(defaultValues);
+      return;
+    }
+
+    const mergedValues = new Map<string, string>();
+    for (const param of currentParams) {
+      mergedValues.set(
+        param.name,
+        savedValues.get(param.name) ?? param.defaultValue ?? "",
+      );
+    }
+
+    setFormValues(mergedValues);
+  }, [currentFile, currentParams, loadFormValues]);
+
+  useEffect(() => {
+    if (!currentFile) return;
+    saveFormValues(currentFile, formValues);
+  }, [currentFile, formValues, saveFormValues]);
 
   useEffect(() => {
     if (currentFile) {
@@ -128,9 +184,8 @@ export function MainContent({
         </div>
       ) : currentFile ? (
         <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2">
-          {/* Left column: header + form */}
           <section className="min-w-0 min-h-0 flex flex-col lg:border-r border-border">
-            <header className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0 ">
+            <header className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
               <div className="flex items-center gap-3">
                 {!isSidebarOpen && (
                   <Button
@@ -256,7 +311,6 @@ export function MainContent({
             </div>
           </section>
 
-          {/* Right column: preview only */}
           <aside className="hidden lg:flex min-w-0 min-h-0 flex-col bg-muted/30">
             <div className="px-6 py-4.5 border-b border-border shrink-0">
               <h2 className="text-lg font-semibold text-foreground">Preview</h2>

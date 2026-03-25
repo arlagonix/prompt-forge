@@ -569,7 +569,7 @@ export default function PromptForge() {
         }
 
         const restoredFileMap = await loadFolderFromHandle(handle);
-        showNotification(`Folder restored: ${handle.name}`);
+        // showNotification(`Folder restored: ${handle.name}`);
 
         const lastFile = loadLastFile();
         if (!lastFile) return;
