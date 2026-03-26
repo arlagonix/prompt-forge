@@ -30,6 +30,7 @@ import {
   Code,
   Copy,
   FileText,
+  Folder,
   MoreHorizontal,
   PanelLeft,
   Pencil,
@@ -45,6 +46,7 @@ interface MainContentProps {
   onOpenDocs: () => void;
   onOpenTemplate: () => void;
   onEditFile: () => void;
+  onMoveFile: () => void;
   onDeleteFile: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
   onToggleSidebar: () => void;
@@ -58,6 +60,7 @@ export function MainContent({
   onOpenDocs,
   onOpenTemplate,
   onEditFile,
+  onMoveFile,
   onDeleteFile,
   showNotification,
   onToggleSidebar,
@@ -240,13 +243,17 @@ export function MainContent({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem onClick={onEditFile}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={onOpenTemplate}>
                       <Code className="h-4 w-4 mr-2" />
                       Template
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onEditFile}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
+                    <DropdownMenuItem onClick={onMoveFile}>
+                      <Folder className="h-4 w-4 mr-2" />
+                      Move to…
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

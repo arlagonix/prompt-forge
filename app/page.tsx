@@ -992,12 +992,12 @@ export default function PromptForge() {
         onOpenDocs={() => setIsDocsOpen(true)}
         onOpenTemplate={() => setIsTemplateOpen(true)}
         onEditFile={() => currentFile && openEditor(currentFile.id)}
+        onMoveFile={() => currentFile && openMovePromptDialog(currentFile.id)}
         onDeleteFile={() => currentFile && deleteFile(currentFile.id)}
         showNotification={showNotification}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}
       />
-
       <CommandPalette
         isOpen={isPaletteOpen}
         onClose={() => setIsPaletteOpen(false)}
