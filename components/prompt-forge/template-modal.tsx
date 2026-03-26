@@ -26,7 +26,7 @@ export function TemplateModal({
           <DialogTitle>Template Source</DialogTitle>
         </DialogHeader>
         <ScrollArea className="max-h-[calc(85vh-80px)]">
-          <pre className="bg-secondary px-6 py-4 text-sm font-mono text-foreground whitespace-pre-wrap leading-relaxed">
+          <pre className="bg-secondary p-4 rounded-md text-sm font-mono text-foreground whitespace-pre-wrap leading-relaxed">
             {content || "No content"}
           </pre>
         </ScrollArea>
