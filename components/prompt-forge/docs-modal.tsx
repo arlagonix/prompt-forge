@@ -1,16 +1,16 @@
-"use client"
+"use client";
 
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { ScrollArea } from "@/components/ui/scroll-area"
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface DocsModalProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 export function DocsModal({ isOpen, onClose }: DocsModalProps) {
@@ -20,66 +20,150 @@ export function DocsModal({ isOpen, onClose }: DocsModalProps) {
         <DialogHeader className="px-6 py-4 border-b border-border">
           <DialogTitle>Template Syntax Guide</DialogTitle>
         </DialogHeader>
+
         <ScrollArea className="max-h-[calc(85vh-80px)]">
           <div className="px-6 py-4 space-y-6">
-            <DocSection title="Front Matter">
+            <DocSection title="Overview">
               <p className="text-sm text-muted-foreground mb-3">
-                Add metadata at the top of your template file. This is shown in the header and excluded from the generated prompt.
+                Templates use YAML front matter for parameter definitions and
+                simple <code>{`{{name}}`}</code> placeholders inside the body.
               </p>
               <CodeBlock>{`---
-name: Name of the prompt
-description: Description of the prompt
-tags:
-  - coding
-  - analysis
-owner: John
+title: Example
+description: A prompt template
+params:
+  - name: audience
+    label: Target audience
+    type: select
+    values: [Beginners, Experts, Executives]
+    default: Beginners
+  - name: tone
+    type: radio
+    values: [Neutral, Friendly, Formal]
+    default: Neutral
+  - name: constraints
+    type: textarea
+    default: ""
 ---
-Your prompt starts here... {{message}}`}</CodeBlock>
+
+Write a response for {{audience}} in a {{tone}} tone.
+
+Constraints:
+{{constraints}}`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Basic Placeholders">
-              <CodeBlock>{`{{message}}
-{{message | label=Your message}}
-{{message | default=Hello}}
-{{message | label=Your message | default=Hello}}`}</CodeBlock>
+            <DocSection title="Front Matter">
+              <p className="text-sm text-muted-foreground mb-3">
+                The section between the two <code>---</code> lines is YAML front
+                matter. It defines the template title, description, and
+                parameter list.
+              </p>
+              <CodeBlock>{`---
+title: Example
+description: A prompt template
+params:
+  - name: audience
+    type: text
+---`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Textarea (default type)">
-              <CodeBlock>{`{{bio}}
-{{bio | type=textarea}}
-{{bio | type=textarea | label=Bio}}
-{{bio | type=textarea | height=10}}
-{{description | type=textarea | label=Long description | height=15 | default=Enter text...}}`}</CodeBlock>
+            <DocSection title="Placeholders">
+              <p className="text-sm text-muted-foreground mb-3">
+                In the body, placeholders are simple. They should match the
+                parameter names from <code>params</code>.
+              </p>
+              <CodeBlock>{`Hello, {{name}}!
+Goal:
+{{goal}}`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Parameter Fields">
+              <p className="text-sm text-muted-foreground mb-3">
+                Each item inside <code>params</code> defines one form field.
+              </p>
+              <CodeBlock>{`params:
+  - name: audience
+    label: Target audience
+    type: select
+    values: [Beginners, Experts, Executives]
+    default: Beginners`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Supported Types">
+              <CodeBlock>{`type: text
+type: textarea
+type: number
+type: checkbox
+type: select
+type: radio`}</CodeBlock>
             </DocSection>
 
             <DocSection title="Text Input">
-              <CodeBlock>{`{{title | type=text}}
-{{title | type=text | label=Title}}
-{{title | type=text | default=Hello}}`}</CodeBlock>
+              <CodeBlock>{`params:
+  - name: name
+    label: Name
+    type: text
+    default: John`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Number Input">
-              <CodeBlock>{`{{age | type=number}}
-{{age | type=number | label=Age}}
-{{age | type=number | default=42}}`}</CodeBlock>
+            <DocSection title="Textarea">
+              <CodeBlock>{`params:
+  - name: constraints
+    label: Constraints
+    type: textarea
+    default: ""`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Number">
+              <CodeBlock>{`params:
+  - name: age
+    label: Age
+    type: number
+    default: 42`}</CodeBlock>
             </DocSection>
 
             <DocSection title="Checkbox">
-              <CodeBlock>{`{{agree | type=checkbox}}
-{{agree | type=checkbox | label=I agree}}
-{{agree | type=checkbox | default=true}}`}</CodeBlock>
+              <CodeBlock>{`params:
+  - name: include_examples
+    label: Include examples
+    type: checkbox
+    default: true`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Select Dropdown">
-              <CodeBlock>{`{{color | type=select | value=Red | value=Green | value=Blue}}
-{{color | type=select | label=Pick a color | value=Red | value=Green | value=Blue}}
-{{color | type=select | value=One | value=Two | value=Three | default=Two}}`}</CodeBlock>
+            <DocSection title="Select">
+              <CodeBlock>{`params:
+  - name: audience
+    label: Target audience
+    type: select
+    values: [Beginners, Experts, Executives]
+    default: Beginners`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Radio Buttons">
-              <CodeBlock>{`{{choice | type=radio | value=A | value=B | value=C}}
-{{choice | type=radio | label=Choose one | value=A | value=B | value=C}}
-{{choice | type=radio | value=One | value=Two | value=Three | default=Three}}`}</CodeBlock>
+            <DocSection title="Radio">
+              <CodeBlock>{`params:
+  - name: tone
+    label: Tone
+    type: radio
+    values: [Neutral, Friendly, Formal]
+    default: Neutral`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Notes">
+              <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                <li>
+                  Parameter names should match the placeholders in the body.
+                </li>
+                <li>
+                  Use simple placeholders like <code>{`{{name}}`}</code>.
+                </li>
+                <li>
+                  <code>values</code> is used for <code>select</code> and{" "}
+                  <code>radio</code>.
+                </li>
+                <li>
+                  <code>default</code> sets the initial value shown in the form.
+                </li>
+              </ul>
             </DocSection>
 
             <DocSection title="Keyboard Shortcuts">
@@ -100,16 +184,22 @@ Your prompt starts here... {{message}}`}</CodeBlock>
         </ScrollArea>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
-function DocSection({ title, children }: { title: string; children: React.ReactNode }) {
+function DocSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <h3 className="text-sm font-semibold text-foreground mb-2">{title}</h3>
       {children}
     </div>
-  )
+  );
 }
 
 function CodeBlock({ children }: { children: string }) {
@@ -117,5 +207,5 @@ function CodeBlock({ children }: { children: string }) {
     <pre className="bg-secondary p-3 rounded-md text-sm font-mono text-foreground overflow-x-auto whitespace-pre-wrap">
       {children}
     </pre>
-  )
+  );
 }

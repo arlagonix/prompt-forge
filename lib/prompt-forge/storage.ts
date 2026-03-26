@@ -20,13 +20,23 @@ const DEFAULT_PROMPT_ID = "prompt-welcome";
 const DEFAULT_TEMPLATE = `---
 title: Welcome Template
 description: A starter prompt template
+params:
+  - name: name
+    label: Name
+    type: text
+    default: John
+  - name: goal
+    label: Goal
+    type: textarea
+    default: ""
 ---
 
 # Welcome
 
-Write your prompt template here. Use {{name}} syntax for parameters.
-
 Hello, {{name}}!
+
+Your goal:
+{{goal}}
 `;
 
 function randomId(prefix: string) {

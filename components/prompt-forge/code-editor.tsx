@@ -115,21 +115,108 @@ export function CodeEditor({
   const handleKeyDownTextarea = (
     e: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
     if (e.key === "Tab") {
       e.preventDefault();
-      const textarea = textareaRef.current;
-      if (!textarea) return;
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation?.();
 
       const start = textarea.selectionStart;
       const end = textarea.selectionEnd;
+
+      if (e.shiftKey) {
+        const lineStart = content.lastIndexOf("\n", start - 1) + 1;
+        const selectedText = content.slice(lineStart, end);
+        const lines = selectedText.split("\n");
+
+        const updatedLines = lines.map((line) => {
+          if (line.startsWith("  ")) return line.slice(2);
+          if (line.startsWith("\t")) return line.slice(1);
+          return line;
+        });
+
+        const replacement = updatedLines.join("\n");
+        const newContent =
+          content.slice(0, lineStart) + replacement + content.slice(end);
+
+        setContent(newContent);
+
+        requestAnimationFrame(() => {
+          const removed = selectedText.length - replacement.length;
+          textarea.selectionStart = lineStart;
+          textarea.selectionEnd = end - removed;
+        });
+
+        return;
+      }
+
+      if (start !== end) {
+        const lineStart = content.lastIndexOf("\n", start - 1) + 1;
+        const selectedText = content.slice(lineStart, end);
+        const lines = selectedText.split("\n");
+        const replacement = lines.map((line) => `  ${line}`).join("\n");
+
+        const newContent =
+          content.slice(0, lineStart) + replacement + content.slice(end);
+
+        setContent(newContent);
+
+        requestAnimationFrame(() => {
+          textarea.selectionStart = lineStart;
+          textarea.selectionEnd = lineStart + replacement.length;
+        });
+
+        return;
+      }
+
+      const newContent = content.slice(0, start) + "  " + content.slice(end);
+      setContent(newContent);
+
+      requestAnimationFrame(() => {
+        textarea.selectionStart = textarea.selectionEnd = start + 2;
+      });
+
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation?.();
+
+      const start = textarea.selectionStart;
+      const end = textarea.selectionEnd;
+
+      const lineStart = content.lastIndexOf("\n", start - 1) + 1;
+      const currentLine = content.slice(lineStart, start);
+
+      const indentMatch = currentLine.match(/^[\t ]*/);
+      const baseIndent = indentMatch?.[0] ?? "";
+
+      const trimmedLine = currentLine.trimEnd();
+
+      let extraIndent = "";
+      if (trimmedLine.endsWith(":")) {
+        extraIndent = "  ";
+      } else if (trimmedLine.startsWith("- ")) {
+        const bulletIndentMatch = currentLine.match(/^([\t ]*)-\s/);
+        if (bulletIndentMatch) {
+          extraIndent = "  ";
+        }
+      }
+
+      const insertion = "\n" + baseIndent + extraIndent;
       const newContent =
-        content.substring(0, start) + "  " + content.substring(end);
+        content.slice(0, start) + insertion + content.slice(end);
 
       setContent(newContent);
 
-      setTimeout(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 2;
-      }, 0);
+      requestAnimationFrame(() => {
+        const nextPos = start + insertion.length;
+        textarea.selectionStart = textarea.selectionEnd = nextPos;
+      });
     }
   };
 
@@ -240,7 +327,7 @@ export function CodeEditor({
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 onScroll={handleScroll}
-                onKeyDown={handleKeyDownTextarea}
+                onKeyDownCapture={handleKeyDownTextarea}
                 spellCheck={false}
                 className={cn(
                   "flex-1 min-h-0 overflow-auto p-3 font-mono text-sm leading-6 resize-none",

@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { buildPrompt } from "@/lib/prompt-forge/parser";
+import { buildPrompt, buildPromptSegments } from "@/lib/prompt-forge/parser";
 import type { Parameter, ParsedFile } from "@/lib/prompt-forge/types";
 import {
   BookOpen,
@@ -68,6 +68,9 @@ export function MainContent({
 }: MainContentProps) {
   const [formValues, setFormValues] = useState<Map<string, string>>(new Map());
   const [preview, setPreview] = useState<string>("");
+  const [previewSegments, setPreviewSegments] = useState<
+    { text: string; isUserValue: boolean; paramName?: string }[]
+  >([]);
 
   const getFormStorageKey = useCallback((file: ParsedFile | null) => {
     if (!file?.id) return null;
@@ -139,13 +142,24 @@ export function MainContent({
 
   useEffect(() => {
     if (currentFile) {
+      const segments = buildPromptSegments(
+        currentFile.bodyContent,
+        currentFile.content,
+        formValues,
+      );
+
       const prompt = buildPrompt(
         currentFile.bodyContent,
         currentFile.content,
         currentParams,
         formValues,
       );
+
+      setPreviewSegments(segments);
       setPreview(prompt ?? "");
+    } else {
+      setPreviewSegments([]);
+      setPreview("");
     }
   }, [currentFile, currentParams, formValues]);
 
@@ -232,6 +246,16 @@ export function MainContent({
                   Docs
                 </Button>
 
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleClear}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Reset
+                </Button>
+
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -243,13 +267,13 @@ export function MainContent({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-40">
-                    <DropdownMenuItem onClick={onEditFile}>
-                      <Pencil className="h-4 w-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={onOpenTemplate}>
                       <Code className="h-4 w-4 mr-2" />
                       Template
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onEditFile}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={onMoveFile}>
                       <Folder className="h-4 w-4 mr-2" />
@@ -271,73 +295,30 @@ export function MainContent({
             <div className="min-h-0 flex-1 overflow-hidden">
               <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 space-y-6">
-                  {Object.keys(currentFile.metadata).length > 0 && (
-                    <div className="rounded-lg border border-border overflow-hidden">
-                      <div className="bg-secondary px-4 py-2 border-b border-border">
-                        <h3 className="text-sm font-medium text-foreground">
-                          Metadata
-                        </h3>
-                      </div>
-                      <div className="divide-y divide-border">
-                        {Object.entries(currentFile.metadata).map(
-                          ([key, value]) => (
-                            <div key={key} className="flex">
-                              <div className="w-32 shrink-0 px-4 py-2 bg-secondary/50 text-sm font-mono text-muted-foreground">
-                                {key}
-                              </div>
-                              <div className="flex-1 px-4 py-2 text-sm text-foreground">
-                                {Array.isArray(value)
-                                  ? value.join(", ")
-                                  : String(value)}
-                              </div>
-                            </div>
-                          ),
-                        )}
-                      </div>
+                  {currentParams.length === 0 ? (
+                    <p className="text-sm text-muted-foreground py-4">
+                      This template has no parameters. The content will be used
+                      as-is.
+                    </p>
+                  ) : (
+                    <div className="space-y-6">
+                      {currentParams.map((param) => (
+                        <ParameterField
+                          key={param.name}
+                          param={param}
+                          value={
+                            formValues.get(param.name) ??
+                            param.defaultValue ??
+                            ""
+                          }
+                          onChange={(value) =>
+                            updateFormValue(param.name, value)
+                          }
+                          onCopy={handleCopy}
+                        />
+                      ))}
                     </div>
                   )}
-
-                  <div className="space-y-5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-foreground">
-                        Parameters
-                      </h3>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleClear}
-                        className="h-8 text-muted-foreground hover:text-foreground"
-                      >
-                        <RotateCcw className="h-3 w-3 mr-1.5" />
-                        Reset
-                      </Button>
-                    </div>
-
-                    {currentParams.length === 0 ? (
-                      <p className="text-sm text-muted-foreground py-4">
-                        This template has no parameters. The content will be
-                        used as-is.
-                      </p>
-                    ) : (
-                      <div className="space-y-4">
-                        {currentParams.map((param) => (
-                          <ParameterField
-                            key={param.name}
-                            param={param}
-                            value={
-                              formValues.get(param.name) ??
-                              param.defaultValue ??
-                              ""
-                            }
-                            onChange={(value) =>
-                              updateFormValue(param.name, value)
-                            }
-                            onCopy={handleCopy}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
 
                   <div className="pt-2">
                     <Button onClick={handleCopy} className="w-full" size="lg">
@@ -362,7 +343,23 @@ export function MainContent({
               <div className="p-6 min-h-full">
                 {preview ? (
                   <pre className="text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed break-words">
-                    {preview}
+                    {previewSegments.map((segment, index) =>
+                      segment.isUserValue ? (
+                        <span
+                          key={index}
+                          className="rounded border border-primary/25 bg-primary/10 px-0.5 text-foreground"
+                          title={
+                            segment.paramName
+                              ? `From: ${segment.paramName}`
+                              : undefined
+                          }
+                        >
+                          {segment.text}
+                        </span>
+                      ) : (
+                        <span key={index}>{segment.text}</span>
+                      ),
+                    )}
                   </pre>
                 ) : (
                   <p className="text-sm text-muted-foreground italic">

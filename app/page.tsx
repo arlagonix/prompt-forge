@@ -43,13 +43,29 @@ import { toast } from "sonner";
 const DEFAULT_TEMPLATE = `---
 title: New Template
 description: A new prompt template
+params:
+  - name: audience
+    label: Target audience
+    type: select
+    values: [Beginners, Experts, Executives]
+    default: Beginners
+  - name: tone
+    label: Tone
+    type: radio
+    values: [Neutral, Friendly, Formal]
+    default: Neutral
+  - name: constraints
+    label: Constraints
+    type: textarea
+    default: ""
 ---
 
 # Your Template
 
-Write your prompt template here. Use {{parameter_name}} syntax for parameters.
+Write a response for {{audience}} in a {{tone}} tone.
 
-Example: Hello, {{name}}! How can I help you today?
+Constraints:
+{{constraints}}
 `;
 
 const LAST_FILE_KEY = "prompt-forge-last-file";
@@ -197,7 +213,7 @@ export default function PromptForge() {
   const applyCurrentFile = useCallback(
     (file: ParsedFile | null) => {
       setCurrentFile(file);
-      setCurrentParams(file ? extractParameters(file.bodyContent) : []);
+      setCurrentParams(file ? extractParameters(file.content) : []);
       if (file) {
         saveLastFile(file);
       }
