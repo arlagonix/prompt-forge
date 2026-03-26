@@ -42,6 +42,7 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { ThemeToggle } from "./theme-toggle";
 
 interface SidebarProps {
   folderTree: FolderNode | null;
@@ -332,6 +333,9 @@ export function Sidebar({
                 <X className="h-4 w-4" />
               </Button>
             )}
+
+            <ThemeToggle />
+
             <Button
               variant="ghost"
               size="icon"
