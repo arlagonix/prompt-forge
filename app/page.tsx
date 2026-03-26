@@ -26,6 +26,7 @@ import {
   ensureSeedData,
   getAllFolders,
   getAllPrompts,
+  getFolderDeleteSummary,
   moveFolder,
   movePrompt,
   renameFolder,
@@ -985,6 +986,7 @@ export default function PromptForge() {
         onRenameFolder={renameExistingFolder}
         onMoveFolder={openMoveFolderDialog}
         onDeleteFolder={deleteExistingFolder}
+        onGetFolderDeleteSummary={getFolderDeleteSummary}
         onDeleteFile={deleteFile as never}
         isLoading={isLoading}
         isOpen={isSidebarOpen}

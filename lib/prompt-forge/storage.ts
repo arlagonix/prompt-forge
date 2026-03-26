@@ -417,6 +417,75 @@ export async function renameFolder(
   return updated;
 }
 
+function collectDescendantFolderIds(
+  folderId: string,
+  folders: FolderRecord[],
+): string[] {
+  const childrenByParent = new Map<string | null, FolderRecord[]>();
+
+  for (const folder of folders) {
+    const list = childrenByParent.get(folder.parentId) ?? [];
+    list.push(folder);
+    childrenByParent.set(folder.parentId, list);
+  }
+
+  const result: string[] = [];
+  const stack = [...(childrenByParent.get(folderId) ?? [])];
+
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    result.push(current.id);
+    stack.push(...(childrenByParent.get(current.id) ?? []));
+  }
+
+  return result;
+}
+
+export async function getFolderDeleteSummary(folderId: string): Promise<{
+  folderName: string;
+  subfolderCount: number;
+  promptCount: number;
+}> {
+  const db = await openPromptForgeDb();
+  const tx = db.transaction([FOLDERS_STORE, PROMPTS_STORE], "readonly");
+
+  const foldersStore = tx.objectStore(FOLDERS_STORE);
+  const promptsStore = tx.objectStore(PROMPTS_STORE);
+
+  const folder = (await requestToPromise(foldersStore.get(folderId))) as
+    | FolderRecord
+    | undefined;
+
+  if (!folder) {
+    throw new Error("Folder not found");
+  }
+
+  if (folder.parentId === null || folder.id === ROOT_FOLDER_ID) {
+    throw new Error("Root folder cannot be deleted");
+  }
+
+  const allFolders = (await requestToPromise(
+    foldersStore.getAll(),
+  )) as FolderRecord[];
+
+  const allPrompts = (await requestToPromise(
+    promptsStore.getAll(),
+  )) as PromptRecord[];
+
+  const descendantIds = collectDescendantFolderIds(folderId, allFolders);
+  const folderIdsToDelete = new Set([folderId, ...descendantIds]);
+
+  const promptCount = allPrompts.filter((prompt) =>
+    folderIdsToDelete.has(prompt.folderId ?? ""),
+  ).length;
+
+  return {
+    folderName: folder.name,
+    subfolderCount: descendantIds.length,
+    promptCount,
+  };
+}
+
 export async function deleteFolder(id: string): Promise<void> {
   const db = await openPromptForgeDb();
   const tx = db.transaction([FOLDERS_STORE, PROMPTS_STORE], "readwrite");
@@ -432,24 +501,53 @@ export async function deleteFolder(id: string): Promise<void> {
     throw new Error("Folder not found");
   }
 
-  const childFolders = (await requestToPromise(
-    foldersStore.index("by_parentId").getAll(id),
+  if (folder.parentId === null || folder.id === ROOT_FOLDER_ID) {
+    throw new Error("Root folder cannot be deleted");
+  }
+
+  const allFolders = (await requestToPromise(
+    foldersStore.getAll(),
   )) as FolderRecord[];
 
-  if (childFolders.length > 0) {
-    throw new Error("Folder is not empty");
-  }
-
-  const childPrompts = (await requestToPromise(
-    promptsStore.index("by_folderId").getAll(id),
+  const allPrompts = (await requestToPromise(
+    promptsStore.getAll(),
   )) as PromptRecord[];
 
-  if (childPrompts.length > 0) {
-    throw new Error("Folder is not empty");
+  const descendantIds = collectDescendantFolderIds(id, allFolders);
+  const folderIdsToDelete = new Set([id, ...descendantIds]);
+
+  for (const prompt of allPrompts) {
+    if (folderIdsToDelete.has(prompt.folderId ?? "")) {
+      promptsStore.delete(prompt.id);
+    }
   }
 
-  foldersStore.delete(id);
+  const foldersToDelete = allFolders
+    .filter((item) => folderIdsToDelete.has(item.id))
+    .sort((a, b) => {
+      const depthA = collectDepth(a.id, allFolders);
+      const depthB = collectDepth(b.id, allFolders);
+      return depthB - depthA;
+    });
+
+  for (const folderToDelete of foldersToDelete) {
+    foldersStore.delete(folderToDelete.id);
+  }
+
   await transactionDone(tx);
+}
+
+function collectDepth(folderId: string, folders: FolderRecord[]): number {
+  const folderMap = new Map(folders.map((f) => [f.id, f]));
+  let depth = 0;
+  let current = folderMap.get(folderId) ?? null;
+
+  while (current?.parentId) {
+    depth += 1;
+    current = folderMap.get(current.parentId) ?? null;
+  }
+
+  return depth;
 }
 
 export async function movePrompt(

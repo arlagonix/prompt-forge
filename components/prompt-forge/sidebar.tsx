@@ -2,6 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -18,6 +26,7 @@ import type {
 } from "@/lib/prompt-forge/types";
 import { cn } from "@/lib/utils";
 import {
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   Code,
@@ -53,6 +62,11 @@ interface SidebarProps {
   ) => void | Promise<void>;
   onRenameFolder: (folderId: string, name: string) => void | Promise<void>;
   onDeleteFolder: (folderId: string) => void | Promise<void>;
+  onGetFolderDeleteSummary: (folderId: string) => Promise<{
+    folderName: string;
+    subfolderCount: number;
+    promptCount: number;
+  }>;
   onDeleteFile: (fileId: string) => void;
   isLoading: boolean;
   isOpen: boolean;
@@ -90,6 +104,7 @@ export function Sidebar({
   onCreateFolder,
   onRenameFolder,
   onDeleteFolder,
+  onGetFolderDeleteSummary,
   onDeleteFile,
   isLoading,
   isOpen,
@@ -118,6 +133,21 @@ export function Sidebar({
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingFolderName, setEditingFolderName] = useState("");
   const [openFolderIds, setOpenFolderIds] = useState<Set<string>>(new Set());
+  const [folderDeleteState, setFolderDeleteState] = useState<{
+    isOpen: boolean;
+    folderId: string | null;
+    folderName: string;
+    subfolderCount: number;
+    promptCount: number;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    folderId: null,
+    folderName: "",
+    subfolderCount: 0,
+    promptCount: 0,
+    isLoading: false,
+  });
 
   const newFolderInputRef = useRef<HTMLInputElement>(null);
   const creatingFolderSubmitRef = useRef(false);
@@ -207,6 +237,75 @@ export function Sidebar({
       creatingFolderSubmitRef.current = false;
     }
   };
+
+  const resetFolderDeleteState = () => {
+    setFolderDeleteState({
+      isOpen: false,
+      folderId: null,
+      folderName: "",
+      subfolderCount: 0,
+      promptCount: 0,
+      isLoading: false,
+    });
+  };
+
+  const openDeleteFolderConfirm = async (folderId: string) => {
+    setFolderDeleteState({
+      isOpen: true,
+      folderId,
+      folderName: "",
+      subfolderCount: 0,
+      promptCount: 0,
+      isLoading: true,
+    });
+
+    try {
+      const summary = await onGetFolderDeleteSummary(folderId);
+      setFolderDeleteState({
+        isOpen: true,
+        folderId,
+        folderName: summary.folderName,
+        subfolderCount: summary.subfolderCount,
+        promptCount: summary.promptCount,
+        isLoading: false,
+      });
+    } catch {
+      resetFolderDeleteState();
+    }
+  };
+
+  const confirmDeleteFolder = async () => {
+    if (!folderDeleteState.folderId) return;
+    await onDeleteFolder(folderDeleteState.folderId);
+    resetFolderDeleteState();
+  };
+
+  const deleteDescription = folderDeleteState.isLoading
+    ? "Loading folder details..."
+    : (() => {
+        const parts: string[] = [];
+
+        if (folderDeleteState.subfolderCount > 0) {
+          parts.push(
+            `${folderDeleteState.subfolderCount} subfolder${
+              folderDeleteState.subfolderCount === 1 ? "" : "s"
+            }`,
+          );
+        }
+
+        if (folderDeleteState.promptCount > 0) {
+          parts.push(
+            `${folderDeleteState.promptCount} template${
+              folderDeleteState.promptCount === 1 ? "" : "s"
+            }`,
+          );
+        }
+
+        const details =
+          parts.length > 0 ? `, including ${parts.join(" and ")}` : "";
+
+        return `This will permanently delete “${folderDeleteState.folderName}”${details}. This action cannot be undone.`;
+      })();
 
   const sidebarContent = (
     <aside
@@ -360,6 +459,7 @@ export function Sidebar({
                 onCreateFile={onCreateFile}
                 onDeleteFolder={onDeleteFolder}
                 onMoveFolder={onMoveFolder}
+                onOpenDeleteFolderConfirm={openDeleteFolderConfirm}
                 creatingFolderParentId={creatingFolderParentId}
                 newFolderName={newFolderName}
                 newFolderInputRef={newFolderInputRef}
@@ -421,6 +521,33 @@ export function Sidebar({
           </div>
         )}
       </ScrollArea>
+
+      <Dialog
+        open={folderDeleteState.isOpen}
+        onOpenChange={(open) => !open && resetFolderDeleteState()}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              Delete folder and all contents?
+            </DialogTitle>
+            <DialogDescription>{deleteDescription}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={resetFolderDeleteState}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => void confirmDeleteFolder()}
+              disabled={folderDeleteState.isLoading}
+            >
+              Delete folder and contents
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 
@@ -448,6 +575,7 @@ interface FolderContentsProps {
   onCreateFile: (folderId?: string) => void;
   onDeleteFolder: (folderId: string) => void | Promise<void>;
   onMoveFolder: (folderId: string) => void;
+  onOpenDeleteFolderConfirm: (folderId: string) => void | Promise<void>;
   creatingFolderParentId: string | null;
   newFolderName: string;
   newFolderInputRef: React.RefObject<HTMLInputElement | null>;
@@ -491,6 +619,7 @@ function FolderContents({
   onCreateFile,
   onDeleteFolder,
   onMoveFolder,
+  onOpenDeleteFolderConfirm,
   creatingFolderParentId,
   newFolderName,
   newFolderInputRef,
@@ -537,6 +666,7 @@ function FolderContents({
             onCreateFile={onCreateFile}
             onDeleteFolder={onDeleteFolder}
             onMoveFolder={onMoveFolder}
+            onOpenDeleteFolderConfirm={onOpenDeleteFolderConfirm}
             creatingFolderParentId={creatingFolderParentId}
             newFolderName={newFolderName}
             newFolderInputRef={newFolderInputRef}
@@ -602,6 +732,7 @@ interface FolderItemProps {
   onCreateFile: (folderId?: string) => void;
   onDeleteFolder: (folderId: string) => void | Promise<void>;
   onMoveFolder: (folderId: string) => void;
+  onOpenDeleteFolderConfirm: (folderId: string) => void | Promise<void>;
   creatingFolderParentId: string | null;
   newFolderName: string;
   newFolderInputRef: React.RefObject<HTMLInputElement | null>;
@@ -645,6 +776,7 @@ function FolderItem({
   onCreateFile,
   onDeleteFolder,
   onMoveFolder,
+  onOpenDeleteFolderConfirm,
   creatingFolderParentId,
   newFolderName,
   newFolderInputRef,
@@ -849,7 +981,7 @@ function FolderItem({
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={() => onDeleteFolder(folder.id)}
+                onClick={() => onOpenDeleteFolderConfirm(folder.id)}
                 className="text-destructive focus:text-destructive"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
@@ -906,6 +1038,7 @@ function FolderItem({
             onCreateFile={onCreateFile}
             onDeleteFolder={onDeleteFolder}
             onMoveFolder={onMoveFolder}
+            onOpenDeleteFolderConfirm={onOpenDeleteFolderConfirm}
             creatingFolderParentId={creatingFolderParentId}
             newFolderName={newFolderName}
             newFolderInputRef={newFolderInputRef}
