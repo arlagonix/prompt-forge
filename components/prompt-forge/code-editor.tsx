@@ -12,9 +12,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
+import { stripReusableFlag } from "@/lib/prompt-forge/parser";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, FileText, Save, X } from "lucide-react";
+import { AlertTriangle, FileText, Library, Save, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  ReusableTemplateOption,
+  TemplatePickerDialog,
+} from "./template-picker-dialog";
 
 interface CodeEditorProps {
   content: string;
@@ -24,6 +29,7 @@ interface CodeEditorProps {
   onClose: () => void;
   onDelete?: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
+  reusableTemplates: ReusableTemplateOption[];
 }
 
 export function CodeEditor({
@@ -34,6 +40,7 @@ export function CodeEditor({
   onClose,
   onDelete,
   showNotification,
+  reusableTemplates,
 }: CodeEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [newFileName, setNewFileName] = useState(fileName);
@@ -41,6 +48,12 @@ export function CodeEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const [showReplaceTemplateConfirm, setShowReplaceTemplateConfirm] =
+    useState(false);
+  const [pendingTemplate, setPendingTemplate] =
+    useState<ReusableTemplateOption | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
 
@@ -92,6 +105,57 @@ export function CodeEditor({
     }
   }, [onDelete]);
 
+  const applyReusableTemplate = useCallback(
+    (template: ReusableTemplateOption) => {
+      const cleanedContent = stripReusableFlag(template.content);
+      setContent(cleanedContent);
+
+      if (!newFileName.trim()) {
+        setNewFileName(template.name);
+      }
+
+      requestAnimationFrame(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = 0;
+        textarea.scrollTop = 0;
+
+        if (lineNumbersRef.current) {
+          lineNumbersRef.current.scrollTop = 0;
+        }
+      });
+    },
+    [newFileName],
+  );
+
+  const shouldConfirmTemplateReplace = useCallback(() => {
+    if (!isNew) return true;
+    return hasChanges;
+  }, [hasChanges, isNew]);
+
+  const handleSelectReusableTemplate = useCallback(
+    (template: ReusableTemplateOption) => {
+      if (shouldConfirmTemplateReplace()) {
+        setPendingTemplate(template);
+        setShowReplaceTemplateConfirm(true);
+        return;
+      }
+
+      applyReusableTemplate(template);
+    },
+    [applyReusableTemplate, shouldConfirmTemplateReplace],
+  );
+
+  const confirmReplaceWithTemplate = useCallback(() => {
+    if (!pendingTemplate) return;
+
+    applyReusableTemplate(pendingTemplate);
+    setPendingTemplate(null);
+    setShowReplaceTemplateConfirm(false);
+  }, [applyReusableTemplate, pendingTemplate]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey;
@@ -99,6 +163,12 @@ export function CodeEditor({
       if (ctrl && e.key.toLowerCase() === "s") {
         e.preventDefault();
         handleSave();
+        return;
+      }
+
+      if (ctrl && e.key.toLowerCase() === "t") {
+        e.preventDefault();
+        setIsTemplatePickerOpen(true);
         return;
       }
 
@@ -227,7 +297,7 @@ export function CodeEditor({
       <Dialog open={true} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent
           showCloseButton={false}
-          className="h-[92vh] p-0 overflow-hidden"
+          className="h-[92vh] overflow-hidden p-0"
           onOpenAutoFocus={(e) => {
             e.preventDefault();
 
@@ -269,9 +339,9 @@ export function CodeEditor({
           </DialogHeader>
 
           <div className="flex h-full min-h-0 flex-col bg-background">
-            <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+            <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
                 <div className="flex items-center gap-2">
                   <Label htmlFor="editor-filename" className="sr-only">
                     Prompt name
@@ -282,40 +352,49 @@ export function CodeEditor({
                     value={newFileName}
                     onChange={(e) => setNewFileName(e.target.value)}
                     placeholder="Prompt name"
-                    className="w-64 h-8 font-mono text-sm"
+                    className="h-8 w-64 font-mono text-sm"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsTemplatePickerOpen(true)}
+                >
+                  <Library className="mr-1.5 h-4 w-4" />
+                  Use template
+                </Button>
+
                 {!isNew && onDelete && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
                   >
                     Delete
                   </Button>
                 )}
                 <Button variant="outline" size="sm" onClick={handleClose}>
-                  <X className="h-4 w-4 mr-1.5" />
+                  <X className="mr-1.5 h-4 w-4" />
                   Close
                 </Button>
                 <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                  <Save className="h-4 w-4 mr-1.5" />
+                  <Save className="mr-1.5 h-4 w-4" />
                   {isSaving ? "Saving..." : "Save"}
                 </Button>
               </div>
             </header>
 
-            <div className="flex-1 min-h-0 flex overflow-hidden">
+            <div className="flex min-h-0 flex-1 overflow-hidden">
               <div
                 ref={lineNumbersRef}
-                className="w-12 bg-muted/50 border-r border-border overflow-hidden shrink-0 select-none"
+                className="w-12 shrink-0 select-none overflow-hidden border-r border-border bg-muted/50"
                 aria-hidden="true"
               >
-                <div className="py-3 px-2 font-mono text-xs text-muted-foreground text-right leading-6">
+                <div className="px-2 py-3 text-right font-mono text-xs leading-6 text-muted-foreground">
                   {Array.from({ length: lineCount }, (_, i) => (
                     <div key={i + 1}>{i + 1}</div>
                   ))}
@@ -330,7 +409,7 @@ export function CodeEditor({
                 onKeyDownCapture={handleKeyDownTextarea}
                 spellCheck={false}
                 className={cn(
-                  "flex-1 min-h-0 overflow-auto p-3 font-mono text-sm leading-6 resize-none",
+                  "flex-1 min-h-0 resize-none overflow-auto p-3 font-mono text-sm leading-6",
                   "bg-background text-foreground",
                   "focus:outline-none",
                   "placeholder:text-muted-foreground",
@@ -339,7 +418,7 @@ export function CodeEditor({
               />
             </div>
 
-            <footer className="flex items-center justify-between px-4 py-2 border-t border-border bg-card text-xs text-muted-foreground shrink-0">
+            <footer className="flex shrink-0 items-center justify-between border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
               <div className="flex items-center gap-4">
                 <span>{lineCount} lines</span>
                 <span>{content.length} characters</span>
@@ -349,6 +428,9 @@ export function CodeEditor({
                   <Kbd>Ctrl</Kbd>+<Kbd>S</Kbd> Save
                 </span>
                 <span>
+                  <Kbd>Ctrl</Kbd>+<Kbd>T</Kbd> Use template
+                </span>
+                <span>
                   <Kbd>Esc</Kbd> Close
                 </span>
               </div>
@@ -356,6 +438,13 @@ export function CodeEditor({
           </div>
         </DialogContent>
       </Dialog>
+
+      <TemplatePickerDialog
+        isOpen={isTemplatePickerOpen}
+        templates={reusableTemplates}
+        onClose={() => setIsTemplatePickerOpen(false)}
+        onSelect={handleSelectReusableTemplate}
+      />
 
       <Dialog open={showConfirmClose} onOpenChange={setShowConfirmClose}>
         <DialogContent showCloseButton={false}>
@@ -378,6 +467,37 @@ export function CodeEditor({
             </Button>
             <Button variant="destructive" onClick={onClose}>
               Discard Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showReplaceTemplateConfirm}
+        onOpenChange={setShowReplaceTemplateConfirm}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              Replace Current Draft
+            </DialogTitle>
+            <DialogDescription>
+              Replace current draft with selected template?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setPendingTemplate(null);
+                setShowReplaceTemplateConfirm(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmReplaceWithTemplate}>
+              Replace
             </Button>
           </DialogFooter>
         </DialogContent>

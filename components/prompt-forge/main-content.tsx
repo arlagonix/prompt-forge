@@ -347,7 +347,7 @@ export function MainContent({
                       segment.isUserValue ? (
                         <span
                           key={index}
-                          className="rounded border border-primary/25 bg-primary/10 px-0.5 text-foreground"
+                          className="rounded border border-primary/25 bg-primary/5 px-0.5 text-foreground"
                           title={
                             segment.paramName
                               ? `From: ${segment.paramName}`

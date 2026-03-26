@@ -162,23 +162,10 @@ export function extractParameters(content: string | null): Parameter[] {
       type: "textarea" as const,
       label: formatParamName(name),
       defaultValue: null,
-      height: null,
+      height: 4,
       values: [],
     };
   });
-}
-
-export function buildPrompt(
-  bodyContent: string | null,
-  content: string | null,
-  _params: Parameter[],
-  formValues: Map<string, string>,
-): string | null {
-  return buildPromptSegments(bodyContent, content, formValues)
-    .map((segment) => segment.text)
-    .join("")
-    .replace(/\n\s*\n\s*\n/g, "\n\n")
-    .trim();
 }
 
 export interface PromptSegment {
@@ -243,4 +230,39 @@ export function buildPromptSegments(
   }
 
   return out;
+}
+
+export function buildPrompt(
+  bodyContent: string | null,
+  content: string | null,
+  _params: Parameter[],
+  formValues: Map<string, string>,
+): string | null {
+  return buildPromptSegments(bodyContent, content, formValues)
+    .map((segment) => segment.text)
+    .join("")
+    .replace(/\n\s*\n\s*\n/g, "\n\n")
+    .trim();
+}
+
+export function stripReusableFlag(content: string): string {
+  if (typeof content !== "string" || !content.trim()) return content;
+
+  const { metadata, body, hasFrontMatter } = parseFrontMatter(content);
+
+  if (!hasFrontMatter) {
+    return content;
+  }
+
+  const nextMetadata = { ...metadata };
+  delete nextMetadata.reusable;
+
+  const metadataKeys = Object.keys(nextMetadata);
+
+  if (metadataKeys.length === 0) {
+    return body;
+  }
+
+  const serialized = YAML.stringify(nextMetadata).trimEnd();
+  return `---\n${serialized}\n---\n\n${body}`;
 }

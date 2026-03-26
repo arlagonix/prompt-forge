@@ -17,26 +17,25 @@ const APP_STATE_STORE = "appState";
 const ROOT_FOLDER_ID = "root";
 const DEFAULT_PROMPT_ID = "prompt-welcome";
 
-const DEFAULT_TEMPLATE = `---
-title: Welcome Template
-description: A starter prompt template
-params:
-  - name: name
-    label: Name
-    type: text
-    default: John
-  - name: goal
-    label: Goal
-    type: textarea
-    default: ""
----
+const DEFAULT_TEMPLATE = `## Task
 
-# Welcome
+...
 
-Hello, {{name}}!
+## Limitations
 
-Your goal:
-{{goal}}
+...
+
+## Example Input
+
+...
+
+## Example Output
+
+...
+
+## User Input 
+
+{{ description }}
 `;
 
 function randomId(prefix: string) {

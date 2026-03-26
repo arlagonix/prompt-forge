@@ -8,6 +8,7 @@ import { MoveFolderDialog } from "@/components/prompt-forge/move-folder-dialog";
 import { MovePromptDialog } from "@/components/prompt-forge/move-prompt-dialog";
 import { Sidebar } from "@/components/prompt-forge/sidebar";
 import { TemplateModal } from "@/components/prompt-forge/template-modal";
+import type { ReusableTemplateOption } from "@/components/prompt-forge/template-picker-dialog";
 import { Toaster } from "@/components/ui/sonner";
 import {
   canMoveFolderToFolder,
@@ -40,32 +41,25 @@ import type {
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const DEFAULT_TEMPLATE = `---
-title: New Template
-description: A new prompt template
-params:
-  - name: audience
-    label: Target audience
-    type: select
-    values: [Beginners, Experts, Executives]
-    default: Beginners
-  - name: tone
-    label: Tone
-    type: radio
-    values: [Neutral, Friendly, Formal]
-    default: Neutral
-  - name: constraints
-    label: Constraints
-    type: textarea
-    default: ""
----
+const DEFAULT_TEMPLATE = `## Task
 
-# Your Template
+...
 
-Write a response for {{audience}} in a {{tone}} tone.
+## Limitations
 
-Constraints:
-{{constraints}}
+...
+
+## Example Input
+
+...
+
+## Example Output
+
+...
+
+## User Input 
+
+{{ description }}
 `;
 
 const LAST_FILE_KEY = "prompt-forge-last-file";
@@ -890,6 +884,17 @@ export default function PromptForge() {
     showNotification,
   ]);
 
+  const reusableTemplates: ReusableTemplateOption[] = Array.from(
+    fileMap.values(),
+  )
+    .filter((file) => file.metadata?.reusable === true)
+    .map((file) => ({
+      id: file.id,
+      name: file.name,
+      content: file.content,
+      path: file.path,
+    }));
+
   useEffect(() => {
     loadWorkspace({ restoreLastFile: true });
   }, [loadWorkspace]);
@@ -1045,6 +1050,7 @@ export default function PromptForge() {
               : () => editorState.fileId && deleteFile(editorState.fileId)
           }
           showNotification={showNotification}
+          reusableTemplates={reusableTemplates}
         />
       )}
 
