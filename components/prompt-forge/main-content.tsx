@@ -2,6 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
@@ -23,8 +30,11 @@ import {
   Code,
   Copy,
   FileText,
+  MoreHorizontal,
   PanelLeft,
+  Pencil,
   RotateCcw,
+  Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -34,6 +44,8 @@ interface MainContentProps {
   isLoading: boolean;
   onOpenDocs: () => void;
   onOpenTemplate: () => void;
+  onEditFile: () => void;
+  onDeleteFile: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
@@ -45,6 +57,8 @@ export function MainContent({
   isLoading,
   onOpenDocs,
   onOpenTemplate,
+  onEditFile,
+  onDeleteFile,
   showNotification,
   onToggleSidebar,
   isSidebarOpen,
@@ -53,8 +67,8 @@ export function MainContent({
   const [preview, setPreview] = useState<string>("");
 
   const getFormStorageKey = useCallback((file: ParsedFile | null) => {
-    if (!file?.path) return null;
-    return `prompt-forge-form-values:${file.path}`;
+    if (!file?.id) return null;
+    return `prompt-forge-form-values:${file.id}`;
   }, []);
 
   const saveFormValues = useCallback(
@@ -214,15 +228,36 @@ export function MainContent({
                   <BookOpen className="h-4 w-4 mr-2" />
                   Docs
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onOpenTemplate}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Code className="h-4 w-4 mr-2" />
-                  Template
-                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem onClick={onOpenTemplate}>
+                      <Code className="h-4 w-4 mr-2" />
+                      Template
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onEditFile}>
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={onDeleteFile}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </header>
 

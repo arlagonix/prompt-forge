@@ -36,7 +36,7 @@ export function CodeEditor({
   showNotification,
 }: CodeEditorProps) {
   const [content, setContent] = useState(initialContent);
-  const [newFileName, setNewFileName] = useState(isNew ? "" : fileName);
+  const [newFileName, setNewFileName] = useState(fileName);
   const [hasChanges, setHasChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showConfirmClose, setShowConfirmClose] = useState(false);
@@ -45,22 +45,16 @@ export function CodeEditor({
   const lineNumbersRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    setHasChanges(content !== initialContent || (isNew && newFileName !== ""));
-  }, [content, initialContent, isNew, newFileName]);
+    setContent(initialContent);
+  }, [initialContent]);
 
   useEffect(() => {
-    if (isNew) {
-      const filenameInput = document.getElementById("editor-filename");
-      if (filenameInput) {
-        filenameInput.focus();
-        return;
-      }
-    }
+    setNewFileName(fileName);
+  }, [fileName]);
 
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isNew]);
+  useEffect(() => {
+    setHasChanges(content !== initialContent || newFileName !== fileName);
+  }, [content, initialContent, newFileName, fileName]);
 
   const handleScroll = useCallback(() => {
     if (textareaRef.current && lineNumbersRef.current) {
@@ -69,29 +63,19 @@ export function CodeEditor({
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (isNew && !newFileName.trim()) {
-      showNotification("Please enter a file name", "error");
-      return;
-    }
-
-    const finalFileName = isNew ? newFileName.trim() : fileName;
-    if (
-      isNew &&
-      !finalFileName.toLowerCase().endsWith(".md") &&
-      !finalFileName.toLowerCase().endsWith(".markdown")
-    ) {
-      showNotification("File name must end with .md or .markdown", "error");
+    if (!newFileName.trim()) {
+      showNotification("Please enter a prompt name", "error");
       return;
     }
 
     setIsSaving(true);
     try {
-      await onSave(content, isNew ? finalFileName : undefined);
+      await onSave(content, newFileName.trim());
       setHasChanges(false);
     } finally {
       setIsSaving(false);
     }
-  }, [content, fileName, isNew, newFileName, onSave, showNotification]);
+  }, [content, newFileName, onSave, showNotification]);
 
   const handleClose = useCallback(() => {
     if (hasChanges) {
@@ -156,46 +140,64 @@ export function CodeEditor({
       <Dialog open={true} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent
           showCloseButton={false}
-          className="w-full max-w-5xl h-[92vh] p-0 overflow-hidden"
+          className="h-[92vh] p-0 overflow-hidden"
+          onOpenAutoFocus={(e) => {
+            e.preventDefault();
+
+            if (isNew) {
+              const filenameInput = document.getElementById("editor-filename");
+              if (filenameInput instanceof HTMLInputElement) {
+                filenameInput.focus();
+                filenameInput.setSelectionRange(
+                  filenameInput.value.length,
+                  filenameInput.value.length,
+                );
+              }
+              return;
+            }
+
+            const textarea = textareaRef.current;
+            if (textarea) {
+              textarea.focus();
+
+              const end = textarea.value.length;
+              textarea.setSelectionRange(end, end);
+
+              requestAnimationFrame(() => {
+                textarea.scrollTop = 0;
+                if (lineNumbersRef.current) {
+                  lineNumbersRef.current.scrollTop = 0;
+                }
+              });
+            }
+          }}
         >
-          <DialogHeader className="sr-only border-b border-border">
+          <DialogHeader className="sr-only">
             <DialogTitle>
-              {isNew ? "Create markdown file" : `Edit ${fileName}`}
+              {isNew ? "Create template" : `Edit ${fileName}`}
             </DialogTitle>
             <DialogDescription>
-              Markdown editor dialog for editing template content.
+              Template editor dialog for editing template name and content.
             </DialogDescription>
           </DialogHeader>
+
           <div className="flex h-full min-h-0 flex-col bg-background">
             <header className="flex items-center justify-between px-4 py-3 border-b border-border bg-card shrink-0">
               <div className="flex items-center gap-3 min-w-0">
                 <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
-                {isNew ? (
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="editor-filename" className="sr-only">
-                      File name
-                    </Label>
-                    <Input
-                      id="editor-filename"
-                      type="text"
-                      value={newFileName}
-                      onChange={(e) => setNewFileName(e.target.value)}
-                      placeholder="filename.md"
-                      className="w-64 h-8 font-mono text-sm"
-                    />
-                  </div>
-                ) : (
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-medium text-foreground truncate">
-                      {fileName}{" "}
-                      {hasChanges && (
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          Unsaved changes
-                        </span>
-                      )}
-                    </h2>
-                  </div>
-                )}
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="editor-filename" className="sr-only">
+                    Prompt name
+                  </Label>
+                  <Input
+                    id="editor-filename"
+                    type="text"
+                    value={newFileName}
+                    onChange={(e) => setNewFileName(e.target.value)}
+                    placeholder="Prompt name"
+                    className="w-64 h-8 font-mono text-sm"
+                  />
+                </div>
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
@@ -213,11 +215,7 @@ export function CodeEditor({
                   <X className="h-4 w-4 mr-1.5" />
                   Close
                 </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={isSaving || (!hasChanges && !isNew)}
-                >
+                <Button size="sm" onClick={handleSave} disabled={isSaving}>
                   <Save className="h-4 w-4 mr-1.5" />
                   {isSaving ? "Saving..." : "Save"}
                 </Button>
@@ -250,9 +248,7 @@ export function CodeEditor({
                   "focus:outline-none",
                   "placeholder:text-muted-foreground",
                 )}
-                placeholder={
-                  isNew ? "Enter your markdown template content here..." : ""
-                }
+                placeholder="Enter your prompt content here..."
               />
             </div>
 
@@ -305,7 +301,7 @@ export function CodeEditor({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Delete File
+              Delete Prompt
             </DialogTitle>
             <DialogDescription>
               Are you sure you want to delete &quot;{fileName}&quot;? This
@@ -320,7 +316,7 @@ export function CodeEditor({
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
-              Delete File
+              Delete Prompt
             </Button>
           </DialogFooter>
         </DialogContent>

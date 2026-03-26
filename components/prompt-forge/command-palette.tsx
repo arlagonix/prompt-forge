@@ -16,8 +16,8 @@ import { useEffect, useMemo, useState } from "react";
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
-  fileMap: Map<number, ParsedFile>;
-  onFileSelect: (fileId: number) => void;
+  fileMap: Map<string, ParsedFile>;
+  onFileSelect: (fileId: string) => void;
 }
 
 export function CommandPalette({
@@ -28,7 +28,6 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [search, setSearch] = useState("");
 
-  // Reset search when opening
   useEffect(() => {
     if (isOpen) {
       setSearch("");
@@ -62,11 +61,9 @@ export function CommandPalette({
           value={search}
           onValueChange={setSearch}
         />
-        <CommandList>
+        <CommandList className="max-h-[420px] min-h-[220px] overflow-y-auto">
           <CommandEmpty>
-            {files.length === 0
-              ? "No folder opened. Press Ctrl+O to open a folder."
-              : "No templates found."}
+            {files.length === 0 ? "No prompts found." : "No templates found."}
           </CommandEmpty>
           <CommandGroup heading="Templates">
             {filteredFiles.map((file) => (
