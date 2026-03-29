@@ -71,3 +71,33 @@ export interface AppStateRecord<T = unknown> {
   key: string;
   value: T;
 }
+
+
+export interface ExportRootNode {
+  type: "root";
+  children: ExportNode[];
+}
+
+export interface ExportFolderNode {
+  type: "folder";
+  name: string;
+  children: ExportNode[];
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface ExportTemplateNode {
+  type: "template";
+  name: string;
+  content: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export type ExportNode = ExportFolderNode | ExportTemplateNode;
+
+export interface PromptForgeExportV1 {
+  version: 1;
+  exportedAt: string;
+  root: ExportRootNode;
+}

@@ -48,6 +48,7 @@ interface MainContentProps {
   onEditFile: () => void;
   onMoveFile: () => void;
   onDeleteFile: () => void;
+  onExportFile: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
@@ -62,6 +63,7 @@ export function MainContent({
   onEditFile,
   onMoveFile,
   onDeleteFile,
+  onExportFile,
   showNotification,
   onToggleSidebar,
   isSidebarOpen,
@@ -278,6 +280,11 @@ export function MainContent({
                     <DropdownMenuItem onClick={onMoveFile}>
                       <Folder className="h-4 w-4 mr-2" />
                       Move to…
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={onExportFile}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Export
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem

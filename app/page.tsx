@@ -31,15 +31,25 @@ import {
   movePrompt,
   renameFolder,
   renamePrompt,
+  ROOT_FOLDER_ID,
   updatePromptContent,
 } from "@/lib/prompt-forge/storage";
+import {
+  buildExportFilename,
+  downloadJsonFile,
+  exportFolderTree,
+  exportTemplateTree,
+  exportWorkspaceTree,
+  importExportTree,
+  parseAndValidateImport,
+} from "@/lib/prompt-forge/import-export";
 import type {
   EditorState,
   FolderNode,
   Parameter,
   ParsedFile,
 } from "@/lib/prompt-forge/types";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const DEFAULT_TEMPLATE = `## Task
@@ -64,7 +74,6 @@ const DEFAULT_TEMPLATE = `## Task
 `;
 
 const LAST_FILE_KEY = "prompt-forge-last-file";
-const ROOT_FOLDER_ID = "root";
 
 function flattenFolders(
   root: FolderNode,
@@ -141,6 +150,9 @@ export default function PromptForge() {
     currentParentPath: "/Workspace",
     selectedFolderId: "",
   });
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const importTargetFolderIdRef = useRef<string>(ROOT_FOLDER_ID);
+
   const [dragState, setDragState] = useState<{
     type: "prompt" | "folder" | null;
     itemId: string | null;
@@ -885,6 +897,82 @@ export default function PromptForge() {
     showNotification,
   ]);
 
+  const openImportPicker = useCallback((targetFolderId: string = ROOT_FOLDER_ID) => {
+    importTargetFolderIdRef.current = targetFolderId;
+    const input = importFileInputRef.current;
+    if (!input) return;
+    input.value = "";
+    input.click();
+  }, []);
+
+  const handleImportFileSelected = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      try {
+        const text = await file.text();
+        const data = parseAndValidateImport(text);
+        await importExportTree(data, importTargetFolderIdRef.current);
+        await loadWorkspace({ preserveFileId: currentFile?.id ?? null });
+        showNotification("Import completed");
+      } catch (err) {
+        showNotification(
+          err instanceof Error ? err.message : "Import failed: invalid export schema",
+          "error",
+        );
+      } finally {
+        event.target.value = "";
+      }
+    },
+    [currentFile?.id, loadWorkspace, showNotification],
+  );
+
+  const handleExportWorkspace = useCallback(async () => {
+    try {
+      const data = await exportWorkspaceTree();
+      downloadJsonFile(data, buildExportFilename("workspace"));
+      showNotification("Workspace exported");
+    } catch (err) {
+      showNotification(
+        `Failed to export workspace: ${(err as Error).message}`,
+        "error",
+      );
+    }
+  }, [showNotification]);
+
+  const handleExportFolder = useCallback(
+    async (folderId: string) => {
+      try {
+        const data = await exportFolderTree(folderId);
+        downloadJsonFile(data, buildExportFilename("folder"));
+        showNotification("Folder exported");
+      } catch (err) {
+        showNotification(
+          `Failed to export folder: ${(err as Error).message}`,
+          "error",
+        );
+      }
+    },
+    [showNotification],
+  );
+
+  const handleExportTemplate = useCallback(
+    async (fileId: string) => {
+      try {
+        const data = await exportTemplateTree(fileId);
+        downloadJsonFile(data, buildExportFilename("template"));
+        showNotification("Template exported");
+      } catch (err) {
+        showNotification(
+          `Failed to export template: ${(err as Error).message}`,
+          "error",
+        );
+      }
+    },
+    [showNotification],
+  );
+
   const reusableTemplates: ReusableTemplateOption[] = Array.from(
     fileMap.values(),
   )
@@ -983,11 +1071,16 @@ export default function PromptForge() {
         onMoveFile={openMovePromptDialog as never}
         onCreateFile={createNewFile}
         onCreateFolder={createNewFolder}
+        onImportRoot={() => openImportPicker(ROOT_FOLDER_ID)}
+        onExportRoot={handleExportWorkspace}
         onRenameFolder={renameExistingFolder}
         onMoveFolder={openMoveFolderDialog}
+        onImportFolder={(folderId) => openImportPicker(folderId)}
+        onExportFolder={handleExportFolder}
         onDeleteFolder={deleteExistingFolder}
         onGetFolderDeleteSummary={getFolderDeleteSummary}
         onDeleteFile={deleteFile as never}
+        onExportFile={handleExportTemplate as never}
         isLoading={isLoading}
         isOpen={isSidebarOpen}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -1017,6 +1110,7 @@ export default function PromptForge() {
         onEditFile={() => currentFile && openEditor(currentFile.id)}
         onMoveFile={() => currentFile && openMovePromptDialog(currentFile.id)}
         onDeleteFile={() => currentFile && deleteFile(currentFile.id)}
+        onExportFile={() => currentFile && handleExportTemplate(currentFile.id)}
         showNotification={showNotification}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}
@@ -1109,6 +1203,14 @@ export default function PromptForge() {
           })
         }
         onConfirm={confirmMoveFolder}
+      />
+
+      <input
+        ref={importFileInputRef}
+        type="file"
+        accept=".json,application/json"
+        className="hidden"
+        onChange={handleImportFileSelected}
       />
 
       <Toaster position="bottom-right" />

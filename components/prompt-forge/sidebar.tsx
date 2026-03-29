@@ -33,12 +33,14 @@ import {
   FileText,
   Folder,
   FolderPlus,
+  Download,
   MoreHorizontal,
   Pencil,
   Plus,
   RefreshCw,
   Search,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -56,11 +58,15 @@ interface SidebarProps {
   onOpenTemplate: (fileId: string) => void;
   onMoveFile: (fileId: string) => void;
   onMoveFolder: (folderId: string) => void;
+  onImportFolder: (folderId: string) => void;
+  onExportFolder: (folderId: string) => void;
   onCreateFile: (folderId?: string) => void;
   onCreateFolder: (
     name: string,
     parentId?: string | null,
   ) => void | Promise<void>;
+  onImportRoot: () => void;
+  onExportRoot: () => void;
   onRenameFolder: (folderId: string, name: string) => void | Promise<void>;
   onDeleteFolder: (folderId: string) => void | Promise<void>;
   onGetFolderDeleteSummary: (folderId: string) => Promise<{
@@ -69,6 +75,7 @@ interface SidebarProps {
     promptCount: number;
   }>;
   onDeleteFile: (fileId: string) => void;
+  onExportFile: (fileId: string) => void;
   isLoading: boolean;
   isOpen: boolean;
   onToggle: () => void;
@@ -101,12 +108,17 @@ export function Sidebar({
   onOpenTemplate,
   onMoveFile,
   onMoveFolder,
+  onImportFolder,
+  onExportFolder,
   onCreateFile,
   onCreateFolder,
+  onImportRoot,
+  onExportRoot,
   onRenameFolder,
   onDeleteFolder,
   onGetFolderDeleteSummary,
   onDeleteFile,
+  onExportFile,
   isLoading,
   isOpen,
   onToggle,
@@ -328,24 +340,35 @@ export function Sidebar({
                 variant="ghost"
                 size="icon"
                 onClick={onToggle}
-                className="h-8 w-8"
+                className="h-8 w-8 rounded-md transition-colors hover:bg-accent"
               >
                 <X className="h-4 w-4" />
               </Button>
             )}
 
-            <ThemeToggle />
-
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onRefresh}
-              disabled={isLoading}
-              className="h-8 w-8"
-              title="Refresh (Alt+R)"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={onImportRoot}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Import JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportRoot}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Export Workspace
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onRefresh} disabled={isLoading}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Refresh
+                </DropdownMenuItem>
+                <ThemeToggle mode="menu-item" />
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -460,7 +483,10 @@ export function Sidebar({
                 onOpenTemplate={onOpenTemplate}
                 onMoveFile={onMoveFile}
                 onDeleteFile={onDeleteFile}
+                onExportFile={onExportFile}
                 onCreateFile={onCreateFile}
+                onImportFolder={onImportFolder}
+                onExportFolder={onExportFolder}
                 onDeleteFolder={onDeleteFolder}
                 onMoveFolder={onMoveFolder}
                 onOpenDeleteFolderConfirm={openDeleteFolderConfirm}
@@ -576,7 +602,10 @@ interface FolderContentsProps {
   onOpenTemplate: (fileId: string) => void;
   onMoveFile: (fileId: string) => void;
   onDeleteFile: (fileId: string) => void;
+  onExportFile: (fileId: string) => void;
   onCreateFile: (folderId?: string) => void;
+  onImportFolder: (folderId: string) => void;
+  onExportFolder: (folderId: string) => void;
   onDeleteFolder: (folderId: string) => void | Promise<void>;
   onMoveFolder: (folderId: string) => void;
   onOpenDeleteFolderConfirm: (folderId: string) => void | Promise<void>;
@@ -620,7 +649,10 @@ function FolderContents({
   onOpenTemplate,
   onMoveFile,
   onDeleteFile,
+  onExportFile,
   onCreateFile,
+  onImportFolder,
+  onExportFolder,
   onDeleteFolder,
   onMoveFolder,
   onOpenDeleteFolderConfirm,
@@ -667,7 +699,10 @@ function FolderContents({
             onOpenTemplate={onOpenTemplate}
             onMoveFile={onMoveFile}
             onDeleteFile={onDeleteFile}
+            onExportFile={onExportFile}
             onCreateFile={onCreateFile}
+            onImportFolder={onImportFolder}
+            onExportFolder={onExportFolder}
             onDeleteFolder={onDeleteFolder}
             onMoveFolder={onMoveFolder}
             onOpenDeleteFolderConfirm={onOpenDeleteFolderConfirm}
@@ -711,6 +746,7 @@ function FolderContents({
             onOpenTemplate={() => onOpenTemplate(node.id)}
             onMove={() => onMoveFile(node.id)}
             onDelete={() => onDeleteFile(node.id)}
+            onExport={() => onExportFile(node.id)}
             level={level}
             isDragging={
               draggedItemType === "prompt" && draggedItemId === node.id
@@ -733,7 +769,10 @@ interface FolderItemProps {
   onOpenTemplate: (fileId: string) => void;
   onMoveFile: (fileId: string) => void;
   onDeleteFile: (fileId: string) => void;
+  onExportFile: (fileId: string) => void;
   onCreateFile: (folderId?: string) => void;
+  onImportFolder: (folderId: string) => void;
+  onExportFolder: (folderId: string) => void;
   onDeleteFolder: (folderId: string) => void | Promise<void>;
   onMoveFolder: (folderId: string) => void;
   onOpenDeleteFolderConfirm: (folderId: string) => void | Promise<void>;
@@ -777,7 +816,10 @@ function FolderItem({
   onOpenTemplate,
   onMoveFile,
   onDeleteFile,
+  onExportFile,
   onCreateFile,
+  onImportFolder,
+  onExportFolder,
   onDeleteFolder,
   onMoveFolder,
   onOpenDeleteFolderConfirm,
@@ -918,13 +960,13 @@ function FolderItem({
       ) : (
         <div
           className={cn(
-            "group flex w-full items-center gap-1 rounded-md pr-2 text-sm transition-colors",
+            "group flex w-full min-w-0 items-center gap-1 rounded-md pr-2 text-sm transition-colors",
             "text-foreground hover:bg-accent",
           )}
         >
           <button
             onClick={() => onToggleFolder(folder.id)}
-            className="flex flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             style={{ paddingLeft: `${level * 12 + 8}px` }}
           >
             {isOpen ? (
@@ -933,7 +975,7 @@ function FolderItem({
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
             <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="truncate">{folder.name}</span>
+            <span className="min-w-0 break-words whitespace-normal text-left leading-tight">{folder.name}</span>
           </button>
 
           <DropdownMenu>
@@ -941,7 +983,7 @@ function FolderItem({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 shrink-0 opacity-60 hover:bg-accent hover:opacity-100"
+                className="h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:bg-muted hover:text-foreground hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-3.5 w-3.5" />
@@ -972,6 +1014,9 @@ function FolderItem({
                 <FolderPlus className="mr-2 h-4 w-4" />
                 New Folder
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onImportFolder(folder.id)}><Download className="mr-2 h-4 w-4" />Import JSON</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExportFolder(folder.id)}><Upload className="mr-2 h-4 w-4" />Export Folder</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onStartFolderRename(folder.id, folder.name)}
@@ -1039,7 +1084,10 @@ function FolderItem({
             onOpenTemplate={onOpenTemplate}
             onMoveFile={onMoveFile}
             onDeleteFile={onDeleteFile}
+            onExportFile={onExportFile}
             onCreateFile={onCreateFile}
+            onImportFolder={onImportFolder}
+            onExportFolder={onExportFolder}
             onDeleteFolder={onDeleteFolder}
             onMoveFolder={onMoveFolder}
             onOpenDeleteFolderConfirm={onOpenDeleteFolderConfirm}
@@ -1087,6 +1135,7 @@ interface FileItemProps {
   onOpenTemplate: () => void;
   onMove: () => void;
   onDelete: () => void;
+  onExport: () => void;
   level: number;
   isDragging: boolean;
   onDragStart: () => void;
@@ -1102,6 +1151,7 @@ function FileItem({
   onOpenTemplate,
   onMove,
   onDelete,
+  onExport,
   level,
   isDragging,
   onDragStart,
@@ -1149,8 +1199,8 @@ function FileItem({
             variant="ghost"
             size="icon"
             className={cn(
-              "h-6 w-6 shrink-0 opacity-60 hover:opacity-100",
-              isActive ? "hover:bg-primary-foreground/20" : "hover:bg-accent",
+              "h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:text-foreground hover:opacity-100",
+              isActive ? "hover:bg-primary-foreground/20" : "hover:bg-muted",
             )}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1169,6 +1219,11 @@ function FileItem({
           <DropdownMenuItem onClick={onMove}>
             <Folder className="mr-2 h-4 w-4" />
             Move to…
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onExport}>
+            <Upload className="mr-2 h-4 w-4" />
+            Export
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem

@@ -14,7 +14,7 @@ const FOLDERS_STORE = "folders";
 const PROMPTS_STORE = "prompts";
 const APP_STATE_STORE = "appState";
 
-const ROOT_FOLDER_ID = "root";
+export const ROOT_FOLDER_ID = "root";
 const DEFAULT_PROMPT_ID = "prompt-welcome";
 
 const DEFAULT_TEMPLATE = `## Task
