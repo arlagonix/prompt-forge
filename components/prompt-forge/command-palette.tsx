@@ -20,6 +20,11 @@ interface CommandPaletteProps {
   onFileSelect: (fileId: string) => void;
 }
 
+function displaySearchPath(path: string) {
+  const normalized = path.replace(/^\/Workspace(?=\/|$)/, "");
+  return normalized || "/";
+}
+
 export function CommandPalette({
   isOpen,
   onClose,
@@ -69,7 +74,7 @@ export function CommandPalette({
             {filteredFiles.map((file) => (
               <CommandItem
                 key={file.id}
-                value={file.name}
+                value={`${file.name} ${displaySearchPath(file.path)}`}
                 onSelect={() => onFileSelect(file.id)}
                 className="flex items-center gap-2"
               >
@@ -77,7 +82,7 @@ export function CommandPalette({
                 <div className="flex-1 min-w-0">
                   <p className="truncate">{file.name}</p>
                   <p className="text-xs text-muted-foreground truncate">
-                    {file.path}
+                    {displaySearchPath(file.path)}
                   </p>
                 </div>
               </CommandItem>

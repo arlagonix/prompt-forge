@@ -24,6 +24,11 @@ interface TemplatePickerDialogProps {
   onSelect: (template: ReusableTemplateOption) => void;
 }
 
+function displaySearchPath(path: string) {
+  const normalized = path.replace(/^\/Workspace(?=\/|$)/, "");
+  return normalized || "/";
+}
+
 export function TemplatePickerDialog({
   isOpen,
   templates,
@@ -46,7 +51,7 @@ export function TemplatePickerDialog({
           {templates.map((template) => (
             <CommandItem
               key={template.id}
-              value={`${template.name} ${template.path}`}
+              value={`${template.name} ${displaySearchPath(template.path)}`}
               onSelect={() => {
                 onSelect(template);
                 onClose();
@@ -57,7 +62,7 @@ export function TemplatePickerDialog({
               <div className="min-w-0 flex-1">
                 <p className="truncate">{template.name}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {template.path}
+                  {displaySearchPath(template.path)}
                 </p>
               </div>
             </CommandItem>

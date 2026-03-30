@@ -966,7 +966,7 @@ function FolderItem({
         >
           <button
             onClick={() => onToggleFolder(folder.id)}
-            className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             style={{ paddingLeft: `${level * 12 + 8}px` }}
           >
             {isOpen ? (
@@ -983,7 +983,7 @@ function FolderItem({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:bg-muted hover:text-foreground hover:opacity-100"
+                className="h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:bg-accent hover:text-foreground hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-3.5 w-3.5" />
@@ -1200,7 +1200,7 @@ function FileItem({
             size="icon"
             className={cn(
               "h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:text-foreground hover:opacity-100",
-              isActive ? "hover:bg-primary-foreground/20" : "hover:bg-muted",
+              isActive ? "hover:bg-primary-foreground/20" : "hover:bg-accent",
             )}
             onClick={(e) => e.stopPropagation()}
           >
