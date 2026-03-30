@@ -983,7 +983,7 @@ function FolderItem({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:bg-accent hover:text-foreground hover:opacity-100"
+                className="h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:!bg-foreground/10 hover:text-foreground hover:opacity-100"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-3.5 w-3.5" />
@@ -1200,7 +1200,7 @@ function FileItem({
             size="icon"
             className={cn(
               "h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:text-foreground hover:opacity-100",
-              isActive ? "hover:bg-primary-foreground/20" : "hover:bg-accent",
+              isActive ? "hover:bg-primary-foreground/20" : "hover:!bg-foreground/10",
             )}
             onClick={(e) => e.stopPropagation()}
           >
