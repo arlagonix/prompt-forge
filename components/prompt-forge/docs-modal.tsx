@@ -25,60 +25,383 @@ export function DocsModal({ isOpen, onClose }: DocsModalProps) {
           <div className="space-y-6 px-6 py-4">
             <DocSection title="Overview">
               <p className="mb-3 text-sm text-muted-foreground">
-                Templates use YAML front matter for parameter definitions and
-                simple <code>{`{{name}}`}</code> placeholders inside the body.
+                Prompt Forge templates use a Markdown body with optional YAML
+                front matter. Plain fields can be written directly in the body,
+                while groups must be declared in front matter.
               </p>
               <CodeBlock>{`---
-title: Example
-description: A prompt template
 params:
-  - name: audience
-    label: Target audience
-    type: select
-    values: [Beginners, Experts, Executives]
-    default: Beginners
-  - name: tone
-    type: radio
-    values: [Neutral, Friendly, Formal]
-    default: Neutral
-  - name: constraints
-    type: textarea
-    default: ""
+  - name: reportTitle
+    type: text
+    label: Report title
+
+  - name: days
+    type: group
+    label: Days
+    repeat: true
+    fields:
+      - name: date
+        type: text
+        label: Date
+
+      - name: meals
+        type: group
+        label: Meals
+        repeat: true
+        fields:
+          - name: name
+            type: text
+            label: Meal
+          - name: calories
+            type: number
+            label: Calories
 ---
 
-Write a response for {{audience}} in a {{tone}} tone.
+Report: {{reportTitle}}
 
-Constraints:
-{{constraints}}`}</CodeBlock>
+{{ days:start }}
+Date: {{date}}
+
+{{ meals:start }}
+Meal: {{name}}
+Calories: {{calories}}
+{{ meals:end }}
+
+{{ days:end }}`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Front Matter">
+            <DocSection title="Simple placeholders">
               <p className="mb-3 text-sm text-muted-foreground">
-                The section between the two <code>---</code> lines is YAML front
-                matter. It defines the template title, description, reusable
-                flag, and parameter list.
+                A placeholder uses <code>{`{{name}}`}</code>. If it is not
+                declared in front matter, it is still valid and becomes a
+                textarea automatically.
+              </p>
+              <CodeBlock>{`Task:
+{{task}}
+
+Audience:
+{{audience}}`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                In this example, both <code>task</code> and{" "}
+                <code>audience</code> become implicit textarea fields.
+              </p>
+            </DocSection>
+
+            <DocSection title="Front matter">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Front matter is optional for plain fields and required for
+                groups. It is used to refine field metadata and define nested
+                structure.
               </p>
               <CodeBlock>{`---
-title: Example
-description: A prompt template
-reusable: true
 params:
-  - name: audience
+  - name: reportTitle
     type: text
+    label: Report title
+
+  - name: intro
+    type: textarea
+    label: Introduction
 ---`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Placeholders">
+            <DocSection title="Name rules">
               <p className="mb-3 text-sm text-muted-foreground">
-                In the body, placeholders are simple. They should match the
-                parameter names from <code>params</code>.
+                Field and group names are technical identifiers. Use{" "}
+                <code>label</code> for human-readable UI text.
               </p>
-              <CodeBlock>{`Hello, {{name}}!
-Goal:
-{{goal}}`}</CodeBlock>
+              <CodeBlock>{`Valid pattern:
+^[a-zA-Z0-9_-]+$
+
+Examples:
+task
+current_state
+report-title`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Reusable Templates">
+            <DocSection title="Field defaults">
+              <p className="mb-3 text-sm text-muted-foreground">
+                If a field is declared in front matter:
+              </p>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>
+                  missing <code>type</code> becomes <code>textarea</code>
+                </li>
+                <li>
+                  missing <code>label</code> is derived from <code>name</code>
+                </li>
+                <li>unknown metadata keys are ignored</li>
+              </ul>
+              <p className="mt-3 text-sm text-muted-foreground">
+                If a declared field is never used in the body, it is not
+                rendered in the form UI.
+              </p>
+            </DocSection>
+
+            <DocSection title="Supported field types">
+              <CodeBlock>{`type: textarea
+type: text
+type: number`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Declared fields">
+              <CodeBlock>{`---
+params:
+  - name: title
+    type: text
+    label: Title
+
+  - name: notes
+    type: textarea
+    label: Notes
+
+  - name: calories
+    type: number
+    label: Calories
+---`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Groups">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Groups are structural blocks that can contain fields and nested
+                groups. Groups must be declared in front matter.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: meals
+    type: group
+    label: Meals
+    repeat: true
+    fields:
+      - name: date
+        type: text
+        label: Date
+
+      - name: calories
+        type: number
+        label: Calories
+---`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Group body syntax">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Use <code>{`{{ group:start }}`}</code> and{" "}
+                <code>{`{{ group:end }}`}</code> to enter and leave a group
+                block.
+              </p>
+              <CodeBlock>{`{{ meals:start }}
+Date: {{date}}
+Calories: {{calories}}
+{{ meals:end }}`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                If a group block appears in the body but the group is not
+                declared in front matter, that is a validation error.
+              </p>
+            </DocSection>
+
+            <DocSection title="Group defaults">
+              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>
+                  missing <code>repeat</code> becomes <code>false</code>
+                </li>
+                <li>
+                  missing <code>label</code> is derived from <code>name</code>
+                </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Implicit fields inside groups">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Child fields inside a declared group do not have to be declared
+                in <code>fields</code>. If they are missing, they are inferred
+                from the body in that group scope and default to textarea.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: meals
+    type: group
+    label: Meals
+    repeat: true
+---
+
+{{ meals:start }}
+Date: {{date}}
+Calories: {{calories}}
+{{ meals:end }}`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Repeatable groups">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Set <code>repeat: true</code> on a group to let the user create
+                multiple instances through the UI.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: meals
+    type: group
+    repeat: true
+---`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>every group starts with one instance by default</li>
+                <li>
+                  <code>repeat: false</code> means exactly one instance
+                </li>
+                <li>
+                  <code>repeat: true</code> shows a full-width Add button
+                </li>
+                <li>the last remaining instance cannot be removed</li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Nested groups">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Nested groups are supported when they are declared inside the
+                parent group.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: days
+    type: group
+    label: Days
+    repeat: true
+    fields:
+      - name: date
+        type: text
+        label: Date
+
+      - name: meals
+        type: group
+        label: Meals
+        repeat: true
+        fields:
+          - name: name
+            type: text
+            label: Meal
+
+          - name: calories
+            type: number
+            label: Calories
+---
+
+{{ days:start }}
+Date: {{date}}
+
+{{ meals:start }}
+Meal: {{name}}
+Calories: {{calories}}
+{{ meals:end }}
+
+{{ days:end }}`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Scope resolution">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Field references use nearest-scope lookup.
+              </p>
+              <CodeBlock>{`{{date}}`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Resolution order:
+              </p>
+              <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>current scope</li>
+                <li>parent scope</li>
+                <li>higher parent scopes</li>
+                <li>root scope</li>
+              </ol>
+              <p className="mt-3 text-sm text-muted-foreground">
+                First match wins.
+              </p>
+            </DocSection>
+
+            <DocSection title="Scope example">
+              <CodeBlock>{`---
+params:
+  - name: reportTitle
+    type: text
+    label: Report title
+
+  - name: days
+    type: group
+    label: Days
+    repeat: true
+    fields:
+      - name: date
+        type: text
+
+      - name: meals
+        type: group
+        label: Meals
+        repeat: true
+        fields:
+          - name: name
+            type: text
+          - name: calories
+            type: number
+---
+
+Report: {{reportTitle}}
+
+{{ days:start }}
+Date: {{date}}
+
+{{ meals:start }}
+Meal: {{name}}
+Calories: {{calories}}
+Report again: {{reportTitle}}
+{{ meals:end }}
+
+{{ days:end }}`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>
+                  <code>{`{{name}}`}</code> resolves to <code>meals.name</code>
+                </li>
+                <li>
+                  <code>{`{{calories}}`}</code> resolves to{" "}
+                  <code>meals.calories</code>
+                </li>
+                <li>
+                  <code>{`{{date}}`}</code> falls back to <code>days.date</code>
+                </li>
+                <li>
+                  <code>{`{{reportTitle}}`}</code> falls back to root
+                </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Rendering rules">
+              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>the same field may appear multiple times in the body</li>
+                <li>all occurrences render the same value</li>
+                <li>declared but unused fields are not shown in the form UI</li>
+                <li>
+                  repeated group instances are separated cleanly in output
+                </li>
+                <li>
+                  boundary newlines around group blocks are trimmed during
+                  rendering
+                </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Group UI behavior">
+              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>every group is shown with border and padding</li>
+                <li>
+                  root-level groups and nested groups use the same visual model
+                </li>
+                <li>
+                  Add button for repeat groups is full-width and placed at the
+                  bottom of the group
+                </li>
+                <li>
+                  Remove button for repeat instances is full-width and placed at
+                  the bottom of the instance
+                </li>
+                <li>repeat group instances do not show numbered titles</li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Reusable templates">
               <p className="mb-3 text-sm text-muted-foreground">
                 Add <code>reusable: true</code> in front matter if you want a
                 template to appear in the <strong>Use template</strong> picker.
@@ -101,122 +424,48 @@ Task:
 {{task}}`}</CodeBlock>
               <p className="mt-3 text-sm text-muted-foreground">
                 When you choose <strong>Use template</strong>, the selected
-                template is loaded into the editor as a starting point. The
+                template is loaded into the editor as a starting point. The{" "}
                 <code>reusable: true</code> flag is removed from the inserted
                 content automatically.
               </p>
             </DocSection>
 
-            <DocSection title="Parameter Fields">
+            <DocSection title="Import / export">
               <p className="mb-3 text-sm text-muted-foreground">
-                Each item inside <code>params</code> defines one form field.
+                Prompt Forge supports JSON-only import and export.
               </p>
-              <CodeBlock>{`params:
-  - name: audience
-    label: Target audience
-    type: select
-    values: [Beginners, Experts, Executives]
-    default: Beginners`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Supported Types">
-              <CodeBlock>{`type: text
-type: textarea
-type: number
-type: checkbox
-type: select
-type: radio`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Fallback Behavior">
-              <p className="mb-3 text-sm text-muted-foreground">
-                If a placeholder exists in the body but is not defined in
-                <code>params</code>, it falls back to a normal textarea.
-              </p>
-              <CodeBlock>{`---
-title: Simple Template
----
-
-Main task:
-{{task}}
-
-Extra notes:
-{{notes}}`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Text Input">
-              <CodeBlock>{`params:
-  - name: name
-    label: Name
-    type: text
-    default: John`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Textarea">
-              <CodeBlock>{`params:
-  - name: constraints
-    label: Constraints
-    type: textarea
-    default: ""`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Number">
-              <CodeBlock>{`params:
-  - name: age
-    label: Age
-    type: number
-    default: 42`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Checkbox">
-              <CodeBlock>{`params:
-  - name: include_examples
-    label: Include examples
-    type: checkbox
-    default: true`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Select">
-              <CodeBlock>{`params:
-  - name: audience
-    label: Target audience
-    type: select
-    values: [Beginners, Experts, Executives]
-    default: Beginners`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Radio">
-              <CodeBlock>{`params:
-  - name: tone
-    label: Tone
-    type: radio
-    values: [Neutral, Friendly, Formal]
-    default: Neutral`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Notes">
               <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>
-                  Parameter names should match the placeholders in the body.
-                </li>
-                <li>
-                  Use simple placeholders like <code>{`{{name}}`}</code>.
-                </li>
-                <li>
-                  <code>values</code> is used for <code>select</code> and{" "}
-                  <code>radio</code>.
-                </li>
-                <li>
-                  <code>default</code> sets the initial value shown in the form.
-                </li>
-                <li>
-                  <code>reusable: true</code> makes a template available in the
-                  reusable template picker.
-                </li>
+                <li>export types: template, folder, workspace</li>
+                <li>import targets: workspace/root or a specific folder</li>
+                <li>JSON content is the source of truth</li>
+                <li>file name is not used by the logic</li>
+                <li>import is merge-only</li>
+                <li>imported nodes always receive new internal IDs</li>
+                <li>duplicate names are allowed</li>
               </ul>
+              <CodeBlock>{`{
+  "version": 1,
+  "exportedAt": "2026-03-30T09:44:12.317Z",
+  "root": {
+    "type": "root",
+    "children": [
+      {
+        "type": "folder",
+        "name": "Writing",
+        "children": [
+          {
+            "type": "template",
+            "name": "Blog prompt",
+            "content": "Write about {{topic}}"
+          }
+        ]
+      }
+    ]
+  }
+}`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Keyboard Shortcuts">
+            <DocSection title="Keyboard shortcuts">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="text-muted-foreground">Open folder</div>
                 <div className="font-mono">Ctrl+O</div>

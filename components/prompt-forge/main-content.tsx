@@ -51,6 +51,7 @@ import {
   Plus,
   RotateCcw,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -63,6 +64,7 @@ interface MainContentProps {
   onEditFile: () => void;
   onMoveFile: () => void;
   onDeleteFile: () => void;
+  onCopyTemplate: () => void;
   onExportFile: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
   onToggleSidebar: () => void;
@@ -275,6 +277,7 @@ export function MainContent({
   onEditFile,
   onMoveFile,
   onDeleteFile,
+  onCopyTemplate,
   onExportFile,
   showNotification,
   onToggleSidebar,
@@ -527,9 +530,13 @@ export function MainContent({
                       <Folder className="h-4 w-4 mr-2" />
                       Move to…
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onCopyTemplate}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onExportFile}>
-                      <Copy className="h-4 w-4 mr-2" />
+                      <Upload className="h-4 w-4 mr-2" />
                       Export
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />

@@ -957,6 +957,27 @@ export default function PromptForge() {
     [showNotification],
   );
 
+
+  const handleCopyTemplate = useCallback(
+    async (fileId: string) => {
+      const file = fileMap.get(fileId);
+      const content = file?.content ?? file?.bodyContent ?? "";
+
+      if (!content) {
+        showNotification("No content to copy", "error");
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(content);
+        showNotification("Copied to clipboard!");
+      } catch {
+        showNotification("Failed to copy", "error");
+      }
+    },
+    [fileMap, showNotification],
+  );
+
   const handleExportTemplate = useCallback(
     async (fileId: string) => {
       try {
@@ -1080,6 +1101,7 @@ export default function PromptForge() {
         onDeleteFolder={deleteExistingFolder}
         onGetFolderDeleteSummary={getFolderDeleteSummary}
         onDeleteFile={deleteFile as never}
+        onCopyFile={handleCopyTemplate as never}
         onExportFile={handleExportTemplate as never}
         isLoading={isLoading}
         isOpen={isSidebarOpen}
@@ -1110,6 +1132,7 @@ export default function PromptForge() {
         onEditFile={() => currentFile && openEditor(currentFile.id)}
         onMoveFile={() => currentFile && openMovePromptDialog(currentFile.id)}
         onDeleteFile={() => currentFile && deleteFile(currentFile.id)}
+        onCopyTemplate={() => currentFile && handleCopyTemplate(currentFile.id)}
         onExportFile={() => currentFile && handleExportTemplate(currentFile.id)}
         showNotification={showNotification}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
