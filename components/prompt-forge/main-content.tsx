@@ -23,8 +23,22 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { buildPrompt, buildPromptSegments } from "@/lib/prompt-forge/parser";
-import type { Parameter, ParsedFile } from "@/lib/prompt-forge/types";
+import {
+  buildPromptFromTemplate,
+  buildPromptSegmentsFromTemplate,
+  createInitialScopeState,
+  parseTemplate,
+  type PromptSegment,
+} from "@/lib/prompt-forge/parser";
+import type {
+  Parameter,
+  ParsedFile,
+  ParsedTemplate,
+  TemplateFieldDefinition,
+  TemplateGroupDefinition,
+  TemplateRenderItem,
+  TemplateScopeState,
+} from "@/lib/prompt-forge/types";
 import {
   BookOpen,
   Code,
@@ -34,6 +48,7 @@ import {
   MoreHorizontal,
   PanelLeft,
   Pencil,
+  Plus,
   RotateCcw,
   Trash2,
 } from "lucide-react";
@@ -54,9 +69,206 @@ interface MainContentProps {
   isSidebarOpen: boolean;
 }
 
+type GroupPathSegment = { groupName: string; index: number };
+
+function cloneScopeState(state: TemplateScopeState): TemplateScopeState {
+  return {
+    fields: { ...state.fields },
+    groups: Object.fromEntries(
+      Object.entries(state.groups).map(([name, instances]) => [
+        name,
+        instances.map(cloneScopeState),
+      ]),
+    ),
+  };
+}
+
+function normalizeLoadedScopeState(
+  group: TemplateGroupDefinition,
+  raw: unknown,
+): TemplateScopeState {
+  const base = createInitialScopeState(group);
+  if (!raw || typeof raw !== "object") return base;
+
+  const item = raw as {
+    fields?: Record<string, unknown>;
+    groups?: Record<string, unknown>;
+  };
+
+  for (const renderItem of group.renderOrder) {
+    if (renderItem.kind === "field") {
+      const rawValue = item.fields?.[renderItem.field.name];
+      base.fields[renderItem.field.name] =
+        rawValue == null ? base.fields[renderItem.field.name] : String(rawValue);
+      continue;
+    }
+
+    const rawInstances = item.groups?.[renderItem.group.name];
+    const instances = Array.isArray(rawInstances) ? rawInstances : [];
+    const normalized =
+      instances.length > 0
+        ? instances.map((instance) =>
+            normalizeLoadedScopeState(renderItem.group, instance),
+          )
+        : [createInitialScopeState(renderItem.group)];
+
+    base.groups[renderItem.group.name] = renderItem.group.repeat
+      ? normalized
+      : [normalized[0]];
+  }
+
+  return base;
+}
+
+function updateScopeAtPath(
+  rootState: TemplateScopeState,
+  path: GroupPathSegment[],
+  updater: (scope: TemplateScopeState) => TemplateScopeState,
+): TemplateScopeState {
+  if (path.length === 0) {
+    return updater(cloneScopeState(rootState));
+  }
+
+  const nextRoot = cloneScopeState(rootState);
+  let current = nextRoot;
+
+  for (let i = 0; i < path.length - 1; i += 1) {
+    const segment = path[i];
+    current = current.groups[segment.groupName][segment.index];
+  }
+
+  const last = path[path.length - 1];
+  current.groups[last.groupName][last.index] = updater(
+    cloneScopeState(current.groups[last.groupName][last.index]),
+  );
+
+  return nextRoot;
+}
+
+function countRenderedItems(group: TemplateGroupDefinition): number {
+  return group.renderOrder.length;
+}
+
+interface GroupEditorProps {
+  group: TemplateGroupDefinition;
+  state: TemplateScopeState;
+  path: GroupPathSegment[];
+  onFieldChange: (path: GroupPathSegment[], fieldName: string, value: string) => void;
+  onAddGroupInstance: (path: GroupPathSegment[], group: TemplateGroupDefinition) => void;
+  onRemoveGroupInstance: (
+    path: GroupPathSegment[],
+    groupName: string,
+    index: number,
+  ) => void;
+  onCopy: () => void;
+}
+
+function GroupEditor({
+  group,
+  state,
+  path,
+  onFieldChange,
+  onAddGroupInstance,
+  onRemoveGroupInstance,
+  onCopy,
+}: GroupEditorProps) {
+  const renderItem = useCallback(
+    (item: TemplateRenderItem) => {
+      if (item.kind === "field") {
+        return (
+          <ParameterField
+            key={`field-${item.field.name}`}
+            param={item.field}
+            value={state.fields[item.field.name] ?? item.field.defaultValue ?? ""}
+            onChange={(value) => onFieldChange(path, item.field.name, value)}
+            onCopy={onCopy}
+          />
+        );
+      }
+
+      const instances =
+        state.groups[item.group.name] ?? [createInitialScopeState(item.group)];
+      return (
+        <div
+          key={`group-${item.group.name}`}
+          className="rounded-xl border border-border bg-card/60 p-4 space-y-4"
+        >
+          <div>
+            <div className="text-sm font-semibold text-foreground">
+              {item.group.label}
+            </div>
+            <code className="text-xs text-muted-foreground">{`{{ ${item.group.name}:start }}`}</code>
+          </div>
+
+          {instances.map((instanceState, index) => {
+            const instancePath = [...path, { groupName: item.group.name, index }];
+            const canRemove = item.group.repeat && instances.length > 1;
+            const innerClass = item.group.repeat
+              ? "rounded-lg border border-border/70 bg-background p-4 space-y-4"
+              : "space-y-4";
+
+            return (
+              <div key={`${item.group.name}-${index}`} className={innerClass}>
+                <GroupEditor
+                  group={item.group}
+                  state={instanceState}
+                  path={instancePath}
+                  onFieldChange={onFieldChange}
+                  onAddGroupInstance={onAddGroupInstance}
+                  onRemoveGroupInstance={onRemoveGroupInstance}
+                  onCopy={onCopy}
+                />
+
+                {item.group.repeat && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    disabled={!canRemove}
+                    onClick={() =>
+                      onRemoveGroupInstance(path, item.group.name, index)
+                    }
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+            );
+          })}
+
+          {item.group.repeat && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => onAddGroupInstance(path, item.group)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add
+            </Button>
+          )}
+        </div>
+      );
+    },
+    [
+      onAddGroupInstance,
+      onCopy,
+      onFieldChange,
+      onRemoveGroupInstance,
+      path,
+      state.fields,
+      state.groups,
+    ],
+  );
+
+  return <div className="space-y-6">{group.renderOrder.map(renderItem)}</div>;
+}
+
 export function MainContent({
   currentFile,
-  currentParams,
+  currentParams: _currentParams,
   isLoading,
   onOpenDocs,
   onOpenTemplate,
@@ -68,11 +280,11 @@ export function MainContent({
   onToggleSidebar,
   isSidebarOpen,
 }: MainContentProps) {
-  const [formValues, setFormValues] = useState<Map<string, string>>(new Map());
+  const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(null);
+  const [templateState, setTemplateState] = useState<TemplateScopeState | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string>("");
-  const [previewSegments, setPreviewSegments] = useState<
-    { text: string; isUserValue: boolean; paramName?: string }[]
-  >([]);
+  const [previewSegments, setPreviewSegments] = useState<PromptSegment[]>([]);
 
   const getFormStorageKey = useCallback((file: ParsedFile | null) => {
     if (!file?.id) return null;
@@ -80,27 +292,23 @@ export function MainContent({
   }, []);
 
   const saveFormValues = useCallback(
-    (file: ParsedFile | null, values: Map<string, string>) => {
+    (file: ParsedFile | null, values: TemplateScopeState | null) => {
       const key = getFormStorageKey(file);
-      if (!key) return;
-
+      if (!key || !values) return;
       try {
-        localStorage.setItem(key, JSON.stringify(Object.fromEntries(values)));
+        localStorage.setItem(key, JSON.stringify(values));
       } catch {}
     },
     [getFormStorageKey],
   );
 
   const loadFormValues = useCallback(
-    (file: ParsedFile | null): Map<string, string> | null => {
+    (file: ParsedFile | null): unknown | null => {
       const key = getFormStorageKey(file);
       if (!key) return null;
-
       try {
         const raw = localStorage.getItem(key);
-        if (!raw) return null;
-        const parsed = JSON.parse(raw) as Record<string, string>;
-        return new Map(Object.entries(parsed));
+        return raw ? JSON.parse(raw) : null;
       } catch {
         return null;
       }
@@ -110,68 +318,105 @@ export function MainContent({
 
   useEffect(() => {
     if (!currentFile) {
-      setFormValues(new Map());
+      setParsedTemplate(null);
+      setTemplateState(null);
+      setParseError(null);
       return;
     }
 
-    const defaultValues = new Map<string, string>();
-    for (const param of currentParams) {
-      defaultValues.set(param.name, param.defaultValue ?? "");
-    }
-
-    const savedValues = loadFormValues(currentFile);
-
-    if (!savedValues) {
-      setFormValues(defaultValues);
-      return;
-    }
-
-    const mergedValues = new Map<string, string>();
-    for (const param of currentParams) {
-      mergedValues.set(
-        param.name,
-        savedValues.get(param.name) ?? param.defaultValue ?? "",
+    try {
+      const nextTemplate = parseTemplate(currentFile.content);
+      const savedValues = loadFormValues(currentFile);
+      const nextState = normalizeLoadedScopeState(
+        nextTemplate.rootGroup,
+        savedValues,
+      );
+      setParsedTemplate(nextTemplate);
+      setTemplateState(nextState);
+      setParseError(null);
+    } catch (error) {
+      setParsedTemplate(null);
+      setTemplateState(null);
+      setParseError(
+        error instanceof Error ? error.message : "Failed to parse template.",
       );
     }
-
-    setFormValues(mergedValues);
-  }, [currentFile, currentParams, loadFormValues]);
+  }, [currentFile, loadFormValues]);
 
   useEffect(() => {
-    if (!currentFile) return;
-    saveFormValues(currentFile, formValues);
-  }, [currentFile, formValues, saveFormValues]);
+    if (!currentFile || !templateState || parseError) return;
+    saveFormValues(currentFile, templateState);
+  }, [currentFile, parseError, saveFormValues, templateState]);
 
   useEffect(() => {
-    if (currentFile) {
-      const segments = buildPromptSegments(
-        currentFile.bodyContent,
-        currentFile.content,
-        formValues,
-      );
-
-      const prompt = buildPrompt(
-        currentFile.bodyContent,
-        currentFile.content,
-        currentParams,
-        formValues,
-      );
-
-      setPreviewSegments(segments);
-      setPreview(prompt ?? "");
-    } else {
-      setPreviewSegments([]);
+    if (!currentFile) {
       setPreview("");
+      setPreviewSegments([]);
+      return;
     }
-  }, [currentFile, currentParams, formValues]);
 
-  const updateFormValue = useCallback((name: string, value: string) => {
-    setFormValues((prev) => {
-      const next = new Map(prev);
-      next.set(name, value);
-      return next;
-    });
-  }, []);
+    if (parseError || !parsedTemplate || !templateState) {
+      const fallback = currentFile.bodyContent || currentFile.content || "";
+      setPreview(fallback);
+      setPreviewSegments([{ text: fallback, isUserValue: false }]);
+      return;
+    }
+
+    setPreviewSegments(buildPromptSegmentsFromTemplate(parsedTemplate, templateState));
+    setPreview(buildPromptFromTemplate(parsedTemplate, templateState));
+  }, [currentFile, parseError, parsedTemplate, templateState]);
+
+  const updateFieldValue = useCallback(
+    (path: GroupPathSegment[], fieldName: string, value: string) => {
+      setTemplateState((prev) => {
+        if (!prev) return prev;
+        return updateScopeAtPath(prev, path, (scope) => ({
+          ...scope,
+          fields: {
+            ...scope.fields,
+            [fieldName]: value,
+          },
+        }));
+      });
+    },
+    [],
+  );
+
+  const addGroupInstance = useCallback(
+    (path: GroupPathSegment[], group: TemplateGroupDefinition) => {
+      setTemplateState((prev) => {
+        if (!prev) return prev;
+        return updateScopeAtPath(prev, path, (scope) => ({
+          ...scope,
+          groups: {
+            ...scope.groups,
+            [group.name]: [...(scope.groups[group.name] ?? []), createInitialScopeState(group)],
+          },
+        }));
+      });
+    },
+    [],
+  );
+
+  const removeGroupInstance = useCallback(
+    (path: GroupPathSegment[], groupName: string, index: number) => {
+      setTemplateState((prev) => {
+        if (!prev) return prev;
+        return updateScopeAtPath(prev, path, (scope) => {
+          const current = scope.groups[groupName] ?? [];
+          if (current.length <= 1) return scope;
+          return {
+            ...scope,
+            groups: {
+              ...scope.groups,
+              [groupName]: current.filter((_, currentIndex) => currentIndex !== index),
+            },
+          };
+        });
+      });
+    },
+    [],
+  );
 
   const handleCopy = useCallback(async () => {
     if (!preview) {
@@ -188,12 +433,9 @@ export function MainContent({
   }, [preview, showNotification]);
 
   const handleClear = useCallback(() => {
-    const initialValues = new Map<string, string>();
-    for (const param of currentParams) {
-      initialValues.set(param.name, param.defaultValue ?? "");
-    }
-    setFormValues(initialValues);
-  }, [currentParams]);
+    if (!parsedTemplate) return;
+    setTemplateState(createInitialScopeState(parsedTemplate.rootGroup));
+  }, [parsedTemplate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -205,6 +447,9 @@ export function MainContent({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [currentFile, handleCopy]);
+
+  const hasVisibleInputs =
+    parsedTemplate != null && countRenderedItems(parsedTemplate.rootGroup) > 0;
 
   return (
     <main className="flex-1 min-h-0 overflow-hidden">
@@ -253,6 +498,7 @@ export function MainContent({
                   size="sm"
                   onClick={handleClear}
                   className="text-muted-foreground hover:text-foreground"
+                  disabled={!parsedTemplate || !!parseError}
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Reset
@@ -302,29 +548,26 @@ export function MainContent({
             <div className="min-h-0 flex-1 overflow-hidden">
               <ScrollArea className="h-full">
                 <div className="p-4 md:p-6 space-y-6">
-                  {currentParams.length === 0 ? (
+                  {parseError ? (
+                    <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
+                      <div className="font-medium mb-1">Template parse error</div>
+                      <div>{parseError}</div>
+                    </div>
+                  ) : !parsedTemplate || !templateState || !hasVisibleInputs ? (
                     <p className="text-sm text-muted-foreground py-4">
                       This template has no parameters. The content will be used
                       as-is.
                     </p>
                   ) : (
-                    <div className="space-y-6">
-                      {currentParams.map((param) => (
-                        <ParameterField
-                          key={param.name}
-                          param={param}
-                          value={
-                            formValues.get(param.name) ??
-                            param.defaultValue ??
-                            ""
-                          }
-                          onChange={(value) =>
-                            updateFormValue(param.name, value)
-                          }
-                          onCopy={handleCopy}
-                        />
-                      ))}
-                    </div>
+                    <GroupEditor
+                      group={parsedTemplate.rootGroup}
+                      state={templateState}
+                      path={[]}
+                      onFieldChange={updateFieldValue}
+                      onAddGroupInstance={addGroupInstance}
+                      onRemoveGroupInstance={removeGroupInstance}
+                      onCopy={handleCopy}
+                    />
                   )}
 
                   <div className="pt-2">
@@ -403,7 +646,7 @@ export function MainContent({
 }
 
 interface ParameterFieldProps {
-  param: Parameter;
+  param: TemplateFieldDefinition;
   value: string;
   onChange: (value: string) => void;
   onCopy: () => void;
@@ -428,7 +671,7 @@ function ParameterField({
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <Label htmlFor={id} className="text-sm font-medium text-foreground">
           {param.label}
         </Label>
@@ -507,11 +750,7 @@ function ParameterField({
       )}
 
       {param.type === "radio" && (
-        <RadioGroup
-          value={value}
-          onValueChange={onChange}
-          className="space-y-2"
-        >
+        <RadioGroup value={value} onValueChange={onChange} className="space-y-2">
           {param.values.map((v) => (
             <div key={v} className="flex items-center gap-2">
               <RadioGroupItem value={v} id={`${id}-${v}`} />

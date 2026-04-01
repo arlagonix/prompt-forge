@@ -1,19 +1,43 @@
 import YAML from "yaml";
-import type { FrontMatterResult, Parameter } from "./types";
+import type {
+  FieldType,
+  FrontMatterResult,
+  Parameter,
+  ParsedTemplate,
+  TemplateBodyNode,
+  TemplateDefinition,
+  TemplateFieldDefinition,
+  TemplateFieldReferenceNode,
+  TemplateGroupDefinition,
+  TemplateGroupNode,
+  TemplateRenderItem,
+  TemplateScopeState,
+} from "./types";
 
-function formatParamName(p: string): string {
-  return p.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+export interface PromptSegment {
+  text: string;
+  isUserValue: boolean;
+  paramName?: string;
 }
 
-function isSupportedParamType(value: unknown): value is Parameter["type"] {
-  return (
-    value === "textarea" ||
-    value === "text" ||
-    value === "number" ||
-    value === "checkbox" ||
-    value === "select" ||
-    value === "radio"
-  );
+const NAME_RE = /^[a-zA-Z0-9_-]+$/;
+const FIELD_TYPES: FieldType[] = [
+  "textarea",
+  "text",
+  "number",
+  "checkbox",
+  "select",
+  "radio",
+];
+
+function formatParamName(p: string): string {
+  return p
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function isSupportedParamType(value: unknown): value is FieldType {
+  return FIELD_TYPES.includes(value as FieldType);
 }
 
 function normalizeStringArray(value: unknown): string[] {
@@ -21,74 +45,135 @@ function normalizeStringArray(value: unknown): string[] {
   return value.map((item) => String(item ?? "").trim()).filter(Boolean);
 }
 
-function normalizeMetadataParam(raw: unknown): Parameter | null {
+function defaultValueForType(
+  type: FieldType,
+  rawDefaultValue: unknown,
+  values: string[],
+): string | null {
+  if (rawDefaultValue != null) return String(rawDefaultValue);
+  if (type === "checkbox") return "false";
+  if ((type === "select" || type === "radio") && values.length > 0) {
+    return values[0];
+  }
+  return null;
+}
+
+function createFieldDefinition(
+  name: string,
+  options: Partial<TemplateFieldDefinition> = {},
+): TemplateFieldDefinition {
+  const type = isSupportedParamType(options.type) ? options.type : "textarea";
+  const values = normalizeStringArray(options.values);
+  return {
+    kind: "field",
+    name,
+    type,
+    label:
+      typeof options.label === "string" && options.label.trim()
+        ? options.label.trim()
+        : formatParamName(name),
+    defaultValue: defaultValueForType(type, options.defaultValue, values),
+    height:
+      typeof options.height === "number" && Number.isFinite(options.height)
+        ? options.height
+        : type === "textarea"
+          ? 4
+          : null,
+    values,
+    explicit: options.explicit ?? false,
+  };
+}
+
+function createGroupDefinition(
+  name: string,
+  options: Partial<TemplateGroupDefinition> = {},
+): TemplateGroupDefinition {
+  return {
+    kind: "group",
+    name,
+    label:
+      typeof options.label === "string" && options.label.trim()
+        ? options.label.trim()
+        : formatParamName(name),
+    repeat: Boolean(options.repeat),
+    explicit: options.explicit ?? false,
+    children: options.children ?? [],
+    renderOrder: options.renderOrder ?? [],
+  };
+}
+
+function getDefinitionByName(
+  group: TemplateGroupDefinition,
+  name: string,
+): TemplateDefinition | null {
+  return group.children.find((child) => child.name === name) ?? null;
+}
+
+function getFieldDefinitionByName(
+  group: TemplateGroupDefinition,
+  name: string,
+): TemplateFieldDefinition | null {
+  const found = getDefinitionByName(group, name);
+  return found?.kind === "field" ? found : null;
+}
+
+function getGroupDefinitionByName(
+  group: TemplateGroupDefinition,
+  name: string,
+): TemplateGroupDefinition | null {
+  const found = getDefinitionByName(group, name);
+  return found?.kind === "group" ? found : null;
+}
+
+function ensureUniqueChildName(group: TemplateGroupDefinition, name: string) {
+  if (getDefinitionByName(group, name)) {
+    throw new Error(`Duplicate name "${name}" in scope "${group.name}".`);
+  }
+}
+
+function normalizeMetadataParam(
+  raw: unknown,
+  ancestorGroupNames: string[] = [],
+): TemplateDefinition | null {
   if (!raw || typeof raw !== "object") return null;
 
   const item = raw as Record<string, unknown>;
   const name = typeof item.name === "string" ? item.name.trim() : "";
+  if (!NAME_RE.test(name)) return null;
 
-  if (!/^[a-zA-Z0-9_-]+$/.test(name)) return null;
-
-  const type = isSupportedParamType(item.type) ? item.type : "textarea";
-
-  const label =
-    typeof item.label === "string" && item.label.trim()
-      ? item.label.trim()
-      : formatParamName(name);
-
-  const defaultValue = item.default == null ? null : String(item.default);
-
-  const height =
-    typeof item.height === "number" && Number.isFinite(item.height)
-      ? item.height
-      : null;
-
-  const values = normalizeStringArray(item.values);
-
-  const finalDefaultValue =
-    defaultValue == null
-      ? type === "checkbox"
-        ? "false"
-        : (type === "select" || type === "radio") && values.length > 0
-          ? values[0]
-          : null
-      : defaultValue;
-
-  return {
-    name,
-    type,
-    label,
-    defaultValue: finalDefaultValue,
-    height,
-    values,
-  };
-}
-
-function extractPlaceholderNames(content: string | null): string[] {
-  if (typeof content !== "string") return [];
-
-  const out: string[] = [];
-  const seen = new Set<string>();
-  let i = 0;
-
-  while (i < content.length) {
-    const s = content.indexOf("{{", i);
-    if (s === -1) break;
-
-    const e = content.indexOf("}}", s + 2);
-    if (e === -1) break;
-
-    const inner = content.slice(s + 2, e).trim();
-
-    if (/^[a-zA-Z0-9_-]+$/.test(inner) && !seen.has(inner)) {
-      seen.add(inner);
-      out.push(inner);
+  if (item.type === "group") {
+    if (ancestorGroupNames.includes(name)) {
+      throw new Error(`Group name "${name}" must be unique along the nesting path.`);
     }
 
-    i = e + 2;
+    const childGroup = createGroupDefinition(name, {
+      label: typeof item.label === "string" ? item.label : undefined,
+      repeat: Boolean(item.repeat),
+      explicit: true,
+      children: [],
+      renderOrder: [],
+    });
+
+    const rawChildren = Array.isArray(item.fields) ? item.fields : [];
+    for (const rawChild of rawChildren) {
+      const normalizedChild = normalizeMetadataParam(rawChild, [...ancestorGroupNames, name]);
+      if (!normalizedChild) continue;
+      ensureUniqueChildName(childGroup, normalizedChild.name);
+      childGroup.children.push(normalizedChild);
+    }
+
+    return childGroup;
   }
 
-  return out;
+  const type = isSupportedParamType(item.type) ? item.type : "textarea";
+  return createFieldDefinition(name, {
+    type,
+    label: typeof item.label === "string" ? item.label : undefined,
+    defaultValue: item.default == null ? null : String(item.default),
+    height: typeof item.height === "number" ? item.height : undefined,
+    values: normalizeStringArray(item.values),
+    explicit: true,
+  });
 }
 
 export function parseFrontMatter(content: string): FrontMatterResult {
@@ -137,41 +222,313 @@ export function parseFrontMatter(content: string): FrontMatterResult {
   };
 }
 
-export function extractParameters(content: string | null): Parameter[] {
-  if (typeof content !== "string") return [];
-
-  const { metadata, body } = parseFrontMatter(content);
-  const placeholderNames = extractPlaceholderNames(body);
-
-  const metadataParamsRaw = Array.isArray(metadata.params)
-    ? metadata.params
-    : [];
-
-  const metadataParams = metadataParamsRaw
-    .map(normalizeMetadataParam)
-    .filter((p): p is Parameter => !!p);
-
-  const byName = new Map(metadataParams.map((p) => [p.name, p]));
-
-  return placeholderNames.map((name) => {
-    const existing = byName.get(name);
-    if (existing) return existing;
-
-    return {
-      name,
-      type: "textarea" as const,
-      label: formatParamName(name),
-      defaultValue: null,
-      height: 4,
-      values: [],
-    };
+function ensureRenderItem(
+  group: TemplateGroupDefinition,
+  item: TemplateRenderItem,
+): void {
+  const exists = group.renderOrder.some((current) => {
+    if (current.kind !== item.kind) return false;
+    if (current.kind === "field" && item.kind === "field") {
+      return current.field.name === item.field.name;
+    }
+    if (current.kind === "group" && item.kind === "group") {
+      return current.group.name === item.group.name;
+    }
+    return false;
   });
+
+  if (!exists) {
+    group.renderOrder.push(item);
+  }
 }
 
-export interface PromptSegment {
-  text: string;
-  isUserValue: boolean;
-  paramName?: string;
+function resolveFieldReference(
+  scopeStack: TemplateGroupDefinition[],
+  name: string,
+): { definition: TemplateFieldDefinition; lookupDepth: number; owner: TemplateGroupDefinition } {
+  for (let depth = 0; depth < scopeStack.length; depth += 1) {
+    const group = scopeStack[scopeStack.length - 1 - depth];
+    const field = getFieldDefinitionByName(group, name);
+    if (field) {
+      return { definition: field, lookupDepth: depth, owner: group };
+    }
+  }
+
+  const currentScope = scopeStack[scopeStack.length - 1];
+  if (getGroupDefinitionByName(currentScope, name)) {
+    throw new Error(
+      `Placeholder "${name}" conflicts with group "${name}" in scope "${currentScope.name}".`,
+    );
+  }
+
+  const implicitField = createFieldDefinition(name, { explicit: false });
+  currentScope.children.push(implicitField);
+  return { definition: implicitField, lookupDepth: 0, owner: currentScope };
+}
+
+export function parseTemplate(content: string | null): ParsedTemplate {
+  if (typeof content !== "string") {
+    return {
+      metadata: {},
+      body: "",
+      rootGroup: createGroupDefinition("root", { explicit: true }),
+      nodes: [],
+    };
+  }
+
+  const { metadata, body } = parseFrontMatter(content);
+  const rootGroup = createGroupDefinition("root", {
+    label: "Root",
+    explicit: true,
+  });
+
+  const metadataParamsRaw = Array.isArray(metadata.params) ? metadata.params : [];
+  for (const rawParam of metadataParamsRaw) {
+    const normalized = normalizeMetadataParam(rawParam, []);
+    if (!normalized) continue;
+    ensureUniqueChildName(rootGroup, normalized.name);
+    rootGroup.children.push(normalized);
+  }
+
+  const rootNodes: TemplateBodyNode[] = [];
+  const nodesStack: TemplateBodyNode[][] = [rootNodes];
+  const scopeStack: TemplateGroupDefinition[] = [rootGroup];
+  const openGroupNodeStack: TemplateGroupNode[] = [];
+
+  let cursor = 0;
+  while (cursor < body.length) {
+    const start = body.indexOf("{{", cursor);
+    if (start === -1) {
+      if (cursor < body.length) {
+        nodesStack[nodesStack.length - 1].push({
+          kind: "text",
+          text: body.slice(cursor),
+        });
+      }
+      break;
+    }
+
+    if (start > cursor) {
+      nodesStack[nodesStack.length - 1].push({
+        kind: "text",
+        text: body.slice(cursor, start),
+      });
+    }
+
+    const end = body.indexOf("}}", start + 2);
+    if (end === -1) {
+      nodesStack[nodesStack.length - 1].push({
+        kind: "text",
+        text: body.slice(start),
+      });
+      break;
+    }
+
+    const inner = body.slice(start + 2, end).trim();
+    const currentScope = scopeStack[scopeStack.length - 1];
+    const groupStartMatch = inner.match(/^([a-zA-Z0-9_-]+):start$/);
+    const groupEndMatch = inner.match(/^([a-zA-Z0-9_-]+):end$/);
+
+    if (groupStartMatch) {
+      const groupName = groupStartMatch[1];
+      const childGroup = getGroupDefinitionByName(currentScope, groupName);
+      if (!childGroup) {
+        throw new Error(
+          `Group "${groupName}" is not declared in scope "${currentScope.name}".`,
+        );
+      }
+
+      ensureRenderItem(currentScope, { kind: "group", group: childGroup });
+      const groupNode: TemplateGroupNode = {
+        kind: "group",
+        name: groupName,
+        definition: childGroup,
+        children: [],
+      };
+      nodesStack[nodesStack.length - 1].push(groupNode);
+      openGroupNodeStack.push(groupNode);
+      nodesStack.push(groupNode.children);
+      scopeStack.push(childGroup);
+      cursor = end + 2;
+      continue;
+    }
+
+    if (groupEndMatch) {
+      const groupName = groupEndMatch[1];
+      const openGroup = openGroupNodeStack[openGroupNodeStack.length - 1];
+      if (!openGroup || openGroup.name !== groupName) {
+        throw new Error(`Unexpected group end "${groupName}".`);
+      }
+      openGroupNodeStack.pop();
+      nodesStack.pop();
+      scopeStack.pop();
+      cursor = end + 2;
+      continue;
+    }
+
+    if (NAME_RE.test(inner)) {
+      const resolved = resolveFieldReference(scopeStack, inner);
+      ensureRenderItem(resolved.owner, {
+        kind: "field",
+        field: resolved.definition,
+      });
+      const fieldNode: TemplateFieldReferenceNode = {
+        kind: "field-ref",
+        name: inner,
+        definition: resolved.definition,
+        lookupDepth: resolved.lookupDepth,
+      };
+      nodesStack[nodesStack.length - 1].push(fieldNode);
+      cursor = end + 2;
+      continue;
+    }
+
+    nodesStack[nodesStack.length - 1].push({
+      kind: "text",
+      text: body.slice(start, end + 2),
+    });
+    cursor = end + 2;
+  }
+
+  if (openGroupNodeStack.length > 0) {
+    throw new Error(`Group "${openGroupNodeStack[openGroupNodeStack.length - 1].name}" was not closed.`);
+  }
+
+  return {
+    metadata,
+    body,
+    rootGroup,
+    nodes: rootNodes,
+  };
+}
+
+export function extractParameters(content: string | null): Parameter[] {
+  try {
+    const parsed = parseTemplate(content);
+    return parsed.rootGroup.renderOrder
+      .filter((item): item is { kind: "field"; field: TemplateFieldDefinition } =>
+        item.kind === "field",
+      )
+      .map((item) => ({
+        name: item.field.name,
+        type: item.field.type,
+        label: item.field.label,
+        defaultValue: item.field.defaultValue,
+        height: item.field.height,
+        values: item.field.values,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+export function createInitialScopeState(
+  group: TemplateGroupDefinition,
+): TemplateScopeState {
+  const fields: Record<string, string> = {};
+  const groups: Record<string, TemplateScopeState[]> = {};
+
+  for (const item of group.renderOrder) {
+    if (item.kind === "field") {
+      fields[item.field.name] = item.field.defaultValue ?? "";
+      continue;
+    }
+
+    groups[item.group.name] = [createInitialScopeState(item.group)];
+  }
+
+  return { fields, groups };
+}
+
+function trimBoundaryNewlines(segments: PromptSegment[]): PromptSegment[] {
+  const trimmed = segments.map((segment) => ({ ...segment }));
+
+  while (trimmed.length > 0 && trimmed[0].text.length === 0) {
+    trimmed.shift();
+  }
+  while (trimmed.length > 0 && trimmed[trimmed.length - 1].text.length === 0) {
+    trimmed.pop();
+  }
+
+  if (trimmed.length > 0 && trimmed[0].text.startsWith("\n")) {
+    trimmed[0].text = trimmed[0].text.slice(1);
+    if (trimmed[0].text.length === 0) trimmed.shift();
+  }
+
+  if (trimmed.length > 0 && trimmed[trimmed.length - 1].text.endsWith("\n")) {
+    trimmed[trimmed.length - 1].text = trimmed[trimmed.length - 1].text.slice(0, -1);
+    if (trimmed[trimmed.length - 1].text.length === 0) trimmed.pop();
+  }
+
+  return trimmed;
+}
+
+function buildSegmentsFromNodes(
+  nodes: TemplateBodyNode[],
+  scopeStack: TemplateScopeState[],
+): PromptSegment[] {
+  const segments: PromptSegment[] = [];
+
+  for (const node of nodes) {
+    if (node.kind === "text") {
+      segments.push({ text: node.text, isUserValue: false });
+      continue;
+    }
+
+    if (node.kind === "field-ref") {
+      const targetScopeIndex = Math.max(0, scopeStack.length - 1 - node.lookupDepth);
+      const targetScope = scopeStack[targetScopeIndex];
+      const value = targetScope.fields[node.definition.name] ?? "";
+      segments.push({
+        text: value,
+        isUserValue: true,
+        paramName: node.definition.name,
+      });
+      continue;
+    }
+
+    const currentScope = scopeStack[scopeStack.length - 1];
+    const instances = currentScope.groups[node.definition.name] ?? [];
+    const groupSegments: PromptSegment[] = [];
+
+    instances.forEach((instance, index) => {
+      const instanceSegments = trimBoundaryNewlines(
+        buildSegmentsFromNodes(node.children, [...scopeStack, instance]),
+      );
+
+      if (instanceSegments.length === 0) {
+        return;
+      }
+
+      if (index > 0 && groupSegments.length > 0) {
+        groupSegments.push({ text: "\n\n", isUserValue: false });
+      }
+
+      groupSegments.push(...instanceSegments);
+    });
+
+    segments.push(...groupSegments);
+  }
+
+  return segments;
+}
+
+export function buildPromptSegmentsFromTemplate(
+  template: ParsedTemplate,
+  state: TemplateScopeState,
+): PromptSegment[] {
+  return trimBoundaryNewlines(buildSegmentsFromNodes(template.nodes, [state]));
+}
+
+export function buildPromptFromTemplate(
+  template: ParsedTemplate,
+  state: TemplateScopeState,
+): string {
+  return buildPromptSegmentsFromTemplate(template, state)
+    .map((segment) => segment.text)
+    .join("")
+    .replace(/\n\s*\n\s*\n/g, "\n\n")
+    .trim();
 }
 
 export function buildPromptSegments(
@@ -187,43 +544,31 @@ export function buildPromptSegments(
     const s = tmpl.indexOf("{{", i);
     if (s === -1) {
       if (i < tmpl.length) {
-        out.push({
-          text: tmpl.slice(i),
-          isUserValue: false,
-        });
+        out.push({ text: tmpl.slice(i), isUserValue: false });
       }
       break;
     }
 
     if (s > i) {
-      out.push({
-        text: tmpl.slice(i, s),
-        isUserValue: false,
-      });
+      out.push({ text: tmpl.slice(i, s), isUserValue: false });
     }
 
     const e = tmpl.indexOf("}}", s + 2);
     if (e === -1) {
-      out.push({
-        text: tmpl.slice(s),
-        isUserValue: false,
-      });
+      out.push({ text: tmpl.slice(s), isUserValue: false });
       break;
     }
 
     const name = tmpl.slice(s + 2, e).trim();
 
-    if (/^[a-zA-Z0-9_-]+$/.test(name) && formValues.has(name)) {
+    if (NAME_RE.test(name) && formValues.has(name)) {
       out.push({
         text: formValues.get(name) || "",
         isUserValue: true,
         paramName: name,
       });
     } else {
-      out.push({
-        text: tmpl.slice(s, e + 2),
-        isUserValue: false,
-      });
+      out.push({ text: tmpl.slice(s, e + 2), isUserValue: false });
     }
 
     i = e + 2;

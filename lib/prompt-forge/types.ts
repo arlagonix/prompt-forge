@@ -43,6 +43,8 @@ export interface Parameter {
   values: string[];
 }
 
+export type FieldType = Parameter["type"];
+
 export interface FrontMatterResult {
   metadata: Record<string, unknown>;
   body: string;
@@ -72,6 +74,67 @@ export interface AppStateRecord<T = unknown> {
   value: T;
 }
 
+export interface TemplateFieldDefinition {
+  kind: "field";
+  name: string;
+  type: FieldType;
+  label: string;
+  defaultValue: string | null;
+  height: number | null;
+  values: string[];
+  explicit: boolean;
+}
+
+export interface TemplateGroupDefinition {
+  kind: "group";
+  name: string;
+  label: string;
+  repeat: boolean;
+  explicit: boolean;
+  children: TemplateDefinition[];
+  renderOrder: TemplateRenderItem[];
+}
+
+export type TemplateDefinition = TemplateFieldDefinition | TemplateGroupDefinition;
+export type TemplateRenderItem =
+  | { kind: "field"; field: TemplateFieldDefinition }
+  | { kind: "group"; group: TemplateGroupDefinition };
+
+export interface TemplateTextNode {
+  kind: "text";
+  text: string;
+}
+
+export interface TemplateFieldReferenceNode {
+  kind: "field-ref";
+  name: string;
+  lookupDepth: number;
+  definition: TemplateFieldDefinition;
+}
+
+export interface TemplateGroupNode {
+  kind: "group";
+  name: string;
+  definition: TemplateGroupDefinition;
+  children: TemplateBodyNode[];
+}
+
+export type TemplateBodyNode =
+  | TemplateTextNode
+  | TemplateFieldReferenceNode
+  | TemplateGroupNode;
+
+export interface ParsedTemplate {
+  metadata: Record<string, unknown>;
+  body: string;
+  rootGroup: TemplateGroupDefinition;
+  nodes: TemplateBodyNode[];
+}
+
+export interface TemplateScopeState {
+  fields: Record<string, string>;
+  groups: Record<string, TemplateScopeState[]>;
+}
 
 export interface ExportRootNode {
   type: "root";
