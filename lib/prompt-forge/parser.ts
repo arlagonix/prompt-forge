@@ -474,30 +474,27 @@ export function createInitialScopeState(
   return { fields, groups };
 }
 
-function trimBoundaryNewlines(segments: PromptSegment[]): PromptSegment[] {
-  const trimmed = segments.map((segment) => ({ ...segment }));
+function hasNonEmptySegmentText(segments: PromptSegment[]): boolean {
+  return segments.some((segment) => segment.text.length > 0);
+}
 
-  while (trimmed.length > 0 && trimmed[0].text.length === 0) {
-    trimmed.shift();
-  }
-  while (trimmed.length > 0 && trimmed[trimmed.length - 1].text.length === 0) {
-    trimmed.pop();
-  }
-
-  if (trimmed.length > 0 && trimmed[0].text.startsWith("\n")) {
-    trimmed[0].text = trimmed[0].text.slice(1);
-    if (trimmed[0].text.length === 0) trimmed.shift();
+function splitRepeatGroupNodes(nodes: TemplateBodyNode[]): {
+  itemNodes: TemplateBodyNode[];
+  separatorText: string;
+} {
+  if (nodes.length === 0) {
+    return { itemNodes: nodes, separatorText: "" };
   }
 
-  if (trimmed.length > 0 && trimmed[trimmed.length - 1].text.endsWith("\n")) {
-    trimmed[trimmed.length - 1].text = trimmed[trimmed.length - 1].text.slice(
-      0,
-      -1,
-    );
-    if (trimmed[trimmed.length - 1].text.length === 0) trimmed.pop();
+  const lastNode = nodes[nodes.length - 1];
+  if (lastNode.kind !== "text") {
+    return { itemNodes: nodes, separatorText: "" };
   }
 
-  return trimmed;
+  return {
+    itemNodes: nodes.slice(0, -1),
+    separatorText: lastNode.text,
+  };
 }
 
 function buildSegmentsFromNodes(
@@ -531,21 +528,32 @@ function buildSegmentsFromNodes(
     const instances = currentScope.groups[node.definition.name] ?? [];
     const groupSegments: PromptSegment[] = [];
 
-    instances.forEach((instance, index) => {
-      const instanceSegments = trimBoundaryNewlines(
-        buildSegmentsFromNodes(node.children, [...scopeStack, instance]),
-      );
+    const repeatParts = node.definition.repeat
+      ? splitRepeatGroupNodes(node.children)
+      : { itemNodes: node.children, separatorText: "" };
 
-      if (instanceSegments.length === 0) {
-        return;
+    let renderedInstanceCount = 0;
+
+    for (const instance of instances) {
+      const instanceSegments = buildSegmentsFromNodes(repeatParts.itemNodes, [
+        ...scopeStack,
+        instance,
+      ]);
+
+      if (!hasNonEmptySegmentText(instanceSegments)) {
+        continue;
       }
 
-      if (index > 0 && groupSegments.length > 0) {
-        groupSegments.push({ text: "\n\n", isUserValue: false });
+      if (renderedInstanceCount > 0 && repeatParts.separatorText.length > 0) {
+        groupSegments.push({
+          text: repeatParts.separatorText,
+          isUserValue: false,
+        });
       }
 
       groupSegments.push(...instanceSegments);
-    });
+      renderedInstanceCount += 1;
+    }
 
     segments.push(...groupSegments);
   }
@@ -557,7 +565,7 @@ export function buildPromptSegmentsFromTemplate(
   template: ParsedTemplate,
   state: TemplateScopeState,
 ): PromptSegment[] {
-  return trimBoundaryNewlines(buildSegmentsFromNodes(template.nodes, [state]));
+  return buildSegmentsFromNodes(template.nodes, [state]);
 }
 
 export function buildPromptFromTemplate(
@@ -566,9 +574,7 @@ export function buildPromptFromTemplate(
 ): string {
   return buildPromptSegmentsFromTemplate(template, state)
     .map((segment) => segment.text)
-    .join("")
-    .replace(/\n\s*\n\s*\n/g, "\n\n")
-    .trim();
+    .join("");
 }
 
 export function buildPromptSegments(
@@ -625,9 +631,7 @@ export function buildPrompt(
 ): string | null {
   return buildPromptSegments(bodyContent, content, formValues)
     .map((segment) => segment.text)
-    .join("")
-    .replace(/\n\s*\n\s*\n/g, "\n\n")
-    .trim();
+    .join("");
 }
 
 export function stripReusableFlag(content: string): string {
