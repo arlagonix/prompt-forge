@@ -1,4 +1,4 @@
-const CACHE_NAME = "prompt-forge-v2.0";
+const CACHE_NAME = "prompt-forge-v2.1";
 const BASE_PATH = "/prompt-forge";
 const APP_SHELL = [
   `${BASE_PATH}/`,
@@ -36,40 +36,26 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  if (req.mode === "navigate") {
-    event.respondWith(
-      fetch(req)
-        .then((response) => {
-          if (response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(`${BASE_PATH}/`, copy);
-            });
-          }
-          return response;
-        })
-        .catch(() => caches.match(`${BASE_PATH}/`)),
-    );
-    return;
-  }
-
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(req)
-        .then((response) => {
-          if (!response || response.status !== 200) {
-            return response;
-          }
-
+    fetch(req)
+      .then((response) => {
+        if (response && response.status === 200) {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
-            cache.put(req, copy);
+            if (req.mode === "navigate") {
+              cache.put(`${BASE_PATH}/`, copy);
+            } else {
+              cache.put(req, copy);
+            }
           });
-          return response;
-        })
-        .catch(() => caches.match(req));
-    }),
+        }
+        return response;
+      })
+      .catch(() => {
+        if (req.mode === "navigate") {
+          return caches.match(`${BASE_PATH}/`);
+        }
+        return caches.match(req);
+      }),
   );
 });

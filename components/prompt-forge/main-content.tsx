@@ -43,8 +43,6 @@ import {
   BookOpen,
   Code,
   Copy,
-  Eye,
-  EyeOff,
   FileText,
   Folder,
   MoreHorizontal,
@@ -53,6 +51,9 @@ import {
   Plus,
   RotateCcw,
   Trash2,
+  Upload,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -65,9 +66,9 @@ interface MainContentProps {
   onEditFile: () => void;
   onMoveFile: () => void;
   onDeleteFile: () => void;
+  onCopyTemplate: () => void;
   onExportFile: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
-
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
 }
@@ -102,9 +103,7 @@ function normalizeLoadedScopeState(
     if (renderItem.kind === "field") {
       const rawValue = item.fields?.[renderItem.field.name];
       base.fields[renderItem.field.name] =
-        rawValue == null
-          ? base.fields[renderItem.field.name]
-          : String(rawValue);
+        rawValue == null ? base.fields[renderItem.field.name] : String(rawValue);
       continue;
     }
 
@@ -158,15 +157,8 @@ interface GroupEditorProps {
   group: TemplateGroupDefinition;
   state: TemplateScopeState;
   path: GroupPathSegment[];
-  onFieldChange: (
-    path: GroupPathSegment[],
-    fieldName: string,
-    value: string,
-  ) => void;
-  onAddGroupInstance: (
-    path: GroupPathSegment[],
-    group: TemplateGroupDefinition,
-  ) => void;
+  onFieldChange: (path: GroupPathSegment[], fieldName: string, value: string) => void;
+  onAddGroupInstance: (path: GroupPathSegment[], group: TemplateGroupDefinition) => void;
   onRemoveGroupInstance: (
     path: GroupPathSegment[],
     groupName: string,
@@ -193,9 +185,7 @@ function GroupEditor({
           <ParameterField
             key={`field-${item.field.name}`}
             param={item.field}
-            value={
-              state.fields[item.field.name] ?? item.field.defaultValue ?? ""
-            }
+            value={state.fields[item.field.name] ?? item.field.defaultValue ?? ""}
             onChange={(value) => onFieldChange(path, item.field.name, value)}
             onCopy={onCopy}
             showTechnicalNames={showTechnicalNames}
@@ -203,32 +193,26 @@ function GroupEditor({
         );
       }
 
-      const instances = state.groups[item.group.name] ?? [
-        createInitialScopeState(item.group),
-      ];
+      const instances =
+        state.groups[item.group.name] ?? [createInitialScopeState(item.group)];
       return (
         <div
           key={`group-${item.group.name}`}
           className="rounded-xl border border-border bg-card/60 p-4 space-y-4"
         >
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="text-sm font-semibold text-foreground">
-                {item.group.label}
-              </div>
-              {showTechnicalNames && (
-                <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
-                  {`{{${item.group.name}:start}}`}
-                </code>
-              )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="text-sm font-semibold text-foreground">
+              {item.group.label}
             </div>
+            {showTechnicalNames && (
+              <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
+                {`{{${item.group.name}:start}}`}
+              </code>
+            )}
           </div>
 
           {instances.map((instanceState, index) => {
-            const instancePath = [
-              ...path,
-              { groupName: item.group.name, index },
-            ];
+            const instancePath = [...path, { groupName: item.group.name, index }];
             const canRemove = item.group.repeat && instances.length > 1;
             const innerClass = item.group.repeat
               ? "rounded-lg border border-border/70 bg-background p-4 space-y-4"
@@ -304,21 +288,19 @@ export function MainContent({
   onEditFile,
   onMoveFile,
   onDeleteFile,
+  onCopyTemplate,
   onExportFile,
   showNotification,
   onToggleSidebar,
   isSidebarOpen,
 }: MainContentProps) {
-  const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(
-    null,
-  );
-  const [templateState, setTemplateState] = useState<TemplateScopeState | null>(
-    null,
-  );
+  const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(null);
+  const [templateState, setTemplateState] = useState<TemplateScopeState | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [previewSegments, setPreviewSegments] = useState<PromptSegment[]>([]);
   const [showTechnicalNames, setShowTechnicalNames] = useState<boolean>(true);
+
 
   useEffect(() => {
     try {
@@ -412,9 +394,7 @@ export function MainContent({
       return;
     }
 
-    setPreviewSegments(
-      buildPromptSegmentsFromTemplate(parsedTemplate, templateState),
-    );
+    setPreviewSegments(buildPromptSegmentsFromTemplate(parsedTemplate, templateState));
     setPreview(buildPromptFromTemplate(parsedTemplate, templateState));
   }, [currentFile, parseError, parsedTemplate, templateState]);
 
@@ -442,10 +422,7 @@ export function MainContent({
           ...scope,
           groups: {
             ...scope.groups,
-            [group.name]: [
-              ...(scope.groups[group.name] ?? []),
-              createInitialScopeState(group),
-            ],
+            [group.name]: [...(scope.groups[group.name] ?? []), createInitialScopeState(group)],
           },
         }));
       });
@@ -464,9 +441,7 @@ export function MainContent({
             ...scope,
             groups: {
               ...scope.groups,
-              [groupName]: current.filter(
-                (_, currentIndex) => currentIndex !== index,
-              ),
+              [groupName]: current.filter((_, currentIndex) => currentIndex !== index),
             },
           };
         });
@@ -586,9 +561,7 @@ export function MainContent({
                       ) : (
                         <Eye className="h-4 w-4 mr-2" />
                       )}
-                      {showTechnicalNames
-                        ? "Hide tech names"
-                        : "Show tech names"}
+                      {showTechnicalNames ? "Hide tech names" : "Show tech names"}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={onEditFile}>
                       <Pencil className="h-4 w-4 mr-2" />
@@ -598,9 +571,13 @@ export function MainContent({
                       <Folder className="h-4 w-4 mr-2" />
                       Move to…
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onCopyTemplate}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy
+                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onExportFile}>
-                      <Copy className="h-4 w-4 mr-2" />
+                      <Upload className="h-4 w-4 mr-2" />
                       Export
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -621,9 +598,7 @@ export function MainContent({
                 <div className="p-4 md:p-6 space-y-6">
                   {parseError ? (
                     <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                      <div className="font-medium mb-1">
-                        Template parse error
-                      </div>
+                      <div className="font-medium mb-1">Template parse error</div>
                       <div>{parseError}</div>
                     </div>
                   ) : !parsedTemplate || !templateState || !hasVisibleInputs ? (

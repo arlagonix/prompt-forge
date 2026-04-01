@@ -31,9 +31,7 @@ const FIELD_TYPES: FieldType[] = [
 ];
 
 function formatParamName(p: string): string {
-  return p
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return p.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function isSupportedParamType(value: unknown): value is FieldType {
@@ -41,7 +39,9 @@ function isSupportedParamType(value: unknown): value is FieldType {
 }
 
 function normalizeScalarToDisplayString(value: unknown): string {
-  if (typeof value === "boolean") return value ? "True" : "False";
+  if (typeof value === "boolean") {
+    return value ? "True" : "False";
+  }
   return String(value ?? "").trim();
 }
 
@@ -56,17 +56,18 @@ function defaultValueForType(
   values: string[],
 ): string | null {
   if (rawDefaultValue != null) {
-    const normalized = normalizeScalarToDisplayString(rawDefaultValue);
+    const normalizedDefault = normalizeScalarToDisplayString(rawDefaultValue);
+
     if ((type === "select" || type === "radio") && values.length > 0) {
-      const exact = values.find((value) => value === normalized);
-      if (exact) return exact;
-      const caseInsensitive = values.find(
-        (value) => value.toLowerCase() === normalized.toLowerCase(),
+      const matched = values.find(
+        (value) => value.toLowerCase() === normalizedDefault.toLowerCase(),
       );
-      if (caseInsensitive) return caseInsensitive;
+      return matched ?? normalizedDefault;
     }
-    return normalized;
+
+    return normalizedDefault;
   }
+
   if (type === "checkbox") return "false";
   if ((type === "select" || type === "radio") && values.length > 0) {
     return values[0];
@@ -159,7 +160,9 @@ function normalizeMetadataParam(
 
   if (item.type === "group") {
     if (ancestorGroupNames.includes(name)) {
-      throw new Error(`Group name "${name}" must be unique along the nesting path.`);
+      throw new Error(
+        `Group name "${name}" must be unique along the nesting path.`,
+      );
     }
 
     const childGroup = createGroupDefinition(name, {
@@ -172,7 +175,10 @@ function normalizeMetadataParam(
 
     const rawChildren = Array.isArray(item.fields) ? item.fields : [];
     for (const rawChild of rawChildren) {
-      const normalizedChild = normalizeMetadataParam(rawChild, [...ancestorGroupNames, name]);
+      const normalizedChild = normalizeMetadataParam(rawChild, [
+        ...ancestorGroupNames,
+        name,
+      ]);
       if (!normalizedChild) continue;
       ensureUniqueChildName(childGroup, normalizedChild.name);
       childGroup.children.push(normalizedChild);
@@ -185,7 +191,10 @@ function normalizeMetadataParam(
   return createFieldDefinition(name, {
     type,
     label: typeof item.label === "string" ? item.label : undefined,
-    defaultValue: item.default == null ? null : normalizeScalarToDisplayString(item.default),
+    defaultValue:
+      item.default == null
+        ? null
+        : normalizeScalarToDisplayString(item.default),
     height: typeof item.height === "number" ? item.height : undefined,
     values: normalizeStringArray(item.values),
     explicit: true,
@@ -261,7 +270,11 @@ function ensureRenderItem(
 function resolveFieldReference(
   scopeStack: TemplateGroupDefinition[],
   name: string,
-): { definition: TemplateFieldDefinition; lookupDepth: number; owner: TemplateGroupDefinition } {
+): {
+  definition: TemplateFieldDefinition;
+  lookupDepth: number;
+  owner: TemplateGroupDefinition;
+} {
   for (let depth = 0; depth < scopeStack.length; depth += 1) {
     const group = scopeStack[scopeStack.length - 1 - depth];
     const field = getFieldDefinitionByName(group, name);
@@ -298,7 +311,9 @@ export function parseTemplate(content: string | null): ParsedTemplate {
     explicit: true,
   });
 
-  const metadataParamsRaw = Array.isArray(metadata.params) ? metadata.params : [];
+  const metadataParamsRaw = Array.isArray(metadata.params)
+    ? metadata.params
+    : [];
   for (const rawParam of metadataParamsRaw) {
     const normalized = normalizeMetadataParam(rawParam, []);
     if (!normalized) continue;
@@ -407,7 +422,9 @@ export function parseTemplate(content: string | null): ParsedTemplate {
   }
 
   if (openGroupNodeStack.length > 0) {
-    throw new Error(`Group "${openGroupNodeStack[openGroupNodeStack.length - 1].name}" was not closed.`);
+    throw new Error(
+      `Group "${openGroupNodeStack[openGroupNodeStack.length - 1].name}" was not closed.`,
+    );
   }
 
   return {
@@ -422,8 +439,9 @@ export function extractParameters(content: string | null): Parameter[] {
   try {
     const parsed = parseTemplate(content);
     return parsed.rootGroup.renderOrder
-      .filter((item): item is { kind: "field"; field: TemplateFieldDefinition } =>
-        item.kind === "field",
+      .filter(
+        (item): item is { kind: "field"; field: TemplateFieldDefinition } =>
+          item.kind === "field",
       )
       .map((item) => ({
         name: item.field.name,
@@ -472,7 +490,10 @@ function trimBoundaryNewlines(segments: PromptSegment[]): PromptSegment[] {
   }
 
   if (trimmed.length > 0 && trimmed[trimmed.length - 1].text.endsWith("\n")) {
-    trimmed[trimmed.length - 1].text = trimmed[trimmed.length - 1].text.slice(0, -1);
+    trimmed[trimmed.length - 1].text = trimmed[trimmed.length - 1].text.slice(
+      0,
+      -1,
+    );
     if (trimmed[trimmed.length - 1].text.length === 0) trimmed.pop();
   }
 
@@ -492,7 +513,10 @@ function buildSegmentsFromNodes(
     }
 
     if (node.kind === "field-ref") {
-      const targetScopeIndex = Math.max(0, scopeStack.length - 1 - node.lookupDepth);
+      const targetScopeIndex = Math.max(
+        0,
+        scopeStack.length - 1 - node.lookupDepth,
+      );
       const targetScope = scopeStack[targetScopeIndex];
       const value = targetScope.fields[node.definition.name] ?? "";
       segments.push({
