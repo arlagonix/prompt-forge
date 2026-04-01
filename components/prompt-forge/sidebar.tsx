@@ -34,7 +34,6 @@ import {
   Folder,
   FolderPlus,
   Download,
-  Copy,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -76,7 +75,6 @@ interface SidebarProps {
     promptCount: number;
   }>;
   onDeleteFile: (fileId: string) => void;
-  onCopyFile: (fileId: string) => void;
   onExportFile: (fileId: string) => void;
   isLoading: boolean;
   isOpen: boolean;
@@ -120,7 +118,6 @@ export function Sidebar({
   onDeleteFolder,
   onGetFolderDeleteSummary,
   onDeleteFile,
-  onCopyFile,
   onExportFile,
   isLoading,
   isOpen,
@@ -605,7 +602,6 @@ interface FolderContentsProps {
   onOpenTemplate: (fileId: string) => void;
   onMoveFile: (fileId: string) => void;
   onDeleteFile: (fileId: string) => void;
-  onCopyFile: (fileId: string) => void;
   onExportFile: (fileId: string) => void;
   onCreateFile: (folderId?: string) => void;
   onImportFolder: (folderId: string) => void;
@@ -653,7 +649,6 @@ function FolderContents({
   onOpenTemplate,
   onMoveFile,
   onDeleteFile,
-  onCopyFile,
   onExportFile,
   onCreateFile,
   onImportFolder,
@@ -704,7 +699,6 @@ function FolderContents({
             onOpenTemplate={onOpenTemplate}
             onMoveFile={onMoveFile}
             onDeleteFile={onDeleteFile}
-            onCopyFile={onCopyFile}
             onExportFile={onExportFile}
             onCreateFile={onCreateFile}
             onImportFolder={onImportFolder}
@@ -752,7 +746,6 @@ function FolderContents({
             onOpenTemplate={() => onOpenTemplate(node.id)}
             onMove={() => onMoveFile(node.id)}
             onDelete={() => onDeleteFile(node.id)}
-            onCopy={() => onCopyFile(node.id)}
             onExport={() => onExportFile(node.id)}
             level={level}
             isDragging={
@@ -776,7 +769,6 @@ interface FolderItemProps {
   onOpenTemplate: (fileId: string) => void;
   onMoveFile: (fileId: string) => void;
   onDeleteFile: (fileId: string) => void;
-  onCopyFile: (fileId: string) => void;
   onExportFile: (fileId: string) => void;
   onCreateFile: (folderId?: string) => void;
   onImportFolder: (folderId: string) => void;
@@ -824,7 +816,6 @@ function FolderItem({
   onOpenTemplate,
   onMoveFile,
   onDeleteFile,
-  onCopyFile,
   onExportFile,
   onCreateFile,
   onImportFolder,
@@ -1093,7 +1084,6 @@ function FolderItem({
             onOpenTemplate={onOpenTemplate}
             onMoveFile={onMoveFile}
             onDeleteFile={onDeleteFile}
-            onCopyFile={onCopyFile}
             onExportFile={onExportFile}
             onCreateFile={onCreateFile}
             onImportFolder={onImportFolder}
@@ -1145,7 +1135,6 @@ interface FileItemProps {
   onOpenTemplate: () => void;
   onMove: () => void;
   onDelete: () => void;
-  onCopy: () => void;
   onExport: () => void;
   level: number;
   isDragging: boolean;
@@ -1162,7 +1151,6 @@ function FileItem({
   onOpenTemplate,
   onMove,
   onDelete,
-  onCopy,
   onExport,
   level,
   isDragging,
@@ -1231,10 +1219,6 @@ function FileItem({
           <DropdownMenuItem onClick={onMove}>
             <Folder className="mr-2 h-4 w-4" />
             Move to…
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={onCopy}>
-            <Copy className="mr-2 h-4 w-4" />
-            Copy
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onExport}>

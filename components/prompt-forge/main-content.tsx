@@ -43,6 +43,8 @@ import {
   BookOpen,
   Code,
   Copy,
+  Eye,
+  EyeOff,
   FileText,
   Folder,
   MoreHorizontal,
@@ -51,7 +53,6 @@ import {
   Plus,
   RotateCcw,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -64,9 +65,9 @@ interface MainContentProps {
   onEditFile: () => void;
   onMoveFile: () => void;
   onDeleteFile: () => void;
-  onCopyTemplate: () => void;
   onExportFile: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
+
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
 }
@@ -101,7 +102,9 @@ function normalizeLoadedScopeState(
     if (renderItem.kind === "field") {
       const rawValue = item.fields?.[renderItem.field.name];
       base.fields[renderItem.field.name] =
-        rawValue == null ? base.fields[renderItem.field.name] : String(rawValue);
+        rawValue == null
+          ? base.fields[renderItem.field.name]
+          : String(rawValue);
       continue;
     }
 
@@ -155,14 +158,22 @@ interface GroupEditorProps {
   group: TemplateGroupDefinition;
   state: TemplateScopeState;
   path: GroupPathSegment[];
-  onFieldChange: (path: GroupPathSegment[], fieldName: string, value: string) => void;
-  onAddGroupInstance: (path: GroupPathSegment[], group: TemplateGroupDefinition) => void;
+  onFieldChange: (
+    path: GroupPathSegment[],
+    fieldName: string,
+    value: string,
+  ) => void;
+  onAddGroupInstance: (
+    path: GroupPathSegment[],
+    group: TemplateGroupDefinition,
+  ) => void;
   onRemoveGroupInstance: (
     path: GroupPathSegment[],
     groupName: string,
     index: number,
   ) => void;
   onCopy: () => void;
+  showTechnicalNames: boolean;
 }
 
 function GroupEditor({
@@ -173,6 +184,7 @@ function GroupEditor({
   onAddGroupInstance,
   onRemoveGroupInstance,
   onCopy,
+  showTechnicalNames,
 }: GroupEditorProps) {
   const renderItem = useCallback(
     (item: TemplateRenderItem) => {
@@ -181,29 +193,42 @@ function GroupEditor({
           <ParameterField
             key={`field-${item.field.name}`}
             param={item.field}
-            value={state.fields[item.field.name] ?? item.field.defaultValue ?? ""}
+            value={
+              state.fields[item.field.name] ?? item.field.defaultValue ?? ""
+            }
             onChange={(value) => onFieldChange(path, item.field.name, value)}
             onCopy={onCopy}
+            showTechnicalNames={showTechnicalNames}
           />
         );
       }
 
-      const instances =
-        state.groups[item.group.name] ?? [createInitialScopeState(item.group)];
+      const instances = state.groups[item.group.name] ?? [
+        createInitialScopeState(item.group),
+      ];
       return (
         <div
           key={`group-${item.group.name}`}
           className="rounded-xl border border-border bg-card/60 p-4 space-y-4"
         >
           <div>
-            <div className="text-sm font-semibold text-foreground">
-              {item.group.label}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="text-sm font-semibold text-foreground">
+                {item.group.label}
+              </div>
+              {showTechnicalNames && (
+                <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
+                  {`{{${item.group.name}:start}}`}
+                </code>
+              )}
             </div>
-            <code className="text-xs text-muted-foreground">{`{{ ${item.group.name}:start }}`}</code>
           </div>
 
           {instances.map((instanceState, index) => {
-            const instancePath = [...path, { groupName: item.group.name, index }];
+            const instancePath = [
+              ...path,
+              { groupName: item.group.name, index },
+            ];
             const canRemove = item.group.repeat && instances.length > 1;
             const innerClass = item.group.repeat
               ? "rounded-lg border border-border/70 bg-background p-4 space-y-4"
@@ -219,6 +244,7 @@ function GroupEditor({
                   onAddGroupInstance={onAddGroupInstance}
                   onRemoveGroupInstance={onRemoveGroupInstance}
                   onCopy={onCopy}
+                  showTechnicalNames={showTechnicalNames}
                 />
 
                 {item.group.repeat && (
@@ -260,6 +286,7 @@ function GroupEditor({
       onFieldChange,
       onRemoveGroupInstance,
       path,
+      showTechnicalNames,
       state.fields,
       state.groups,
     ],
@@ -277,17 +304,37 @@ export function MainContent({
   onEditFile,
   onMoveFile,
   onDeleteFile,
-  onCopyTemplate,
   onExportFile,
   showNotification,
   onToggleSidebar,
   isSidebarOpen,
 }: MainContentProps) {
-  const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(null);
-  const [templateState, setTemplateState] = useState<TemplateScopeState | null>(null);
+  const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(
+    null,
+  );
+  const [templateState, setTemplateState] = useState<TemplateScopeState | null>(
+    null,
+  );
   const [parseError, setParseError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [previewSegments, setPreviewSegments] = useState<PromptSegment[]>([]);
+  const [showTechnicalNames, setShowTechnicalNames] = useState<boolean>(true);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("prompt-forge-show-tech-names");
+      if (raw != null) setShowTechnicalNames(raw === "true");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "prompt-forge-show-tech-names",
+        showTechnicalNames ? "true" : "false",
+      );
+    } catch {}
+  }, [showTechnicalNames]);
 
   const getFormStorageKey = useCallback((file: ParsedFile | null) => {
     if (!file?.id) return null;
@@ -365,7 +412,9 @@ export function MainContent({
       return;
     }
 
-    setPreviewSegments(buildPromptSegmentsFromTemplate(parsedTemplate, templateState));
+    setPreviewSegments(
+      buildPromptSegmentsFromTemplate(parsedTemplate, templateState),
+    );
     setPreview(buildPromptFromTemplate(parsedTemplate, templateState));
   }, [currentFile, parseError, parsedTemplate, templateState]);
 
@@ -393,7 +442,10 @@ export function MainContent({
           ...scope,
           groups: {
             ...scope.groups,
-            [group.name]: [...(scope.groups[group.name] ?? []), createInitialScopeState(group)],
+            [group.name]: [
+              ...(scope.groups[group.name] ?? []),
+              createInitialScopeState(group),
+            ],
           },
         }));
       });
@@ -412,7 +464,9 @@ export function MainContent({
             ...scope,
             groups: {
               ...scope.groups,
-              [groupName]: current.filter((_, currentIndex) => currentIndex !== index),
+              [groupName]: current.filter(
+                (_, currentIndex) => currentIndex !== index,
+              ),
             },
           };
         });
@@ -439,6 +493,10 @@ export function MainContent({
     if (!parsedTemplate) return;
     setTemplateState(createInitialScopeState(parsedTemplate.rootGroup));
   }, [parsedTemplate]);
+
+  const handleToggleTechnicalNames = useCallback(() => {
+    setShowTechnicalNames((prev) => !prev);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -522,6 +580,16 @@ export function MainContent({
                       <Code className="h-4 w-4 mr-2" />
                       Template
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={handleToggleTechnicalNames}>
+                      {showTechnicalNames ? (
+                        <EyeOff className="h-4 w-4 mr-2" />
+                      ) : (
+                        <Eye className="h-4 w-4 mr-2" />
+                      )}
+                      {showTechnicalNames
+                        ? "Hide tech names"
+                        : "Show tech names"}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={onEditFile}>
                       <Pencil className="h-4 w-4 mr-2" />
                       Edit
@@ -530,13 +598,9 @@ export function MainContent({
                       <Folder className="h-4 w-4 mr-2" />
                       Move to…
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onCopyTemplate}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy
-                    </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onExportFile}>
-                      <Upload className="h-4 w-4 mr-2" />
+                      <Copy className="h-4 w-4 mr-2" />
                       Export
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -557,7 +621,9 @@ export function MainContent({
                 <div className="p-4 md:p-6 space-y-6">
                   {parseError ? (
                     <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                      <div className="font-medium mb-1">Template parse error</div>
+                      <div className="font-medium mb-1">
+                        Template parse error
+                      </div>
                       <div>{parseError}</div>
                     </div>
                   ) : !parsedTemplate || !templateState || !hasVisibleInputs ? (
@@ -574,6 +640,7 @@ export function MainContent({
                       onAddGroupInstance={addGroupInstance}
                       onRemoveGroupInstance={removeGroupInstance}
                       onCopy={handleCopy}
+                      showTechnicalNames={showTechnicalNames}
                     />
                   )}
 
@@ -657,6 +724,7 @@ interface ParameterFieldProps {
   value: string;
   onChange: (value: string) => void;
   onCopy: () => void;
+  showTechnicalNames: boolean;
 }
 
 function ParameterField({
@@ -664,6 +732,7 @@ function ParameterField({
   value,
   onChange,
   onCopy,
+  showTechnicalNames,
 }: ParameterFieldProps) {
   const id = `param-${param.name}`;
 
@@ -676,18 +745,33 @@ function ParameterField({
     }
   };
 
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 flex-wrap">
-        <Label htmlFor={id} className="text-sm font-medium text-foreground">
-          {param.label}
-        </Label>
+  const meta = (
+    <div className="flex items-center gap-2 flex-wrap min-w-0 sm:w-56 sm:min-w-56 sm:flex-none">
+      <Label htmlFor={id} className="text-sm font-medium text-foreground">
+        {param.label}
+      </Label>
+      {showTechnicalNames && (
         <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
           {`{{${param.name}}}`}
         </code>
-      </div>
+      )}
+    </div>
+  );
 
-      {param.type === "textarea" && (
+  if (param.type === "textarea") {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Label htmlFor={id} className="text-sm font-medium text-foreground">
+            {param.label}
+          </Label>
+          {showTechnicalNames && (
+            <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
+              {`{{${param.name}}}`}
+            </code>
+          )}
+        </div>
+
         <Textarea
           id={id}
           value={value}
@@ -699,9 +783,14 @@ function ParameterField({
             minHeight: param.height ? `${param.height * 1.5}rem` : undefined,
           }}
         />
-      )}
+      </div>
+    );
+  }
 
-      {param.type === "text" && (
+  if (param.type === "text") {
+    return (
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {meta}
         <Input
           id={id}
           type="text"
@@ -709,11 +798,16 @@ function ParameterField({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={`Enter ${param.label.toLowerCase()}...`}
-          className="bg-card border-border"
+          className="bg-card border-border flex-1 min-w-0"
         />
-      )}
+      </div>
+    );
+  }
 
-      {param.type === "number" && (
+  if (param.type === "number") {
+    return (
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {meta}
         <Input
           id={id}
           type="number"
@@ -721,12 +815,17 @@ function ParameterField({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={`Enter ${param.label.toLowerCase()}...`}
-          className="bg-card border-border"
+          className="bg-card border-border flex-1 min-w-0"
         />
-      )}
+      </div>
+    );
+  }
 
-      {param.type === "checkbox" && (
-        <div className="flex items-center gap-3 p-3 rounded-md bg-card border border-border">
+  if (param.type === "checkbox") {
+    return (
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {meta}
+        <div className="flex flex-1 items-center gap-3 rounded-md border border-border bg-card p-3 min-w-0">
           <Checkbox
             id={id}
             checked={value === "true"}
@@ -739,11 +838,16 @@ function ParameterField({
             {value === "true" ? "true" : "false"}
           </Label>
         </div>
-      )}
+      </div>
+    );
+  }
 
-      {param.type === "select" && (
+  if (param.type === "select") {
+    return (
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        {meta}
         <Select value={value} onValueChange={onChange}>
-          <SelectTrigger className="bg-card border-border">
+          <SelectTrigger className="bg-card border-border flex-1 min-w-0">
             <SelectValue placeholder="Select an option" />
           </SelectTrigger>
           <SelectContent>
@@ -754,12 +858,21 @@ function ParameterField({
             ))}
           </SelectContent>
         </Select>
-      )}
+      </div>
+    );
+  }
 
-      {param.type === "radio" && (
-        <RadioGroup value={value} onValueChange={onChange} className="space-y-2">
+  if (param.type === "radio") {
+    return (
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        {meta}
+        <RadioGroup
+          value={value}
+          onValueChange={onChange}
+          className="flex flex-1 flex-wrap gap-3 min-w-0"
+        >
           {param.values.map((v) => (
-            <div key={v} className="flex items-center gap-2">
+            <div key={v} className="inline-flex items-center gap-2">
               <RadioGroupItem value={v} id={`${id}-${v}`} />
               <Label
                 htmlFor={`${id}-${v}`}
@@ -770,7 +883,9 @@ function ParameterField({
             </div>
           ))}
         </RadioGroup>
-      )}
-    </div>
-  );
+      </div>
+    );
+  }
+
+  return null;
 }

@@ -40,9 +40,14 @@ function isSupportedParamType(value: unknown): value is FieldType {
   return FIELD_TYPES.includes(value as FieldType);
 }
 
+function normalizeScalarToDisplayString(value: unknown): string {
+  if (typeof value === "boolean") return value ? "True" : "False";
+  return String(value ?? "").trim();
+}
+
 function normalizeStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+  return value.map(normalizeScalarToDisplayString).filter(Boolean);
 }
 
 function defaultValueForType(
@@ -50,7 +55,18 @@ function defaultValueForType(
   rawDefaultValue: unknown,
   values: string[],
 ): string | null {
-  if (rawDefaultValue != null) return String(rawDefaultValue);
+  if (rawDefaultValue != null) {
+    const normalized = normalizeScalarToDisplayString(rawDefaultValue);
+    if ((type === "select" || type === "radio") && values.length > 0) {
+      const exact = values.find((value) => value === normalized);
+      if (exact) return exact;
+      const caseInsensitive = values.find(
+        (value) => value.toLowerCase() === normalized.toLowerCase(),
+      );
+      if (caseInsensitive) return caseInsensitive;
+    }
+    return normalized;
+  }
   if (type === "checkbox") return "false";
   if ((type === "select" || type === "radio") && values.length > 0) {
     return values[0];
@@ -169,7 +185,7 @@ function normalizeMetadataParam(
   return createFieldDefinition(name, {
     type,
     label: typeof item.label === "string" ? item.label : undefined,
-    defaultValue: item.default == null ? null : String(item.default),
+    defaultValue: item.default == null ? null : normalizeScalarToDisplayString(item.default),
     height: typeof item.height === "number" ? item.height : undefined,
     values: normalizeStringArray(item.values),
     explicit: true,
