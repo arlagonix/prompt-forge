@@ -261,23 +261,21 @@ export function CodeEditor({
 
       const lineStart = content.lastIndexOf("\n", start - 1) + 1;
       const currentLine = content.slice(lineStart, start);
+      const trimmedLine = currentLine.trimEnd();
 
       const indentMatch = currentLine.match(/^[\t ]*/);
       const baseIndent = indentMatch?.[0] ?? "";
 
-      const trimmedLine = currentLine.trimEnd();
+      const isMarkdownBullet = /^\s*-\s+\S/.test(trimmedLine);
 
-      let extraIndent = "";
+      let insertion = "\n";
+
       if (trimmedLine.endsWith(":")) {
-        extraIndent = "  ";
-      } else if (trimmedLine.startsWith("- ")) {
-        const bulletIndentMatch = currentLine.match(/^([\t ]*)-\s/);
-        if (bulletIndentMatch) {
-          extraIndent = "  ";
-        }
+        insertion = "\n" + baseIndent + "  ";
+      } else if (!isMarkdownBullet) {
+        insertion = "\n" + baseIndent;
       }
 
-      const insertion = "\n" + baseIndent + extraIndent;
       const newContent =
         content.slice(0, start) + insertion + content.slice(end);
 
@@ -287,6 +285,8 @@ export function CodeEditor({
         const nextPos = start + insertion.length;
         textarea.selectionStart = textarea.selectionEnd = nextPos;
       });
+
+      return;
     }
   };
 
