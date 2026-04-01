@@ -21,6 +21,248 @@ import {
   TemplatePickerDialog,
 } from "./template-picker-dialog";
 
+type EditorSection = "frontmatter" | "body";
+
+type EditResult = {
+  newContent: string;
+  selectionStart: number;
+  selectionEnd: number;
+};
+
+type EditorContext = {
+  content: string;
+  start: number;
+  end: number;
+};
+
+type MarkdownContinuation = {
+  indent: string;
+  continuation: string | null;
+  isEmptyStructure: boolean;
+};
+
+const INDENT = "  ";
+
+function normalizeLeadingIndent(raw: string): string {
+  return raw.replace(/\t/g, INDENT);
+}
+
+function getLineStart(content: string, pos: number): number {
+  return content.lastIndexOf("\n", Math.max(0, pos - 1)) + 1;
+}
+
+function getLeadingWhitespace(line: string): string {
+  const match = line.match(/^[\t ]*/);
+  return normalizeLeadingIndent(match?.[0] ?? "");
+}
+
+function detectEditorSection(content: string, cursor: number): EditorSection {
+  const match = content.match(
+    /^(\uFEFF)?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/,
+  );
+  if (!match) return "body";
+  return cursor <= match[0].length ? "frontmatter" : "body";
+}
+
+function replaceRange(
+  content: string,
+  start: number,
+  end: number,
+  replacement: string,
+): string {
+  return content.slice(0, start) + replacement + content.slice(end);
+}
+
+function applyEditResult(
+  textarea: HTMLTextAreaElement,
+  setContent: (value: string) => void,
+  result: EditResult,
+) {
+  setContent(result.newContent);
+
+  requestAnimationFrame(() => {
+    textarea.selectionStart = result.selectionStart;
+    textarea.selectionEnd = result.selectionEnd;
+  });
+}
+
+function createSingleInsertionResult(
+  content: string,
+  start: number,
+  end: number,
+  insertion: string,
+): EditResult {
+  return {
+    newContent: replaceRange(content, start, end, insertion),
+    selectionStart: start + insertion.length,
+    selectionEnd: start + insertion.length,
+  };
+}
+
+function handleEnterInFrontmatter(ctx: EditorContext): EditResult {
+  const lineStart = getLineStart(ctx.content, ctx.start);
+  const currentLine = ctx.content.slice(lineStart, ctx.start);
+  const trimmedLine = currentLine.trimEnd();
+  const baseIndent = getLeadingWhitespace(currentLine);
+  const extraIndent = trimmedLine.endsWith(":") ? INDENT : "";
+
+  return createSingleInsertionResult(
+    ctx.content,
+    ctx.start,
+    ctx.end,
+    "\n" + baseIndent + extraIndent,
+  );
+}
+
+function parseMarkdownContinuation(line: string): MarkdownContinuation {
+  const indent = getLeadingWhitespace(line);
+  const normalizedLine = normalizeLeadingIndent(line);
+
+  const taskMatch = normalizedLine.match(
+    /^([ ]*)([-*+])\s+\[(?: |x|X)\](?:\s+(.*))?$/,
+  );
+  if (taskMatch) {
+    const [, taskIndent, marker, text = ""] = taskMatch;
+    return {
+      indent: taskIndent,
+      continuation: `${taskIndent}${marker} [ ] `,
+      isEmptyStructure: text.trim().length === 0,
+    };
+  }
+
+  const bulletMatch = normalizedLine.match(/^([ ]*)([-*+])(?:\s+(.*))?$/);
+  if (bulletMatch) {
+    const [, bulletIndent, marker, text = ""] = bulletMatch;
+    return {
+      indent: bulletIndent,
+      continuation: `${bulletIndent}${marker} `,
+      isEmptyStructure: text.trim().length === 0,
+    };
+  }
+
+  const numberedMatch = normalizedLine.match(/^([ ]*)(\d+)([.)])(?:\s+(.*))?$/);
+  if (numberedMatch) {
+    const [, numberIndent, rawNumber, delimiter, text = ""] = numberedMatch;
+    const nextNumber = Number.parseInt(rawNumber, 10) + 1;
+    return {
+      indent: numberIndent,
+      continuation: `${numberIndent}${nextNumber}${delimiter} `,
+      isEmptyStructure: text.trim().length === 0,
+    };
+  }
+
+  const quoteMatch = normalizedLine.match(/^([ ]*)>(?:\s?(.*))?$/);
+  if (quoteMatch) {
+    const [, quoteIndent, text = ""] = quoteMatch;
+    return {
+      indent: quoteIndent,
+      continuation: `${quoteIndent}> `,
+      isEmptyStructure: text.trim().length === 0,
+    };
+  }
+
+  return {
+    indent,
+    continuation: null,
+    isEmptyStructure: false,
+  };
+}
+
+function handleEnterInMarkdown(ctx: EditorContext): EditResult {
+  const lineStart = getLineStart(ctx.content, ctx.start);
+  const currentLine = ctx.content.slice(lineStart, ctx.start);
+  const parsed = parseMarkdownContinuation(currentLine);
+
+  if (parsed.continuation) {
+    if (parsed.isEmptyStructure) {
+      return {
+        newContent: replaceRange(
+          ctx.content,
+          lineStart,
+          ctx.end,
+          parsed.indent,
+        ),
+        selectionStart: lineStart + parsed.indent.length,
+        selectionEnd: lineStart + parsed.indent.length,
+      };
+    }
+
+    return createSingleInsertionResult(
+      ctx.content,
+      ctx.start,
+      ctx.end,
+      "\n" + parsed.continuation,
+    );
+  }
+
+  return createSingleInsertionResult(
+    ctx.content,
+    ctx.start,
+    ctx.end,
+    "\n" + parsed.indent,
+  );
+}
+
+function handleTabIndent(ctx: EditorContext): EditResult {
+  if (ctx.start !== ctx.end) {
+    const lineStart = getLineStart(ctx.content, ctx.start);
+    const selectedText = ctx.content.slice(lineStart, ctx.end);
+    const lines = selectedText.split("\n");
+    const replacement = lines.map((line) => `${INDENT}${line}`).join("\n");
+
+    return {
+      newContent: replaceRange(ctx.content, lineStart, ctx.end, replacement),
+      selectionStart: lineStart,
+      selectionEnd: lineStart + replacement.length,
+    };
+  }
+
+  return createSingleInsertionResult(ctx.content, ctx.start, ctx.end, INDENT);
+}
+
+function removeSingleIndentStep(line: string): string {
+  if (line.startsWith(INDENT)) return line.slice(INDENT.length);
+  if (line.startsWith("\t")) return line.slice(1);
+  if (line.startsWith(" ")) return line.slice(1);
+  return line;
+}
+
+function handleShiftTabOutdent(ctx: EditorContext): EditResult {
+  const lineStart = getLineStart(ctx.content, ctx.start);
+  const effectiveEnd =
+    ctx.start === ctx.end
+      ? ctx.content.indexOf("\n", ctx.end) === -1
+        ? ctx.content.length
+        : ctx.content.indexOf("\n", ctx.end)
+      : ctx.end;
+  const selectedText = ctx.content.slice(lineStart, effectiveEnd);
+  const lines = selectedText.split("\n");
+  const updatedLines = lines.map(removeSingleIndentStep);
+  const replacement = updatedLines.join("\n");
+  const removed = selectedText.length - replacement.length;
+
+  if (ctx.start === ctx.end) {
+    const removedFromCurrentLine = lines[0].length - updatedLines[0].length;
+    const nextPos = Math.max(lineStart, ctx.start - removedFromCurrentLine);
+    return {
+      newContent: replaceRange(
+        ctx.content,
+        lineStart,
+        effectiveEnd,
+        replacement,
+      ),
+      selectionStart: nextPos,
+      selectionEnd: nextPos,
+    };
+  }
+
+  return {
+    newContent: replaceRange(ctx.content, lineStart, effectiveEnd, replacement),
+    selectionStart: lineStart,
+    selectionEnd: Math.max(lineStart, ctx.end - removed),
+  };
+}
+
 interface CodeEditorProps {
   content: string;
   fileName: string;
@@ -188,66 +430,22 @@ export function CodeEditor({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
+    const ctx: EditorContext = {
+      content,
+      start: textarea.selectionStart,
+      end: textarea.selectionEnd,
+    };
+
     if (e.key === "Tab") {
       e.preventDefault();
       e.stopPropagation();
       e.nativeEvent.stopImmediatePropagation?.();
 
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
+      const result = e.shiftKey
+        ? handleShiftTabOutdent(ctx)
+        : handleTabIndent(ctx);
 
-      if (e.shiftKey) {
-        const lineStart = content.lastIndexOf("\n", start - 1) + 1;
-        const selectedText = content.slice(lineStart, end);
-        const lines = selectedText.split("\n");
-
-        const updatedLines = lines.map((line) => {
-          if (line.startsWith("  ")) return line.slice(2);
-          if (line.startsWith("\t")) return line.slice(1);
-          return line;
-        });
-
-        const replacement = updatedLines.join("\n");
-        const newContent =
-          content.slice(0, lineStart) + replacement + content.slice(end);
-
-        setContent(newContent);
-
-        requestAnimationFrame(() => {
-          const removed = selectedText.length - replacement.length;
-          textarea.selectionStart = lineStart;
-          textarea.selectionEnd = end - removed;
-        });
-
-        return;
-      }
-
-      if (start !== end) {
-        const lineStart = content.lastIndexOf("\n", start - 1) + 1;
-        const selectedText = content.slice(lineStart, end);
-        const lines = selectedText.split("\n");
-        const replacement = lines.map((line) => `  ${line}`).join("\n");
-
-        const newContent =
-          content.slice(0, lineStart) + replacement + content.slice(end);
-
-        setContent(newContent);
-
-        requestAnimationFrame(() => {
-          textarea.selectionStart = lineStart;
-          textarea.selectionEnd = lineStart + replacement.length;
-        });
-
-        return;
-      }
-
-      const newContent = content.slice(0, start) + "  " + content.slice(end);
-      setContent(newContent);
-
-      requestAnimationFrame(() => {
-        textarea.selectionStart = textarea.selectionEnd = start + 2;
-      });
-
+      applyEditResult(textarea, setContent, result);
       return;
     }
 
@@ -256,36 +454,13 @@ export function CodeEditor({
       e.stopPropagation();
       e.nativeEvent.stopImmediatePropagation?.();
 
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
+      const section = detectEditorSection(content, ctx.start);
+      const result =
+        section === "frontmatter"
+          ? handleEnterInFrontmatter(ctx)
+          : handleEnterInMarkdown(ctx);
 
-      const lineStart = content.lastIndexOf("\n", start - 1) + 1;
-      const currentLine = content.slice(lineStart, start);
-      const trimmedLine = currentLine.trimEnd();
-
-      const indentMatch = currentLine.match(/^[\t ]*/);
-      const baseIndent = indentMatch?.[0] ?? "";
-
-      const isMarkdownBullet = /^\s*-\s+\S/.test(trimmedLine);
-
-      let insertion = "\n";
-
-      if (trimmedLine.endsWith(":")) {
-        insertion = "\n" + baseIndent + "  ";
-      } else if (!isMarkdownBullet) {
-        insertion = "\n" + baseIndent;
-      }
-
-      const newContent =
-        content.slice(0, start) + insertion + content.slice(end);
-
-      setContent(newContent);
-
-      requestAnimationFrame(() => {
-        const nextPos = start + insertion.length;
-        textarea.selectionStart = textarea.selectionEnd = nextPos;
-      });
-
+      applyEditResult(textarea, setContent, result);
       return;
     }
   };
@@ -523,7 +698,7 @@ export function CodeEditor({
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleDelete}>
-              Delete Prompt
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
