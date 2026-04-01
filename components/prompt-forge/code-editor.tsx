@@ -41,7 +41,25 @@ type MarkdownContinuation = {
   isEmptyStructure: boolean;
 };
 
+type HistoryEntry = {
+  content: string;
+  selectionStart: number;
+  selectionEnd: number;
+};
+
+type HistoryState = {
+  past: HistoryEntry[];
+  future: HistoryEntry[];
+};
+
+type TypingBatchState = {
+  active: boolean;
+  timeoutId: number | null;
+};
+
 const INDENT = "  ";
+const MAX_HISTORY = 100;
+const TYPING_BATCH_MS = 700;
 
 function normalizeLeadingIndent(raw: string): string {
   return raw.replace(/\t/g, INDENT);
@@ -298,10 +316,156 @@ export function CodeEditor({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lineNumbersRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef(initialContent);
+  const historyRef = useRef<HistoryState>({ past: [], future: [] });
+  const typingBatchRef = useRef<TypingBatchState>({
+    active: false,
+    timeoutId: null,
+  });
+  const skipNextTypingBatchRef = useRef(false);
+
+  const syncContent = useCallback((value: string) => {
+    contentRef.current = value;
+    setContent(value);
+  }, []);
+
+  const clearTypingBatchTimer = useCallback(() => {
+    const timeoutId = typingBatchRef.current.timeoutId;
+    if (timeoutId !== null) {
+      window.clearTimeout(timeoutId);
+      typingBatchRef.current.timeoutId = null;
+    }
+  }, []);
+
+  const flushTypingBatch = useCallback(() => {
+    clearTypingBatchTimer();
+    typingBatchRef.current.active = false;
+  }, [clearTypingBatchTimer]);
+
+  const getCurrentSelection = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      const end = contentRef.current.length;
+      return { selectionStart: end, selectionEnd: end };
+    }
+
+    return {
+      selectionStart: textarea.selectionStart,
+      selectionEnd: textarea.selectionEnd,
+    };
+  }, []);
+
+  const createHistoryEntry = useCallback(
+    (
+      snapshotContent = contentRef.current,
+      selection = getCurrentSelection(),
+    ): HistoryEntry => ({
+      content: snapshotContent,
+      selectionStart: selection.selectionStart,
+      selectionEnd: selection.selectionEnd,
+    }),
+    [getCurrentSelection],
+  );
+
+  const pushPastEntry = useCallback((entry: HistoryEntry) => {
+    const history = historyRef.current;
+    const lastEntry = history.past[history.past.length - 1];
+
+    if (
+      lastEntry &&
+      lastEntry.content === entry.content &&
+      lastEntry.selectionStart === entry.selectionStart &&
+      lastEntry.selectionEnd === entry.selectionEnd
+    ) {
+      history.future = [];
+      return;
+    }
+
+    history.past.push(entry);
+    if (history.past.length > MAX_HISTORY) {
+      history.past.splice(0, history.past.length - MAX_HISTORY);
+    }
+    history.future = [];
+  }, []);
+
+  const restoreHistoryEntry = useCallback(
+    (entry: HistoryEntry) => {
+      syncContent(entry.content);
+
+      requestAnimationFrame(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+
+        textarea.focus();
+        textarea.selectionStart = entry.selectionStart;
+        textarea.selectionEnd = entry.selectionEnd;
+      });
+    },
+    [syncContent],
+  );
+
+  const applyHistoryTrackedEdit = useCallback(
+    (result: EditResult) => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+
+      flushTypingBatch();
+      pushPastEntry(createHistoryEntry());
+      applyEditResult(textarea, syncContent, result);
+    },
+    [createHistoryEntry, flushTypingBatch, pushPastEntry, syncContent],
+  );
+
+  const handleUndo = useCallback(() => {
+    flushTypingBatch();
+
+    const history = historyRef.current;
+    const previous = history.past.pop();
+    if (!previous) return;
+
+    history.future.push(createHistoryEntry());
+    restoreHistoryEntry(previous);
+  }, [createHistoryEntry, flushTypingBatch, restoreHistoryEntry]);
+
+  const handleRedo = useCallback(() => {
+    flushTypingBatch();
+
+    const history = historyRef.current;
+    const next = history.future.pop();
+    if (!next) return;
+
+    history.past.push(createHistoryEntry());
+    if (history.past.length > MAX_HISTORY) {
+      history.past.splice(0, history.past.length - MAX_HISTORY);
+    }
+
+    restoreHistoryEntry(next);
+  }, [createHistoryEntry, flushTypingBatch, restoreHistoryEntry]);
+
+  const beginTypingBatchIfNeeded = useCallback(() => {
+    if (!typingBatchRef.current.active) {
+      pushPastEntry(createHistoryEntry());
+      typingBatchRef.current.active = true;
+    }
+
+    clearTypingBatchTimer();
+    typingBatchRef.current.timeoutId = window.setTimeout(() => {
+      typingBatchRef.current.active = false;
+      typingBatchRef.current.timeoutId = null;
+    }, TYPING_BATCH_MS);
+  }, [clearTypingBatchTimer, createHistoryEntry, pushPastEntry]);
 
   useEffect(() => {
-    setContent(initialContent);
-  }, [initialContent]);
+    syncContent(initialContent);
+    historyRef.current = { past: [], future: [] };
+    flushTypingBatch();
+  }, [flushTypingBatch, initialContent, syncContent]);
+
+  useEffect(() => {
+    return () => {
+      clearTypingBatchTimer();
+    };
+  }, [clearTypingBatchTimer]);
 
   useEffect(() => {
     setNewFileName(fileName);
@@ -349,8 +513,11 @@ export function CodeEditor({
 
   const applyReusableTemplate = useCallback(
     (template: ReusableTemplateOption) => {
+      flushTypingBatch();
+      pushPastEntry(createHistoryEntry());
+
       const cleanedContent = stripReusableFlag(template.content);
-      setContent(cleanedContent);
+      syncContent(cleanedContent);
 
       if (!newFileName.trim()) {
         setNewFileName(template.name);
@@ -361,7 +528,8 @@ export function CodeEditor({
         if (!textarea) return;
 
         textarea.focus();
-        textarea.selectionStart = textarea.selectionEnd = 0;
+        textarea.selectionStart = 0;
+        textarea.selectionEnd = 0;
         textarea.scrollTop = 0;
 
         if (lineNumbersRef.current) {
@@ -369,7 +537,13 @@ export function CodeEditor({
         }
       });
     },
-    [newFileName],
+    [
+      createHistoryEntry,
+      flushTypingBatch,
+      newFileName,
+      pushPastEntry,
+      syncContent,
+    ],
   );
 
   const shouldConfirmTemplateReplace = useCallback(() => {
@@ -424,11 +598,50 @@ export function CodeEditor({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSave, handleClose]);
 
+  const handleTextAreaChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      if (skipNextTypingBatchRef.current) {
+        skipNextTypingBatchRef.current = false;
+        syncContent(e.target.value);
+        return;
+      }
+
+      beginTypingBatchIfNeeded();
+      syncContent(e.target.value);
+    },
+    [beginTypingBatchIfNeeded, syncContent],
+  );
+
+  const handlePasteTextarea = useCallback(() => {
+    flushTypingBatch();
+    pushPastEntry(createHistoryEntry());
+    skipNextTypingBatchRef.current = true;
+  }, [createHistoryEntry, flushTypingBatch, pushPastEntry]);
+
   const handleKeyDownTextarea = (
     e: React.KeyboardEvent<HTMLTextAreaElement>,
   ) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
+
+    const ctrl = e.ctrlKey || e.metaKey;
+    const key = e.key.toLowerCase();
+
+    if (ctrl && !e.shiftKey && key === "z") {
+      e.preventDefault();
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation?.();
+      handleUndo();
+      return;
+    }
+
+    if ((ctrl && key === "y") || (ctrl && e.shiftKey && key === "z")) {
+      e.preventDefault();
+      e.stopPropagation();
+      e.nativeEvent.stopImmediatePropagation?.();
+      handleRedo();
+      return;
+    }
 
     const ctx: EditorContext = {
       content,
@@ -445,7 +658,7 @@ export function CodeEditor({
         ? handleShiftTabOutdent(ctx)
         : handleTabIndent(ctx);
 
-      applyEditResult(textarea, setContent, result);
+      applyHistoryTrackedEdit(result);
       return;
     }
 
@@ -460,8 +673,7 @@ export function CodeEditor({
           ? handleEnterInFrontmatter(ctx)
           : handleEnterInMarkdown(ctx);
 
-      applyEditResult(textarea, setContent, result);
-      return;
+      applyHistoryTrackedEdit(result);
     }
   };
 
@@ -579,7 +791,8 @@ export function CodeEditor({
               <textarea
                 ref={textareaRef}
                 value={content}
-                onChange={(e) => setContent(e.target.value)}
+                onChange={handleTextAreaChange}
+                onPaste={handlePasteTextarea}
                 onScroll={handleScroll}
                 onKeyDownCapture={handleKeyDownTextarea}
                 spellCheck={false}
