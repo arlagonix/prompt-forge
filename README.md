@@ -2,14 +2,16 @@
 
 Prompt Forge is a local-first app for building prompts from Markdown templates.
 
-It lets you:
+It helps you:
 
-- organize templates in a folder/tree
+- organize templates in a folder tree
+- create and edit templates directly in the app
 - fill templates through generated forms
-- preview the final rendered prompt
+- preview the rendered prompt
 - copy the result
-- import and export templates/folders/root as JSON
-- use structured repeatable groups in templates
+- import and export templates, folders, or the full root as JSON
+- work with repeatable and nested groups
+- use the app comfortably on desktop and mobile
 
 ## Screenshots
 
@@ -39,10 +41,13 @@ Structured templates can define fields and groups in frontmatter and use group b
 ## Features
 
 - local-first template management
+- create, edit, rename, move, and delete templates and folders
 - root / folder / template import-export in JSON
 - sidebar browsing with nested folders
+- mobile-friendly responsive layout
+- mobile preview support
 - template search
-- template picker / "Use template"
+- quick template picking / "Use template"
 - dynamic form generation from template body and frontmatter
 - live preview
 - copy rendered prompt
@@ -52,6 +57,54 @@ Structured templates can define fields and groups in frontmatter and use group b
 - per-template saved values
 - theme switcher
 - refresh from UI
+- PWA-ready setup
+
+## Responsive behavior
+
+Prompt Forge uses one adaptive interface across desktop and mobile.
+
+### Desktop
+
+- sidebar on the left
+- form and preview shown side by side
+- drag and drop for moving items in the sidebar
+- full editing and management flow from the main UI
+
+### Mobile
+
+- sidebar opens as an overlay
+- form is shown first
+- preview is available below the form
+- large editors and content-heavy dialogs are mobile-friendly
+- Move actions are used instead of drag and drop
+
+All major app capabilities remain available on mobile.
+
+## Getting started
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the development server:
+
+```bash
+npm run dev
+```
+
+Build the app:
+
+```bash
+npm run build
+```
+
+Start the production build:
+
+```bash
+npm run start
+```
 
 ## Import / export
 
@@ -233,6 +286,9 @@ Example:
 
 ```yaml
 ---
+name: Report helper
+description: Generate a structured report prompt
+
 params:
   - name: reportTitle
     type: text
@@ -244,14 +300,23 @@ params:
 ---
 ```
 
+### Metadata
+
+Top-level frontmatter can also include template metadata such as:
+
+- `name`
+- `description`
+
+This metadata is shown in the app UI and is excluded from the rendered prompt output.
+
+Unknown metadata keys are ignored.
+
 ### Field defaults
 
 For declared fields:
 
 - missing `type` -> `textarea`
 - missing `label` -> derived from `name`
-
-Unknown metadata keys are ignored.
 
 If a declared field is never used in the body, it is not rendered in the UI.
 
@@ -368,10 +433,23 @@ repeat: true
 
 Behavior:
 
-- every group starts with one instance by default
+- every repeatable group starts with one instance by default
 - `repeat: false` -> exactly one instance
 - `repeat: true` -> user can add more instances with the Add button
 - last remaining instance cannot be removed
+
+### Separator behavior
+
+For repeatable groups, Prompt Forge preserves the template’s literal whitespace and separators between instances.
+
+That means:
+
+- separator inference applies only to repeatable groups
+- whitespace after one instance can act as the separator for the next instance
+- if a repeatable group has only one instance, separator output is ignored
+- nested groups keep separator behavior within their own scope
+
+This helps repeated output stay closer to the original template formatting.
 
 ## Nested groups
 
@@ -497,8 +575,8 @@ Inside `meals`:
 - same field may appear multiple times in the body
 - all occurrences render the same value
 - declared but unused fields are not rendered in the form UI
-- repeated group instances are separated cleanly in generated output
-- leading/trailing boundary newlines around group blocks are trimmed during rendering
+- repeated group instances preserve inferred separators from the template
+- template whitespace is preserved more faithfully for repeated group output
 
 ## Group UI behavior
 
@@ -507,6 +585,20 @@ Inside `meals`:
 - Add button for repeat groups is full-width and placed at the bottom of the group
 - Remove button for repeat instances is full-width and placed at the bottom of the instance
 - repeat group instances do not show numbered titles
+
+## Template editing
+
+Prompt Forge includes an in-app editor for creating and updating templates.
+
+You can:
+
+- create a template from the sidebar
+- create a template directly from the empty state
+- edit an existing template in the built-in editor
+- preview template source in a dedicated modal
+- open related docs from the UI
+
+On mobile, the editor is designed to remain usable without dropping core features.
 
 ## Example templates
 
