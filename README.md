@@ -11,7 +11,19 @@ It lets you:
 - import and export templates/folders/root as JSON
 - use structured repeatable groups in templates
 
----
+## Screenshots
+
+<img width="2558" height="1266" alt="image" src="https://github.com/user-attachments/assets/6ceef05b-b833-4de5-ae4f-9a640964eb1d" />
+
+<img width="2558" height="1267" alt="image" src="https://github.com/user-attachments/assets/744024ff-b1f7-4aef-bd7c-79bcb71e6891" />
+
+<img width="2558" height="1268" alt="image" src="https://github.com/user-attachments/assets/e74d8af1-9350-4b66-8879-18e59d23960a" />
+
+<img width="2558" height="1272" alt="image" src="https://github.com/user-attachments/assets/695c7131-407a-4003-87df-ad05824ffc39" />
+
+<img width="593" height="526" alt="image" src="https://github.com/user-attachments/assets/22bae342-4949-495a-8c47-840666a96664" />
+
+<img width="2559" height="1268" alt="image" src="https://github.com/user-attachments/assets/06e9a501-fd51-4dcd-b76f-e5ff5f9dbee8" />
 
 ## Main ideas
 
@@ -23,8 +35,6 @@ Prompt Forge treats a template as:
 Simple templates can be written with only placeholders in the body.
 
 Structured templates can define fields and groups in frontmatter and use group blocks in the body.
-
----
 
 ## Features
 
@@ -42,8 +52,6 @@ Structured templates can define fields and groups in frontmatter and use group b
 - per-template saved values
 - theme switcher
 - refresh from UI
-
----
 
 ## Import / export
 
@@ -160,16 +168,12 @@ Import fails if:
 
 Import is all-or-nothing.
 
----
-
 ## Template syntax
 
 Prompt Forge supports two levels of template complexity:
 
 - simple body-only placeholders
 - structured templates with frontmatter groups
-
----
 
 ## Simple placeholders
 
@@ -200,8 +204,6 @@ Audience:
 
 This will render two textarea fields automatically.
 
----
-
 ## Name rules
 
 Field and group names are technical identifiers.
@@ -222,8 +224,6 @@ Examples:
 - invalid: `task name`
 - invalid: `title!`
 - invalid: `{task}`
-
----
 
 ## Frontmatter
 
@@ -255,8 +255,6 @@ Unknown metadata keys are ignored.
 
 If a declared field is never used in the body, it is not rendered in the UI.
 
----
-
 ## Supported field types
 
 Supported field types:
@@ -283,8 +281,6 @@ params:
     label: Calories
 ---
 ```
-
----
 
 ## Groups
 
@@ -362,8 +358,6 @@ Calories: {{calories}}
 
 In this case, `date` and `calories` are inferred inside the `meals` scope.
 
----
-
 ## Repeatable groups
 
 Groups can be repeatable with:
@@ -378,8 +372,6 @@ Behavior:
 - `repeat: false` -> exactly one instance
 - `repeat: true` -> user can add more instances with the Add button
 - last remaining instance cannot be removed
-
----
 
 ## Nested groups
 
@@ -427,8 +419,6 @@ Calories: {{calories}}
 
 {{ days:end }}
 ```
-
----
 
 ## Scope resolution
 
@@ -502,8 +492,6 @@ Inside `meals`:
 - `{{date}}` falls back to `days.date` if needed
 - `{{reportTitle}}` falls back to root
 
----
-
 ## Rendering rules
 
 - same field may appear multiple times in the body
@@ -512,8 +500,6 @@ Inside `meals`:
 - repeated group instances are separated cleanly in generated output
 - leading/trailing boundary newlines around group blocks are trimmed during rendering
 
----
-
 ## Group UI behavior
 
 - every group is shown with border and padding
@@ -521,8 +507,6 @@ Inside `meals`:
 - Add button for repeat groups is full-width and placed at the bottom of the group
 - Remove button for repeat instances is full-width and placed at the bottom of the instance
 - repeat group instances do not show numbered titles
-
----
 
 ## Example templates
 
@@ -624,8 +608,6 @@ Meals for this day:
 {{ days:end }}
 ```
 
----
-
 ## Data storage
 
 Prompt Forge is local-first.
@@ -637,8 +619,6 @@ Project data is stored in IndexedDB:
 - app state
 
 Per-template form values are stored locally as well.
-
----
 
 ## Notes
 
