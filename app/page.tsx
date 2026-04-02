@@ -50,6 +50,7 @@ import type {
   ParsedFile,
 } from "@/lib/prompt-forge/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
 const DEFAULT_TEMPLATE = `## Task
@@ -152,6 +153,7 @@ export default function PromptForge() {
   });
   const importFileInputRef = useRef<HTMLInputElement>(null);
   const importTargetFolderIdRef = useRef<string>(ROOT_FOLDER_ID);
+  const isMobile = useIsMobile();
 
   const [dragState, setDragState] = useState<{
     type: "prompt" | "folder" | null;
@@ -168,10 +170,8 @@ export default function PromptForge() {
   });
 
   useEffect(() => {
-    if (window.innerWidth < 768) {
-      setIsSidebarOpen(false);
-    }
-  }, []);
+    setIsSidebarOpen(!isMobile);
+  }, [isMobile]);
 
   const showNotification = useCallback(
     (message: string, type: "success" | "error" = "success") => {

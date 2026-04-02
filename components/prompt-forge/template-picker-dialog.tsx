@@ -9,6 +9,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { FileText } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 export interface ReusableTemplateOption {
   id: string;
@@ -35,13 +37,15 @@ export function TemplatePickerDialog({
   onClose,
   onSelect,
 }: TemplatePickerDialogProps) {
+  const isMobile = useIsMobile();
+
   return (
     <CommandDialog
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
       title="Use Template"
       description="Choose a reusable template"
-      className="sm:max-w-2xl"
+      className={cn(isMobile ? "h-[100dvh] w-screen max-w-none rounded-none" : "sm:max-w-2xl")}
       showCloseButton={false}
     >
       <CommandInput placeholder="Search reusable templates..." />

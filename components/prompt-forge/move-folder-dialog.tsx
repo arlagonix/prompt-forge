@@ -52,7 +52,7 @@ export function MoveFolderDialog({
 }: MoveFolderDialogProps) {
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="sm:max-w-3xl">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl">
         <DialogHeader>
           <DialogTitle>Move folder</DialogTitle>
           <DialogDescription>
@@ -88,7 +88,7 @@ export function MoveFolderDialog({
           </div>
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-col sm:flex-row">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>

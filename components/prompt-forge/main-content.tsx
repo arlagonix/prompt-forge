@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   buildPromptFromTemplate,
   buildPromptSegmentsFromTemplate,
@@ -43,6 +44,8 @@ import {
   BookOpen,
   Code,
   Copy,
+  Eye,
+  EyeOff,
   FileText,
   Folder,
   MoreHorizontal,
@@ -52,8 +55,6 @@ import {
   RotateCcw,
   Trash2,
   Upload,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -103,7 +104,9 @@ function normalizeLoadedScopeState(
     if (renderItem.kind === "field") {
       const rawValue = item.fields?.[renderItem.field.name];
       base.fields[renderItem.field.name] =
-        rawValue == null ? base.fields[renderItem.field.name] : String(rawValue);
+        rawValue == null
+          ? base.fields[renderItem.field.name]
+          : String(rawValue);
       continue;
     }
 
@@ -157,8 +160,15 @@ interface GroupEditorProps {
   group: TemplateGroupDefinition;
   state: TemplateScopeState;
   path: GroupPathSegment[];
-  onFieldChange: (path: GroupPathSegment[], fieldName: string, value: string) => void;
-  onAddGroupInstance: (path: GroupPathSegment[], group: TemplateGroupDefinition) => void;
+  onFieldChange: (
+    path: GroupPathSegment[],
+    fieldName: string,
+    value: string,
+  ) => void;
+  onAddGroupInstance: (
+    path: GroupPathSegment[],
+    group: TemplateGroupDefinition,
+  ) => void;
   onRemoveGroupInstance: (
     path: GroupPathSegment[],
     groupName: string,
@@ -185,7 +195,9 @@ function GroupEditor({
           <ParameterField
             key={`field-${item.field.name}`}
             param={item.field}
-            value={state.fields[item.field.name] ?? item.field.defaultValue ?? ""}
+            value={
+              state.fields[item.field.name] ?? item.field.defaultValue ?? ""
+            }
             onChange={(value) => onFieldChange(path, item.field.name, value)}
             onCopy={onCopy}
             showTechnicalNames={showTechnicalNames}
@@ -193,8 +205,9 @@ function GroupEditor({
         );
       }
 
-      const instances =
-        state.groups[item.group.name] ?? [createInitialScopeState(item.group)];
+      const instances = state.groups[item.group.name] ?? [
+        createInitialScopeState(item.group),
+      ];
       return (
         <div
           key={`group-${item.group.name}`}
@@ -212,7 +225,10 @@ function GroupEditor({
           </div>
 
           {instances.map((instanceState, index) => {
-            const instancePath = [...path, { groupName: item.group.name, index }];
+            const instancePath = [
+              ...path,
+              { groupName: item.group.name, index },
+            ];
             const canRemove = item.group.repeat && instances.length > 1;
             const innerClass = item.group.repeat
               ? "rounded-lg border border-border/70 bg-background p-4 space-y-4"
@@ -294,13 +310,17 @@ export function MainContent({
   onToggleSidebar,
   isSidebarOpen,
 }: MainContentProps) {
-  const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(null);
-  const [templateState, setTemplateState] = useState<TemplateScopeState | null>(null);
+  const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(
+    null,
+  );
+  const [templateState, setTemplateState] = useState<TemplateScopeState | null>(
+    null,
+  );
   const [parseError, setParseError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [previewSegments, setPreviewSegments] = useState<PromptSegment[]>([]);
   const [showTechnicalNames, setShowTechnicalNames] = useState<boolean>(true);
-
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     try {
@@ -394,7 +414,9 @@ export function MainContent({
       return;
     }
 
-    setPreviewSegments(buildPromptSegmentsFromTemplate(parsedTemplate, templateState));
+    setPreviewSegments(
+      buildPromptSegmentsFromTemplate(parsedTemplate, templateState),
+    );
     setPreview(buildPromptFromTemplate(parsedTemplate, templateState));
   }, [currentFile, parseError, parsedTemplate, templateState]);
 
@@ -422,7 +444,10 @@ export function MainContent({
           ...scope,
           groups: {
             ...scope.groups,
-            [group.name]: [...(scope.groups[group.name] ?? []), createInitialScopeState(group)],
+            [group.name]: [
+              ...(scope.groups[group.name] ?? []),
+              createInitialScopeState(group),
+            ],
           },
         }));
       });
@@ -441,7 +466,9 @@ export function MainContent({
             ...scope,
             groups: {
               ...scope.groups,
-              [groupName]: current.filter((_, currentIndex) => currentIndex !== index),
+              [groupName]: current.filter(
+                (_, currentIndex) => currentIndex !== index,
+              ),
             },
           };
         });
@@ -499,46 +526,50 @@ export function MainContent({
       ) : currentFile ? (
         <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2">
           <section className="min-w-0 min-h-0 flex flex-col lg:border-r border-border">
-            <header className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
-              <div className="flex items-center gap-3">
+            <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:px-6 md:py-4 shrink-0">
+              <div className="flex min-w-0 items-center gap-3">
                 {!isSidebarOpen && (
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={onToggleSidebar}
-                    className="h-8 w-8"
+                    className="h-8 w-8 shrink-0"
                   >
                     <PanelLeft className="h-4 w-4" />
                   </Button>
                 )}
-                <div>
-                  <h2 className="text-lg font-semibold text-foreground">
+                <div className="min-w-0">
+                  <h2 className="truncate text-base font-semibold text-foreground md:text-lg">
                     {currentFile.name}
                   </h2>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onOpenDocs}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  Docs
-                </Button>
+              <div className="flex shrink-0 items-center gap-2">
+                {!isMobile && (
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={onOpenDocs}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Docs
+                    </Button>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleClear}
-                  className="text-muted-foreground hover:text-foreground"
-                  disabled={!parsedTemplate || !!parseError}
-                >
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Reset
-                </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClear}
+                      className="text-muted-foreground hover:text-foreground"
+                      disabled={!parsedTemplate || !!parseError}
+                    >
+                      <RotateCcw className="mr-2 h-4 w-4" />
+                      Reset
+                    </Button>
+                  </>
+                )}
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -550,34 +581,52 @@ export function MainContent({
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuContent align="end" className="w-48">
+                    {isMobile && (
+                      <>
+                        <DropdownMenuItem onClick={onOpenDocs}>
+                          <BookOpen className="mr-2 h-4 w-4" />
+                          Docs
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleClear}
+                          disabled={!parsedTemplate || !!parseError}
+                        >
+                          <RotateCcw className="mr-2 h-4 w-4" />
+                          Reset
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                      </>
+                    )}
                     <DropdownMenuItem onClick={onOpenTemplate}>
-                      <Code className="h-4 w-4 mr-2" />
+                      <Code className="mr-2 h-4 w-4" />
                       Template
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleToggleTechnicalNames}>
                       {showTechnicalNames ? (
-                        <EyeOff className="h-4 w-4 mr-2" />
+                        <EyeOff className="mr-2 h-4 w-4" />
                       ) : (
-                        <Eye className="h-4 w-4 mr-2" />
+                        <Eye className="mr-2 h-4 w-4" />
                       )}
-                      {showTechnicalNames ? "Hide tech names" : "Show tech names"}
+                      {showTechnicalNames
+                        ? "Hide tech names"
+                        : "Show tech names"}
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={onEditFile}>
-                      <Pencil className="h-4 w-4 mr-2" />
+                      <Pencil className="mr-2 h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={onMoveFile}>
-                      <Folder className="h-4 w-4 mr-2" />
+                      <Folder className="mr-2 h-4 w-4" />
                       Move to…
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={onCopyTemplate}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy source
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onExportFile}>
-                      <Upload className="h-4 w-4 mr-2" />
+                      <Upload className="mr-2 h-4 w-4" />
                       Export
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
@@ -585,7 +634,7 @@ export function MainContent({
                       onClick={onDeleteFile}
                       className="text-destructive focus:text-destructive"
                     >
-                      <Trash2 className="h-4 w-4 mr-2" />
+                      <Trash2 className="mr-2 h-4 w-4" />
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -598,7 +647,9 @@ export function MainContent({
                 <div className="p-4 md:p-6 space-y-6">
                   {parseError ? (
                     <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
-                      <div className="font-medium mb-1">Template parse error</div>
+                      <div className="font-medium mb-1">
+                        Template parse error
+                      </div>
                       <div>{parseError}</div>
                     </div>
                   ) : !parsedTemplate || !templateState || !hasVisibleInputs ? (
@@ -621,27 +672,67 @@ export function MainContent({
 
                   <div className="pt-2">
                     <Button onClick={handleCopy} className="w-full" size="lg">
-                      <Copy className="h-4 w-4 mr-2" />
+                      <Copy className="mr-2 h-4 w-4" />
                       Copy Prompt
                     </Button>
-                    <p className="text-center text-xs text-muted-foreground mt-2">
-                      <Kbd>Ctrl</Kbd> + <Kbd>Enter</Kbd> to copy
-                    </p>
+                    {!isMobile && (
+                      <p className="mt-2 text-center text-xs text-muted-foreground">
+                        <Kbd>Ctrl</Kbd> + <Kbd>Enter</Kbd> to copy
+                      </p>
+                    )}
                   </div>
+
+                  {isMobile && (
+                    <section className="rounded-xl border border-border bg-muted/30">
+                      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+                        <h2 className="text-base font-semibold text-foreground">
+                          Preview
+                        </h2>
+                      </div>
+
+                      <div className="max-h-[50vh] overflow-auto p-4">
+                        {preview ? (
+                          <pre className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-foreground">
+                            {previewSegments.map((segment, index) =>
+                              segment.isUserValue ? (
+                                <span
+                                  key={index}
+                                  className="rounded border border-primary/25 bg-primary/5 px-0.5 text-foreground"
+                                  title={
+                                    segment.paramName
+                                      ? `From: ${segment.paramName}`
+                                      : undefined
+                                  }
+                                >
+                                  {segment.text}
+                                </span>
+                              ) : (
+                                <span key={index}>{segment.text}</span>
+                              ),
+                            )}
+                          </pre>
+                        ) : (
+                          <p className="text-sm italic text-muted-foreground">
+                            No preview available.
+                          </p>
+                        )}
+                      </div>
+                    </section>
+                  )}
                 </div>
               </ScrollArea>
             </div>
           </section>
 
-          <aside className="hidden lg:flex min-w-0 min-h-0 flex-col bg-muted/30">
-            <div className="px-6 py-4.5 border-b border-border shrink-0">
+          <aside className="hidden min-w-0 min-h-0 flex-col bg-muted/30 lg:flex">
+            <div className="border-b border-border px-6 py-4.5 shrink-0">
               <h2 className="text-lg font-semibold text-foreground">Preview</h2>
             </div>
 
             <div className="min-h-0 flex-1 overflow-auto">
-              <div className="p-6 min-h-full">
+              <div className="min-h-full p-6">
                 {preview ? (
-                  <pre className="text-sm text-foreground whitespace-pre-wrap font-mono leading-relaxed break-words">
+                  <pre className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-foreground">
                     {previewSegments.map((segment, index) =>
                       segment.isUserValue ? (
                         <span
@@ -661,7 +752,7 @@ export function MainContent({
                     )}
                   </pre>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">
+                  <p className="text-sm italic text-muted-foreground">
                     No preview available.
                   </p>
                 )}

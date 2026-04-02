@@ -7,6 +7,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface DocsModalProps {
   isOpen: boolean;
@@ -14,14 +16,16 @@ interface DocsModalProps {
 }
 
 export function DocsModal({ isOpen, onClose }: DocsModalProps) {
+  const isMobile = useIsMobile();
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[85vh] max-w-3xl p-0">
-        <DialogHeader className="border-b border-border px-6 py-4">
+      <DialogContent className={cn("p-0", isMobile ? "h-[100dvh] w-screen max-w-none rounded-none border-0" : "max-h-[85vh] max-w-3xl")}>
+        <DialogHeader className="border-b border-border px-4 py-4 md:px-6">
           <DialogTitle>Template Syntax Guide</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[calc(85vh-80px)]">
+        <ScrollArea className={cn(isMobile ? "h-[calc(100dvh-73px)]" : "max-h-[calc(85vh-80px)]")}>
           <div className="space-y-6 px-6 py-4">
             <DocSection title="Overview">
               <p className="mb-3 text-sm text-muted-foreground">

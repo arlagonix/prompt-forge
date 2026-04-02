@@ -14,6 +14,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
 import { stripReusableFlag } from "@/lib/prompt-forge/parser";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { AlertTriangle, FileText, Library, Save, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -309,6 +310,7 @@ export function CodeEditor({
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
+  const isMobile = useIsMobile();
   const [showReplaceTemplateConfirm, setShowReplaceTemplateConfirm] =
     useState(false);
   const [pendingTemplate, setPendingTemplate] =
@@ -684,7 +686,7 @@ export function CodeEditor({
       <Dialog open={true} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent
           showCloseButton={false}
-          className="h-[92vh] overflow-hidden p-0"
+          className={cn("overflow-hidden p-0", isMobile ? "h-[100dvh] w-screen max-w-none rounded-none border-0" : "h-[92vh]")}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
 
@@ -726,25 +728,27 @@ export function CodeEditor({
           </DialogHeader>
 
           <div className="flex h-full min-h-0 flex-col bg-background">
-            <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="editor-filename" className="sr-only">
-                    Prompt name
-                  </Label>
-                  <Input
-                    id="editor-filename"
-                    type="text"
-                    value={newFileName}
-                    onChange={(e) => setNewFileName(e.target.value)}
-                    placeholder="Prompt name"
-                    className="h-8 w-64 font-mono text-sm"
-                  />
+            <header className={cn("shrink-0 border-b border-border bg-card px-4 py-3", isMobile ? "space-y-3" : "flex items-center justify-between")}>
+              <div className={cn("min-w-0", isMobile ? "space-y-3" : "flex items-center gap-3")}>
+                <div className="flex min-w-0 items-center gap-3">
+                  <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <Label htmlFor="editor-filename" className="sr-only">
+                      Prompt name
+                    </Label>
+                    <Input
+                      id="editor-filename"
+                      type="text"
+                      value={newFileName}
+                      onChange={(e) => setNewFileName(e.target.value)}
+                      placeholder="Prompt name"
+                      className={cn("h-9 font-mono text-sm", isMobile ? "w-full" : "w-64")}
+                    />
+                  </div>
                 </div>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2">
+              <div className={cn("shrink-0 gap-2", isMobile ? "grid grid-cols-2" : "flex items-center")}>
                 <Button
                   variant="outline"
                   size="sm"
@@ -778,7 +782,7 @@ export function CodeEditor({
             <div className="flex min-h-0 flex-1 overflow-hidden">
               <div
                 ref={lineNumbersRef}
-                className="w-12 shrink-0 select-none overflow-hidden border-r border-border bg-muted/50"
+                className="hidden w-12 shrink-0 select-none overflow-hidden border-r border-border bg-muted/50 md:block"
                 aria-hidden="true"
               >
                 <div className="px-2 py-3 text-right font-mono text-xs leading-6 text-muted-foreground">
@@ -806,21 +810,25 @@ export function CodeEditor({
               />
             </div>
 
-            <footer className="flex shrink-0 items-center justify-between border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
-              <div className="flex items-center gap-4">
-                <span>{lineCount} lines</span>
-                <span>{content.length} characters</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span>
-                  <Kbd>Ctrl</Kbd>+<Kbd>S</Kbd> Save
-                </span>
-                <span>
-                  <Kbd>Ctrl</Kbd>+<Kbd>T</Kbd> Use template
-                </span>
-                <span>
-                  <Kbd>Esc</Kbd> Close
-                </span>
+            <footer className="shrink-0 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
+              <div className={cn("flex items-center justify-between gap-3", isMobile && "flex-col items-start")}>
+                <div className="flex items-center gap-4">
+                  <span>{lineCount} lines</span>
+                  <span>{content.length} characters</span>
+                </div>
+                {!isMobile && (
+                  <div className="flex items-center gap-3">
+                    <span>
+                      <Kbd>Ctrl</Kbd>+<Kbd>S</Kbd> Save
+                    </span>
+                    <span>
+                      <Kbd>Ctrl</Kbd>+<Kbd>T</Kbd> Use template
+                    </span>
+                    <span>
+                      <Kbd>Esc</Kbd> Close
+                    </span>
+                  </div>
+                )}
               </div>
             </footer>
           </div>
@@ -846,7 +854,7 @@ export function CodeEditor({
               editor? Your changes will be lost.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row">
             <Button
               variant="outline"
               onClick={() => setShowConfirmClose(false)}
@@ -874,7 +882,7 @@ export function CodeEditor({
               Replace current draft with selected template?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row">
             <Button
               variant="outline"
               onClick={() => {
@@ -903,7 +911,7 @@ export function CodeEditor({
               action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row">
             <Button
               variant="outline"
               onClick={() => setShowDeleteConfirm(false)}

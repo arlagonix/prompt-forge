@@ -25,6 +25,7 @@ import type {
   ParsedFile,
 } from "@/lib/prompt-forge/types";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   AlertTriangle,
   ChevronDown,
@@ -141,7 +142,7 @@ export function Sidebar({
   onRootDragLeave,
   onRootDrop,
 }: SidebarProps) {
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const [creatingFolderParentId, setCreatingFolderParentId] = useState<
     string | null
   >(null);
@@ -170,12 +171,6 @@ export function Sidebar({
   const ignoreCreateBlurRef = useRef(false);
   const suppressMenuRestoreFocusRef = useRef(false);
 
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
 
   useEffect(() => {
     if (creatingFolderParentId === null) return;
