@@ -81,6 +81,7 @@ interface SidebarProps {
   onExportFile: (fileId: string) => void;
   isLoading: boolean;
   isOpen: boolean;
+  animate?: boolean;
   onToggle: () => void;
 
   draggedItemType: "prompt" | "folder" | null;
@@ -125,6 +126,7 @@ export function Sidebar({
   onExportFile,
   isLoading,
   isOpen,
+  animate = true,
   onToggle,
   draggedItemType,
   draggedItemId,
@@ -323,7 +325,10 @@ export function Sidebar({
       className={cn(
         "bg-card flex h-full shrink-0 flex-col",
         isMobile
-          ? "fixed inset-y-0 left-0 z-50 w-80 border-r border-border shadow-xl"
+          ? [
+              "fixed inset-y-0 left-0 z-50 w-80 border-r border-border shadow-xl",
+              animate && "transition-transform duration-200",
+            ]
           : "w-80 border-r border-border",
       )}
     >
@@ -582,7 +587,13 @@ export function Sidebar({
   if (isMobile) {
     return (
       <>
-        <div className="fixed inset-0 z-40 bg-black/50" onClick={onToggle} />
+        <div
+          className={cn(
+            "fixed inset-0 z-40 bg-black/50",
+            animate && "transition-opacity duration-200",
+          )}
+          onClick={onToggle}
+        />
         {sidebarContent}
       </>
     );

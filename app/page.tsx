@@ -169,6 +169,12 @@ export default function PromptForge() {
     isHoveringRoot: false,
   });
 
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     setIsSidebarOpen(!isMobile);
   }, [isMobile]);
@@ -1108,7 +1114,8 @@ export default function PromptForge() {
         onCopyFile={handleCopyTemplate as never}
         onExportFile={handleExportTemplate as never}
         isLoading={isLoading}
-        isOpen={isSidebarOpen}
+        isOpen={mounted ? isSidebarOpen : false}
+        animate={mounted}
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
         draggedItemType={dragState.type}
         draggedItemId={dragState.itemId}
@@ -1141,7 +1148,7 @@ export default function PromptForge() {
         onCreateFile={() => createNewFile(ROOT_FOLDER_ID)}
         showNotification={showNotification}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-        isSidebarOpen={isSidebarOpen}
+        isSidebarOpen={mounted ? isSidebarOpen : false}
       />
       <CommandPalette
         isOpen={isPaletteOpen}
