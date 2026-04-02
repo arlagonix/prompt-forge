@@ -10,6 +10,16 @@ import { Sidebar } from "@/components/prompt-forge/sidebar";
 import { TemplateModal } from "@/components/prompt-forge/template-modal";
 import type { ReusableTemplateOption } from "@/components/prompt-forge/template-picker-dialog";
 import { Toaster } from "@/components/ui/sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  buildExportFilename,
+  downloadJsonFile,
+  exportFolderTree,
+  exportTemplateTree,
+  exportWorkspaceTree,
+  importExportTree,
+  parseAndValidateImport,
+} from "@/lib/prompt-forge/import-export";
 import {
   canMoveFolderToFolder,
   canMovePromptToFolder,
@@ -34,15 +44,6 @@ import {
   ROOT_FOLDER_ID,
   updatePromptContent,
 } from "@/lib/prompt-forge/storage";
-import {
-  buildExportFilename,
-  downloadJsonFile,
-  exportFolderTree,
-  exportTemplateTree,
-  exportWorkspaceTree,
-  importExportTree,
-  parseAndValidateImport,
-} from "@/lib/prompt-forge/import-export";
 import type {
   EditorState,
   FolderNode,
@@ -50,7 +51,6 @@ import type {
   ParsedFile,
 } from "@/lib/prompt-forge/types";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { toast } from "sonner";
 
 const DEFAULT_TEMPLATE = `## Task
@@ -897,13 +897,16 @@ export default function PromptForge() {
     showNotification,
   ]);
 
-  const openImportPicker = useCallback((targetFolderId: string = ROOT_FOLDER_ID) => {
-    importTargetFolderIdRef.current = targetFolderId;
-    const input = importFileInputRef.current;
-    if (!input) return;
-    input.value = "";
-    input.click();
-  }, []);
+  const openImportPicker = useCallback(
+    (targetFolderId: string = ROOT_FOLDER_ID) => {
+      importTargetFolderIdRef.current = targetFolderId;
+      const input = importFileInputRef.current;
+      if (!input) return;
+      input.value = "";
+      input.click();
+    },
+    [],
+  );
 
   const handleImportFileSelected = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -918,7 +921,9 @@ export default function PromptForge() {
         showNotification("Import completed");
       } catch (err) {
         showNotification(
-          err instanceof Error ? err.message : "Import failed: invalid export schema",
+          err instanceof Error
+            ? err.message
+            : "Import failed: invalid export schema",
           "error",
         );
       } finally {
@@ -956,7 +961,6 @@ export default function PromptForge() {
     },
     [showNotification],
   );
-
 
   const handleCopyTemplate = useCallback(
     async (fileId: string) => {
@@ -1134,6 +1138,7 @@ export default function PromptForge() {
         onDeleteFile={() => currentFile && deleteFile(currentFile.id)}
         onCopyTemplate={() => currentFile && handleCopyTemplate(currentFile.id)}
         onExportFile={() => currentFile && handleExportTemplate(currentFile.id)}
+        onCreateFile={() => createNewFile(ROOT_FOLDER_ID)}
         showNotification={showNotification}
         onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
         isSidebarOpen={isSidebarOpen}

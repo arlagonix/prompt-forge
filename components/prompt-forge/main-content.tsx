@@ -69,6 +69,7 @@ interface MainContentProps {
   onDeleteFile: () => void;
   onCopyTemplate: () => void;
   onExportFile: () => void;
+  onCreateFile: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
@@ -309,6 +310,7 @@ export function MainContent({
   showNotification,
   onToggleSidebar,
   isSidebarOpen,
+  onCreateFile,
 }: MainContentProps) {
   const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(
     null,
@@ -761,22 +763,53 @@ export function MainContent({
           </aside>
         </div>
       ) : (
-        <div className="flex h-full items-center justify-center">
-          <div className="text-center max-w-sm">
-            <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-foreground mb-2">
-              Select a template
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Choose a markdown template from the sidebar to get started
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
-              <span>
-                <Kbd>Ctrl</Kbd>+<Kbd>O</Kbd> Open folder
-              </span>
-              <span>
-                <Kbd>Ctrl</Kbd>+<Kbd>K</Kbd> Quick open
-              </span>
+        <div className="flex h-full min-h-0 flex-col">
+          <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:px-6 md:py-4 shrink-0">
+            <div className="flex min-w-0 items-center gap-3">
+              {!isSidebarOpen && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggleSidebar}
+                  className="h-8 w-8 shrink-0"
+                >
+                  <PanelLeft className="h-4 w-4" />
+                </Button>
+              )}
+
+              <div className="min-w-0">
+                <h2 className="truncate text-base font-semibold text-foreground md:text-lg">
+                  Prompt Forge
+                </h2>
+              </div>
+            </div>
+          </header>
+
+          <div className="flex flex-1 items-center justify-center p-6">
+            <div className="max-w-sm text-center">
+              <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+              <h3 className="mb-2 text-lg font-medium text-foreground">
+                Select a template
+              </h3>
+              <p className="mb-4 text-sm text-muted-foreground">
+                Choose a markdown template from the sidebar to get started
+              </p>
+
+              <div className="mb-5 flex justify-center">
+                <Button onClick={onCreateFile} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  Create template
+                </Button>
+              </div>
+
+              <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
+                <span>
+                  <Kbd>Ctrl</Kbd>+<Kbd>O</Kbd> Open folder
+                </span>
+                <span>
+                  <Kbd>Ctrl</Kbd>+<Kbd>K</Kbd> Quick open
+                </span>
+              </div>
             </div>
           </div>
         </div>
