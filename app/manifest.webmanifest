@@ -1,5 +1,5 @@
 {
-  "name": "Prompt Forge v2.0",
+  "name": "Prompt Forge",
   "short_name": "PromptForge",
   "description": "Generate prompts from markdown templates with dynamic parameters",
   "start_url": "/prompt-forge/",
