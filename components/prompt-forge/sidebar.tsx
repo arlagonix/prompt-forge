@@ -19,23 +19,23 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Spinner } from "@/components/ui/spinner";
+import { useIsMobile } from "@/hooks/use-mobile";
 import type {
   FileNode,
   FolderNode,
   ParsedFile,
 } from "@/lib/prompt-forge/types";
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
 import {
   AlertTriangle,
   ChevronDown,
   ChevronRight,
   Code,
+  Copy,
+  Download,
   FileText,
   Folder,
   FolderPlus,
-  Download,
-  Copy,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -172,7 +172,6 @@ export function Sidebar({
   const creatingFolderSubmitRef = useRef(false);
   const ignoreCreateBlurRef = useRef(false);
   const suppressMenuRestoreFocusRef = useRef(false);
-
 
   useEffect(() => {
     if (creatingFolderParentId === null) return;
@@ -981,7 +980,7 @@ function FolderItem({
         >
           <button
             onClick={() => onToggleFolder(folder.id)}
-            className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             style={{ paddingLeft: `${level * 12 + 8}px` }}
           >
             {isOpen ? (
@@ -990,7 +989,9 @@ function FolderItem({
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
             <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 break-words whitespace-normal text-left leading-tight">{folder.name}</span>
+            <span className="min-w-0 whitespace-normal text-left leading-tight [overflow-wrap:anywhere]">
+              {folder.name}
+            </span>
           </button>
 
           <DropdownMenu>
@@ -1030,8 +1031,14 @@ function FolderItem({
                 New Folder
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onImportFolder(folder.id)}><Download className="mr-2 h-4 w-4" />Import JSON</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onExportFolder(folder.id)}><Upload className="mr-2 h-4 w-4" />Export Folder</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onImportFolder(folder.id)}>
+                <Download className="mr-2 h-4 w-4" />
+                Import JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onExportFolder(folder.id)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Export Folder
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onStartFolderRename(folder.id, folder.name)}
@@ -1195,7 +1202,7 @@ function FileItem({
         onDragEnd();
       }}
       className={cn(
-        "group flex w-full items-center gap-1 rounded-md pr-2 text-sm transition-colors",
+        "group flex w-full min-w-0 items-center gap-1 rounded-md pr-2 text-sm transition-colors",
         isDragging ? "opacity-50" : "",
         isActive
           ? "bg-primary text-primary-foreground"
@@ -1205,10 +1212,12 @@ function FileItem({
     >
       <button
         onClick={onSelect}
-        className="flex flex-1 items-center gap-2 py-1.5 pr-1 focus-visible:outline-none"
+        className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-1 text-left focus-visible:outline-none"
       >
-        <FileText className="h-4 w-4 shrink-0" />
-        <span className="truncate">{file.name}</span>
+        <FileText className="h-4 w-4 shrink-0 self-center" />
+        <span className="min-w-0 whitespace-normal text-left leading-tight [overflow-wrap:anywhere]">
+          {file.name}
+        </span>
       </button>
 
       <DropdownMenu>
@@ -1218,7 +1227,9 @@ function FileItem({
             size="icon"
             className={cn(
               "h-6 w-6 shrink-0 self-center rounded-md opacity-60 transition-colors hover:text-foreground hover:opacity-100",
-              isActive ? "hover:bg-primary-foreground/20" : "hover:!bg-foreground/10",
+              isActive
+                ? "hover:bg-primary-foreground/20"
+                : "hover:!bg-foreground/10",
             )}
             onClick={(e) => e.stopPropagation()}
           >
