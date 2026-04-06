@@ -328,7 +328,7 @@ export function Sidebar({
               "fixed inset-y-0 left-0 z-50 w-80 border-r border-border shadow-xl",
               animate && "transition-transform duration-200",
             ]
-          : "w-80 border-r border-border",
+          : "w-96 border-r border-border",
       )}
     >
       <div className="border-b border-border p-4">
@@ -989,7 +989,7 @@ function FolderItem({
               <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
             )}
             <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 whitespace-normal text-left leading-tight [overflow-wrap:anywhere] text-xs">
+            <span className="min-w-0 whitespace-normal text-left leading-tight [overflow-wrap:anywhere]">
               {folder.name}
             </span>
           </button>
@@ -1215,7 +1215,7 @@ function FileItem({
         className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-1 text-left focus-visible:outline-none"
       >
         <FileText className="h-4 w-4 shrink-0 self-center" />
-        <span className="min-w-0 whitespace-normal text-left leading-tight text-xs [overflow-wrap:anywhere]">
+        <span className="min-w-0 whitespace-normal text-left leading-tight [overflow-wrap:anywhere]">
           {file.name}
         </span>
       </button>
