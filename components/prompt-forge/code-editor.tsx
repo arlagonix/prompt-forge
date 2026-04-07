@@ -12,9 +12,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { stripReusableFlag } from "@/lib/prompt-forge/parser";
 import { cn } from "@/lib/utils";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { AlertTriangle, FileText, Library, Save, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -291,6 +291,8 @@ interface CodeEditorProps {
   onDelete?: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
   reusableTemplates: ReusableTemplateOption[];
+  title?: string;
+  showNameInput?: boolean;
 }
 
 export function CodeEditor({
@@ -302,6 +304,8 @@ export function CodeEditor({
   onDelete,
   showNotification,
   reusableTemplates,
+  title,
+  showNameInput = true,
 }: CodeEditorProps) {
   const [content, setContent] = useState(initialContent);
   const [newFileName, setNewFileName] = useState(fileName);
@@ -484,19 +488,19 @@ export function CodeEditor({
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (!newFileName.trim()) {
+    if (showNameInput && !newFileName.trim()) {
       showNotification("Please enter a prompt name", "error");
       return;
     }
 
     setIsSaving(true);
     try {
-      await onSave(content, newFileName.trim());
+      await onSave(content, showNameInput ? newFileName.trim() : undefined);
       setHasChanges(false);
     } finally {
       setIsSaving(false);
     }
-  }, [content, newFileName, onSave, showNotification]);
+  }, [content, newFileName, onSave, showNameInput, showNotification]);
 
   const handleClose = useCallback(() => {
     if (hasChanges) {
@@ -686,7 +690,12 @@ export function CodeEditor({
       <Dialog open={true} onOpenChange={(open) => !open && handleClose()}>
         <DialogContent
           showCloseButton={false}
-          className={cn("overflow-hidden p-0", isMobile ? "h-[100dvh] w-screen max-w-none rounded-none border-0" : "h-[92vh]")}
+          className={cn(
+            "overflow-hidden p-0",
+            isMobile
+              ? "h-[100dvh] w-screen max-w-none rounded-none border-0"
+              : "h-[92vh]",
+          )}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
 
@@ -720,35 +729,60 @@ export function CodeEditor({
         >
           <DialogHeader className="sr-only">
             <DialogTitle>
-              {isNew ? "Create template" : `Edit ${fileName}`}
+              {title ?? (isNew ? "Create template" : `Edit ${fileName}`)}
             </DialogTitle>
-            <DialogDescription>
-              Template editor dialog for editing template name and content.
-            </DialogDescription>
           </DialogHeader>
 
           <div className="flex h-full min-h-0 flex-col bg-background">
-            <header className={cn("shrink-0 border-b border-border bg-card px-4 py-3", isMobile ? "space-y-3" : "flex items-center justify-between")}>
-              <div className={cn("min-w-0", isMobile ? "space-y-3" : "flex items-center gap-3")}>
+            <header
+              className={cn(
+                "shrink-0 border-b border-border bg-card px-4 py-3",
+                isMobile ? "space-y-3" : "flex items-center justify-between",
+              )}
+            >
+              <div
+                className={cn(
+                  "min-w-0",
+                  isMobile ? "space-y-3" : "flex items-center gap-3",
+                )}
+              >
                 <div className="flex min-w-0 items-center gap-3">
                   <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
-                    <Label htmlFor="editor-filename" className="sr-only">
-                      Prompt name
-                    </Label>
-                    <Input
-                      id="editor-filename"
-                      type="text"
-                      value={newFileName}
-                      onChange={(e) => setNewFileName(e.target.value)}
-                      placeholder="Prompt name"
-                      className={cn("h-9 font-mono text-sm", isMobile ? "w-full" : "w-64")}
-                    />
+                    {showNameInput ? (
+                      <>
+                        <Label htmlFor="editor-filename" className="sr-only">
+                          Prompt name
+                        </Label>
+                        <Input
+                          id="editor-filename"
+                          type="text"
+                          value={newFileName}
+                          onChange={(e) => setNewFileName(e.target.value)}
+                          placeholder="Prompt name"
+                          className={cn(
+                            "h-9 font-mono text-sm",
+                            isMobile ? "w-full" : "w-64",
+                          )}
+                        />
+                      </>
+                    ) : (
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {title ?? fileName}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
 
-              <div className={cn("shrink-0 gap-2", isMobile ? "grid grid-cols-2" : "flex items-center")}>
+              <div
+                className={cn(
+                  "shrink-0 gap-2",
+                  isMobile ? "grid grid-cols-2" : "flex items-center",
+                )}
+              >
                 <Button
                   variant="outline"
                   size="sm"
@@ -811,7 +845,12 @@ export function CodeEditor({
             </div>
 
             <footer className="shrink-0 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
-              <div className={cn("flex items-center justify-between gap-3", isMobile && "flex-col items-start")}>
+              <div
+                className={cn(
+                  "flex items-center justify-between gap-3",
+                  isMobile && "flex-col items-start",
+                )}
+              >
                 <div className="flex items-center gap-4">
                   <span>{lineCount} lines</span>
                   <span>{content.length} characters</span>

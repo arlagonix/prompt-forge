@@ -69,6 +69,7 @@ interface SidebarProps {
   ) => void | Promise<void>;
   onImportRoot: () => void;
   onExportRoot: () => void;
+  onEditTemplateStarter: () => void;
   onRenameFolder: (folderId: string, name: string) => void | Promise<void>;
   onDeleteFolder: (folderId: string) => void | Promise<void>;
   onGetFolderDeleteSummary: (folderId: string) => Promise<{
@@ -118,6 +119,7 @@ export function Sidebar({
   onCreateFolder,
   onImportRoot,
   onExportRoot,
+  onEditTemplateStarter,
   onRenameFolder,
   onDeleteFolder,
   onGetFolderDeleteSummary,
@@ -362,6 +364,11 @@ export function Sidebar({
                 <DropdownMenuItem onClick={onExportRoot}>
                   <Upload className="mr-2 h-4 w-4" />
                   Export Workspace
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onEditTemplateStarter}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit template starter
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onRefresh} disabled={isLoading}>

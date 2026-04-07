@@ -17,25 +17,39 @@ const APP_STATE_STORE = "appState";
 export const ROOT_FOLDER_ID = "root";
 const DEFAULT_PROMPT_ID = "prompt-welcome";
 
-const DEFAULT_TEMPLATE = `## Task
+export const TEMPLATE_STARTER_STORAGE_KEY = "template-starter";
 
-...
+export const DEFAULT_TEMPLATE_STARTER_CONTENT = `---
+reusable: false
+params:
+  - name: description
+    type: textarea
+    label: User input
+---
+
+## Task
+
+Help the user complete the requested task clearly and directly.
 
 ## Limitations
 
-...
+- Do not invent facts that were not provided.
+- If important information is missing, make a reasonable assumption and state it briefly.
+- Keep the answer practical and easy to use.
+- Prefer concrete output over long explanations.
+- Preserve any important wording, names, numbers, or constraints from the user input.
 
 ## Example Input
 
-...
+Write a short release note for a feature that lets users edit the default template starter in the app settings.
 
 ## Example Output
 
-...
+Added support for editing the template starter from the app menu. Users can now customize the default content used for new templates without changing the code. The editor reuses the existing template editing UI and saves the starter locally.
 
-## User Input 
+## User Input
 
-{{ description }}
+{{description}}
 `;
 
 function randomId(prefix: string) {
@@ -114,7 +128,7 @@ export async function ensureSeedData(): Promise<void> {
     id: DEFAULT_PROMPT_ID,
     name: "welcome-template.md",
     folderId: ROOT_FOLDER_ID,
-    content: DEFAULT_TEMPLATE,
+    content: DEFAULT_TEMPLATE_STARTER_CONTENT,
     createdAt: now,
     updatedAt: now,
   };
@@ -252,6 +266,14 @@ export async function setAppState<T = unknown>(
   await transactionDone(tx);
 }
 
+export async function getTemplateStarter(): Promise<string> {
+  const saved = await getAppState<string>(TEMPLATE_STARTER_STORAGE_KEY);
+  return saved ?? DEFAULT_TEMPLATE_STARTER_CONTENT;
+}
+
+export async function setTemplateStarter(content: string): Promise<void> {
+  await setAppState(TEMPLATE_STARTER_STORAGE_KEY, content);
+}
 function buildFolderPath(
   folderId: string | null,
   folderMap: Map<string, FolderRecord>,

@@ -37,11 +37,13 @@ import {
   getAllFolders,
   getAllPrompts,
   getFolderDeleteSummary,
+  getTemplateStarter,
   moveFolder,
   movePrompt,
   renameFolder,
   renamePrompt,
   ROOT_FOLDER_ID,
+  setTemplateStarter,
   updatePromptContent,
 } from "@/lib/prompt-forge/storage";
 import type {
@@ -52,27 +54,6 @@ import type {
 } from "@/lib/prompt-forge/types";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-
-const DEFAULT_TEMPLATE = `## Task
-
-...
-
-## Limitations
-
-...
-
-## Example Input
-
-...
-
-## Example Output
-
-...
-
-## User Input 
-
-{{ description }}
-`;
 
 const LAST_FILE_KEY = "prompt-forge-last-file";
 
@@ -116,11 +97,13 @@ export default function PromptForge() {
   const [editorState, setEditorState] = useState<EditorState>({
     isOpen: false,
     isNew: false,
+    mode: "prompt",
     fileId: null,
     content: "",
     fileName: "",
     folderId: null,
   });
+  const [templateStarterContent, setTemplateStarterContent] = useState("");
   const [movePromptState, setMovePromptState] = useState<{
     isOpen: boolean;
     promptId: string | null;
@@ -247,13 +230,16 @@ export default function PromptForge() {
       try {
         await ensureSeedData();
 
-        const [folders, prompts] = await Promise.all([
+        const [folders, prompts, nextTemplateStarter] = await Promise.all([
           getAllFolders(),
           getAllPrompts(),
+          getTemplateStarter(),
         ]);
 
         const { folderTree: nextFolderTree, fileMap: nextFileMap } =
           buildFolderTree(folders, prompts);
+
+        setTemplateStarterContent(nextTemplateStarter);
 
         setAllFolders(
           folders.map((folder) => ({
@@ -340,6 +326,7 @@ export default function PromptForge() {
       setEditorState({
         isOpen: true,
         isNew: false,
+        mode: "prompt",
         fileId,
         content: file.content,
         fileName: file.name,
@@ -349,16 +336,32 @@ export default function PromptForge() {
     [fileMap, showNotification],
   );
 
-  const createNewFile = useCallback((folderId?: string) => {
+  const createNewFile = useCallback(
+    (folderId?: string) => {
+      setEditorState({
+        isOpen: true,
+        isNew: true,
+        mode: "prompt",
+        fileId: null,
+        content: templateStarterContent,
+        fileName: "",
+        folderId: folderId ?? ROOT_FOLDER_ID,
+      });
+    },
+    [templateStarterContent],
+  );
+
+  const openTemplateStarterEditor = useCallback(() => {
     setEditorState({
       isOpen: true,
-      isNew: true,
+      isNew: false,
+      mode: "template-starter",
       fileId: null,
-      content: DEFAULT_TEMPLATE,
-      fileName: "",
-      folderId: folderId ?? ROOT_FOLDER_ID,
+      content: templateStarterContent,
+      fileName: "Template starter",
+      folderId: null,
     });
-  }, []);
+  }, [templateStarterContent]);
 
   const createNewFolder = useCallback(
     async (name: string, parentId?: string | null) => {
@@ -423,6 +426,14 @@ export default function PromptForge() {
   const saveFile = useCallback(
     async (content: string, newFileName?: string) => {
       try {
+        if (editorState.mode === "template-starter") {
+          await setTemplateStarter(content);
+          setTemplateStarterContent(content);
+          showNotification("Saved template starter");
+          setEditorState((prev) => ({ ...prev, content, isOpen: false }));
+          return;
+        }
+
         const finalFileName = newFileName?.trim();
 
         if (!finalFileName) {
@@ -477,13 +488,19 @@ export default function PromptForge() {
         }
       } catch (err) {
         showNotification(
-          `Failed to save prompt: ${(err as Error).message}`,
+          `Failed to save ${editorState.mode === "template-starter" ? "template starter" : "prompt"}: ${(err as Error).message}`,
           "error",
         );
         throw err;
       }
     },
-    [editorState, fileMap, loadWorkspace, showNotification],
+    [
+      editorState,
+      fileMap,
+      loadWorkspace,
+      showNotification,
+      setTemplateStarterContent,
+    ],
   );
 
   const deleteFile = useCallback(
@@ -1104,6 +1121,7 @@ export default function PromptForge() {
         onCreateFolder={createNewFolder}
         onImportRoot={() => openImportPicker(ROOT_FOLDER_ID)}
         onExportRoot={handleExportWorkspace}
+        onEditTemplateStarter={openTemplateStarterEditor}
         onRenameFolder={renameExistingFolder}
         onMoveFolder={openMoveFolderDialog}
         onImportFolder={(folderId) => openImportPicker(folderId)}
@@ -1176,12 +1194,18 @@ export default function PromptForge() {
           onSave={saveFile}
           onClose={closeEditor}
           onDelete={
-            editorState.isNew
-              ? undefined
-              : () => editorState.fileId && deleteFile(editorState.fileId)
+            editorState.mode === "prompt" && !editorState.isNew
+              ? () => editorState.fileId && deleteFile(editorState.fileId)
+              : undefined
           }
           showNotification={showNotification}
           reusableTemplates={reusableTemplates}
+          title={
+            editorState.mode === "template-starter"
+              ? "Template starter"
+              : undefined
+          }
+          showNameInput={editorState.mode === "prompt"}
         />
       )}
 

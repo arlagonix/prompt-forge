@@ -25,9 +25,12 @@ export interface ParsedFile extends FileNode {
   updatedAt: number;
 }
 
+export type EditorMode = "prompt" | "template-starter";
+
 export interface EditorState {
   isOpen: boolean;
   isNew: boolean;
+  mode: EditorMode;
   fileId: string | null;
   content: string;
   fileName: string;
