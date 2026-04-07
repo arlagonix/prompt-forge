@@ -58,6 +58,101 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
+type PreviewLinePart = {
+  text: string;
+  isUserValue: boolean;
+  paramName?: string;
+};
+
+function buildPreviewLines(segments: PromptSegment[]): PreviewLinePart[][] {
+  if (segments.length === 0) return [];
+
+  const lines: PreviewLinePart[][] = [[]];
+
+  for (const segment of segments) {
+    const parts = segment.text.split("\n");
+
+    parts.forEach((part, index) => {
+      if (part.length > 0) {
+        lines[lines.length - 1].push({
+          text: part,
+          isUserValue: segment.isUserValue,
+          paramName: segment.paramName,
+        });
+      } else if (segment.isUserValue) {
+        lines[lines.length - 1].push({
+          text: "",
+          isUserValue: true,
+          paramName: segment.paramName,
+        });
+      }
+
+      if (index < parts.length - 1) {
+        lines.push([]);
+      }
+    });
+  }
+
+  return lines;
+}
+
+function PromptPreview({
+  segments,
+  preview,
+  className = "",
+}: {
+  segments: PromptSegment[];
+  preview: string;
+  className?: string;
+}) {
+  if (!preview) {
+    return (
+      <p className="text-sm italic text-muted-foreground">
+        No preview available.
+      </p>
+    );
+  }
+
+  const lines = buildPreviewLines(segments);
+
+  return (
+    <div className={className}>
+      <div className="font-mono text-sm leading-relaxed text-foreground">
+        {lines.map((line, lineIndex) => {
+          const hasContent = line.length > 0;
+
+          return (
+            <div
+              key={lineIndex}
+              className="min-h-[1.6em] whitespace-pre-wrap break-words"
+            >
+              {hasContent ? (
+                line.map((part, partIndex) =>
+                  part.isUserValue ? (
+                    <span
+                      key={partIndex}
+                      className="rounded border border-primary/25 bg-primary/5 px-0.5 text-foreground [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
+                      title={
+                        part.paramName ? `From: ${part.paramName}` : undefined
+                      }
+                    >
+                      {part.text === "" ? " " : part.text}
+                    </span>
+                  ) : (
+                    <span key={partIndex}>{part.text}</span>
+                  ),
+                )
+              ) : (
+                <span> </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 interface MainContentProps {
   currentFile: ParsedFile | null;
   currentParams: Parameter[];
@@ -693,31 +788,10 @@ export function MainContent({
                       </div>
 
                       <div className="max-h-[50vh] overflow-auto p-4">
-                        {preview ? (
-                          <pre className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-foreground">
-                            {previewSegments.map((segment, index) =>
-                              segment.isUserValue ? (
-                                <span
-                                  key={index}
-                                  className="rounded border border-primary/25 bg-primary/5 px-0.5 text-foreground"
-                                  title={
-                                    segment.paramName
-                                      ? `From: ${segment.paramName}`
-                                      : undefined
-                                  }
-                                >
-                                  {segment.text}
-                                </span>
-                              ) : (
-                                <span key={index}>{segment.text}</span>
-                              ),
-                            )}
-                          </pre>
-                        ) : (
-                          <p className="text-sm italic text-muted-foreground">
-                            No preview available.
-                          </p>
-                        )}
+                        <PromptPreview
+                          preview={preview}
+                          segments={previewSegments}
+                        />
                       </div>
                     </section>
                   )}
@@ -733,31 +807,7 @@ export function MainContent({
 
             <div className="min-h-0 flex-1 overflow-auto">
               <div className="min-h-full p-6">
-                {preview ? (
-                  <pre className="whitespace-pre-wrap break-words font-mono text-sm leading-relaxed text-foreground">
-                    {previewSegments.map((segment, index) =>
-                      segment.isUserValue ? (
-                        <span
-                          key={index}
-                          className="rounded border border-primary/25 bg-primary/5 px-0.5 text-foreground"
-                          title={
-                            segment.paramName
-                              ? `From: ${segment.paramName}`
-                              : undefined
-                          }
-                        >
-                          {segment.text}
-                        </span>
-                      ) : (
-                        <span key={index}>{segment.text}</span>
-                      ),
-                    )}
-                  </pre>
-                ) : (
-                  <p className="text-sm italic text-muted-foreground">
-                    No preview available.
-                  </p>
-                )}
+                <PromptPreview preview={preview} segments={previewSegments} />
               </div>
             </div>
           </aside>
