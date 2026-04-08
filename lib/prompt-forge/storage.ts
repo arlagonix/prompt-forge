@@ -126,7 +126,7 @@ export async function ensureSeedData(): Promise<void> {
 
   const welcomePrompt: PromptRecord = {
     id: DEFAULT_PROMPT_ID,
-    name: "welcome-template.md",
+    name: "Default Template",
     folderId: ROOT_FOLDER_ID,
     content: DEFAULT_TEMPLATE_STARTER_CONTENT,
     createdAt: now,
