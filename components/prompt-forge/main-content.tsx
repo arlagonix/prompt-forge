@@ -695,9 +695,21 @@ export function MainContent({
                         <DropdownMenuSeparator />
                       </>
                     )}
+                    <DropdownMenuItem onClick={onEditFile}>
+                      <Pencil className="mr-2 h-4 w-4" />
+                      Edit
+                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={onOpenTemplate}>
                       <Code className="mr-2 h-4 w-4" />
                       Template
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onMoveFile}>
+                      <Folder className="mr-2 h-4 w-4" />
+                      Move to…
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={onCopyTemplate}>
+                      <Copy className="mr-2 h-4 w-4" />
+                      Copy source
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={handleToggleTechnicalNames}>
                       {showTechnicalNames ? (
@@ -708,18 +720,6 @@ export function MainContent({
                       {showTechnicalNames
                         ? "Hide tech names"
                         : "Show tech names"}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onEditFile}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onMoveFile}>
-                      <Folder className="mr-2 h-4 w-4" />
-                      Move to…
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onCopyTemplate}>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy source
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onExportFile}>
