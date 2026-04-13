@@ -76,7 +76,9 @@ export function CodeEditor({
   }, []);
 
   const editorTheme =
-    themeMounted && resolvedTheme === "dark" ? "vs-dark" : "vs";
+    themeMounted && resolvedTheme === "dark"
+      ? "promptforge-dark"
+      : "promptforge-light";
 
   useEffect(() => {
     setContent(initialContent);
@@ -198,94 +200,118 @@ export function CodeEditor({
   }, [content]);
 
   const handleEditorWillMount = useCallback((monaco: typeof Monaco) => {
-    // Register custom language for Markdown with Front Matter support
     const languageId = "markdown-fm";
 
-    // Register the language
     monaco.languages.register({ id: languageId });
 
-    // Set Monarch tokenizer for front matter support
     monaco.languages.setMonarchTokensProvider(languageId, {
       defaultToken: "",
-      tokenPostfix: ".md",
+      tokenPostfix: ".mdfm",
 
-      // Define tokenizer rules
       tokenizer: {
         root: [
-          // Match opening front matter delimiter
           [/^---\s*$/, { token: "keyword", next: "@frontmatter" }],
-          // Delegate to standard markdown rules for everything else
           { include: "@markdown" },
         ],
 
         frontmatter: [
-          // Match closing front matter delimiter
+          [/^---\s*$/, { token: "keyword", next: "@markdown" }],
+
+          [/#.*$/, "comment"],
+
+          [/^(\s*)([a-zA-Z0-9_-]+)(\s*:)/, ["", "fm-key", "fm-colon"]],
           [
-            /^---\s*$/,
-            { token: "keyword", next: "@markdown", nextEmbedded: "text/html" },
+            /^(\s*-\s+)([a-zA-Z0-9_-]+)(\s*:)/,
+            ["fm-punctuation", "fm-key", "fm-colon"],
           ],
-          // Match YAML key-value pairs
-          [/^(\s*)([a-zA-Z0-9_-]+)(\s*:)/, ["", "type", "keyword"]],
-          // Match YAML list items
-          [/^\s*-\s+/, "keyword"],
-          // Match numbers
-          [/\b\d+(\.\d+)?\b/, "number"],
-          // Match boolean values
-          [/\b(true|false)\b/, "keyword"],
-          // Match null
-          [/\bnull\b/, "keyword"],
-          // Match strings (including quotes)
-          [/"[^"]*"/, "string"],
-          [/'[^']*'/, "string"],
-          // Match arrays
-          [/\[[^\]]*\]/, "tag"],
-          // Default YAML content
-          [/[^:\s]+(?=\s*:)/, "type"],
-          [/.*/, "string"],
+
+          [/\s*-\s+/, "fm-punctuation"],
+          [/[{}\[\]]/, "fm-punctuation"],
+          [/,/, "fm-punctuation"],
+          [/:/, "fm-colon"],
+
+          [/\b\d+(\.\d+)?\b/, "fm-value"],
+          [/\b(true|false|null)\b/, "fm-value"],
+
+          [/"([^"\\]|\\.)*"/, "fm-value"],
+          [/'([^'\\]|\\.)*'/, "fm-value"],
+          [/https?:\/\/\S+/, "fm-value"],
+
+          [/[a-zA-Z_][\w.-]*/, "fm-value"],
+          [/\s+/, ""],
         ],
 
         markdown: [
-          // Headers
-          [/^#{1,6}\s.*$/, "keyword"],
-          // Bold
-          [/\*\*[^*]+\*\*/, "strong"],
-          [/__[^_]+__/, "strong"],
-          // Italic
-          [/\*[^*]+\*/, "emphasis"],
-          [/_[^_]+_/, "emphasis"],
-          // Bold + Italic
-          [/\*\*\*[^*]+\*\*\*/, "strong"],
-          [/___[^_]+___/, "strong"],
-          // Inline code
-          [/`[^`]+`/, "string"],
-          // Links
-          [/\[[^\]]+\]\([^)]+\)/, "tag"],
-          // Images
-          [/!\[[^\]]*\]\([^)]+\)/, "tag"],
-          // Horizontal rules
-          [/^[-*_]{3,}\s*$/, "comment"],
-          // Blockquotes
-          [/^>\s+.*$/, "comment"],
-          // Lists
+          [/^#{1,6}\s+.*$/, "heading"],
+          [/^>\s+/, "comment"],
           [/^\s*[-*+]\s+/, "keyword"],
           [/^\s*\d+\.\s+/, "keyword"],
-          // Code blocks (fenced)
-          [/^```[\s\S]*?^```$/, "string"],
-          // Code blocks (indented)
-          [/^ {4}.*$/, "string"],
-          // Plain text
-          [/.*/, "text"],
+
+          [/^```.*$/, { token: "string", next: "@codeblock" }],
+          [/^ {4}.+$/, "string"],
+
+          [/!\[[^\]]*\]\([^)]+\)/, "tag"],
+          [/\[[^\]]+\]\([^)]+\)/, "tag"],
+
+          [/\*\*\*[^*]+\*\*\*/, "strong.emphasis"],
+          [/___[^_]+___/, "strong.emphasis"],
+          [/\*\*[^*]+\*\*/, "strong"],
+          [/__[^_]+__/, "strong"],
+          [/\*[^*]+\*/, "emphasis"],
+          [/_[^_]+_/, "emphasis"],
+
+          [/`[^`]+`/, "string"],
+
+          [/^[-*_]{3,}\s*$/, "comment"],
+
+          [/\{\{\s*[^{}\n]+\s*\}\}/, "variable"],
+
+          [/[^\\`*_!\[{]+/, "text"],
+          [/./, "text"],
+        ],
+
+        codeblock: [
+          [/^```$/, { token: "string", next: "@markdown" }],
+          [/.*$/, "string"],
         ],
       },
     });
 
-    // Set language configuration
+    monaco.editor.defineTheme("promptforge-light", {
+      base: "vs",
+      inherit: true,
+      rules: [
+        { token: "variable", foreground: "000000", fontStyle: "bold" },
+        { token: "heading", foreground: "000000", fontStyle: "bold" },
+
+        { token: "fm-key", foreground: "000000", fontStyle: "bold" },
+        { token: "fm-value", foreground: "000000" },
+        { token: "fm-colon", foreground: "000000" },
+        { token: "fm-punctuation", foreground: "000000" },
+      ],
+      colors: {},
+    });
+
+    monaco.editor.defineTheme("promptforge-dark", {
+      base: "vs-dark",
+      inherit: true,
+      rules: [
+        { token: "variable", foreground: "D4D4D4", fontStyle: "bold" },
+        { token: "heading", foreground: "D4D4D4", fontStyle: "bold" },
+
+        { token: "fm-key", foreground: "D4D4D4", fontStyle: "bold" },
+        { token: "fm-value", foreground: "D4D4D4" },
+        { token: "fm-colon", foreground: "D4D4D4" },
+        { token: "fm-punctuation", foreground: "D4D4D4" },
+      ],
+      colors: {},
+    });
+
     monaco.languages.setLanguageConfiguration(languageId, {
       comments: {
         blockComment: ["<!--", "-->"],
       },
       brackets: [
-        ["{", "}"],
         ["[", "]"],
         ["(", ")"],
       ],
@@ -508,6 +534,13 @@ export function CodeEditor({
                   suggestOnTriggerCharacters: false,
                   wordBasedSuggestions: "off",
                   wrappingIndent: "same",
+                  bracketPairColorization: {
+                    enabled: false,
+                  },
+                  guides: {
+                    bracketPairs: false,
+                    highlightActiveBracketPair: false,
+                  },
                 }}
                 theme={editorTheme}
               />
