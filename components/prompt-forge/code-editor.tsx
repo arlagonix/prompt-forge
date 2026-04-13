@@ -199,6 +199,47 @@ export function CodeEditor({
     return content.length === 0 ? 1 : content.split("\n").length;
   }, [content]);
 
+  const wrapCurrentSelection = useCallback(
+    (
+      editor: Monaco.editor.IStandaloneCodeEditor,
+      monaco: typeof Monaco,
+      wrapper: string,
+    ) => {
+      const selection = editor.getSelection();
+      const model = editor.getModel();
+
+      if (!selection || !model || selection.isEmpty()) {
+        return false;
+      }
+
+      const selectedText = model.getValueInRange(selection);
+      const wrappedText = `${wrapper}${selectedText}${wrapper}`;
+
+      editor.pushUndoStop();
+      editor.executeEdits("wrap-selection", [
+        {
+          range: selection,
+          text: wrappedText,
+          forceMoveMarkers: true,
+        },
+      ]);
+
+      editor.setSelection(
+        new monaco.Selection(
+          selection.startLineNumber,
+          selection.startColumn + wrapper.length,
+          selection.endLineNumber,
+          selection.endColumn + wrapper.length,
+        ),
+      );
+      editor.pushUndoStop();
+      editor.focus();
+
+      return true;
+    },
+    [],
+  );
+
   const handleEditorWillMount = useCallback((monaco: typeof Monaco) => {
     const languageId = "markdown-fm";
 
@@ -360,6 +401,38 @@ export function CodeEditor({
         handleClose();
       });
 
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI, () => {
+        wrapCurrentSelection(editor, monaco, "*");
+      });
+
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
+        wrapCurrentSelection(editor, monaco, "**");
+      });
+
+      editor.onKeyDown((e) => {
+        const selection = editor.getSelection();
+        const hasSelection = !!selection && !selection.isEmpty();
+
+        if (!hasSelection) {
+          return;
+        }
+
+        const key = e.browserEvent.key;
+        if (key !== "*") {
+          return;
+        }
+
+        if (e.ctrlKey || e.metaKey || e.altKey) {
+          return;
+        }
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const wrapper = e.shiftKey ? "**" : "*";
+        wrapCurrentSelection(editor, monaco, wrapper);
+      });
+
       if (!isNew) {
         const model = editor.getModel();
         const lastLine = model?.getLineCount() ?? 1;
@@ -372,7 +445,7 @@ export function CodeEditor({
         editor.focus();
       });
     },
-    [handleClose, handleSave, isNew],
+    [handleClose, handleSave, isNew, wrapCurrentSelection],
   );
 
   return (
