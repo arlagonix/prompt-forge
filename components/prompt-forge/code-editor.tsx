@@ -328,43 +328,33 @@ export function CodeEditor({
             <header
               className={cn(
                 "shrink-0 border-b border-border bg-card px-4 py-3",
-                isMobile ? "space-y-3" : "flex items-center justify-between",
+                isMobile ? "space-y-3" : "flex items-center justify-between gap-4",
               )}
             >
-              <div
-                className={cn(
-                  "min-w-0",
-                  isMobile ? "space-y-3" : "flex items-center gap-3",
-                )}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
-                  <div className="min-w-0 flex-1">
-                    {showNameInput ? (
-                      <>
-                        <Label htmlFor="editor-filename" className="sr-only">
-                          Prompt name
-                        </Label>
-                        <Input
-                          id="editor-filename"
-                          type="text"
-                          value={newFileName}
-                          onChange={(e) => setNewFileName(e.target.value)}
-                          placeholder="Prompt name"
-                          className={cn(
-                            "h-9 font-mono text-sm",
-                            isMobile ? "w-full" : "w-64",
-                          )}
-                        />
-                      </>
-                    ) : (
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-foreground">
-                          {title ?? fileName}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+                <div className="min-w-0 flex-1">
+                  {showNameInput ? (
+                    <>
+                      <Label htmlFor="editor-filename" className="sr-only">
+                        Prompt name
+                      </Label>
+                      <Input
+                        id="editor-filename"
+                        type="text"
+                        value={newFileName}
+                        onChange={(e) => setNewFileName(e.target.value)}
+                        placeholder="Prompt name"
+                        className="h-9 w-full font-mono text-sm"
+                      />
+                    </>
+                  ) : (
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {title ?? fileName}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -383,25 +373,9 @@ export function CodeEditor({
                   Use template
                 </Button>
 
-                {!isNew && onDelete && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                  >
-                    Delete
-                  </Button>
-                )}
-
                 <Button variant="outline" size="sm" onClick={handleClose}>
                   <X className="mr-1.5 h-4 w-4" />
                   Close
-                </Button>
-
-                <Button size="sm" onClick={handleSave} disabled={isSaving}>
-                  <Save className="mr-1.5 h-4 w-4" />
-                  {isSaving ? "Saving..." : "Save"}
                 </Button>
               </div>
             </header>
@@ -414,7 +388,7 @@ export function CodeEditor({
               />
             </div>
 
-            <footer className="shrink-0 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
+            <div className="shrink-0 border-t border-border px-4 py-2 text-xs text-muted-foreground">
               <div
                 className={cn(
                   "flex items-center justify-between gap-3",
@@ -439,6 +413,40 @@ export function CodeEditor({
                     </span>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <footer
+              className={cn(
+                "shrink-0 border-t border-border bg-card px-4 py-3",
+                isMobile ? "space-y-3" : "flex items-center justify-between gap-4",
+              )}
+            >
+              <div className={cn(isMobile ? "grid" : "flex items-center") }>
+                {!isNew && onDelete ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    Delete
+                  </Button>
+                ) : (
+                  <div />
+                )}
+              </div>
+
+              <div
+                className={cn(
+                  "gap-2",
+                  isMobile ? "grid grid-cols-1" : "flex items-center",
+                )}
+              >
+                <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                  <Save className="mr-1.5 h-4 w-4" />
+                  {isSaving ? "Saving..." : "Save"}
+                </Button>
               </div>
             </footer>
           </div>
