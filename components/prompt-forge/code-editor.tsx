@@ -16,271 +16,18 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { stripReusableFlag } from "@/lib/prompt-forge/parser";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, FileText, Library, Save, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import type * as Monaco from "monaco-editor";
+import { useTheme } from "next-themes";
+import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReusableTemplateOption,
   TemplatePickerDialog,
 } from "./template-picker-dialog";
 
-type EditorSection = "frontmatter" | "body";
-
-type EditResult = {
-  newContent: string;
-  selectionStart: number;
-  selectionEnd: number;
-};
-
-type EditorContext = {
-  content: string;
-  start: number;
-  end: number;
-};
-
-type MarkdownContinuation = {
-  indent: string;
-  continuation: string | null;
-  isEmptyStructure: boolean;
-};
-
-type HistoryEntry = {
-  content: string;
-  selectionStart: number;
-  selectionEnd: number;
-};
-
-type HistoryState = {
-  past: HistoryEntry[];
-  future: HistoryEntry[];
-};
-
-type TypingBatchState = {
-  active: boolean;
-  timeoutId: number | null;
-};
-
-const INDENT = "  ";
-const MAX_HISTORY = 100;
-const TYPING_BATCH_MS = 700;
-
-function normalizeLeadingIndent(raw: string): string {
-  return raw.replace(/\t/g, INDENT);
-}
-
-function getLineStart(content: string, pos: number): number {
-  return content.lastIndexOf("\n", Math.max(0, pos - 1)) + 1;
-}
-
-function getLeadingWhitespace(line: string): string {
-  const match = line.match(/^[\t ]*/);
-  return normalizeLeadingIndent(match?.[0] ?? "");
-}
-
-function detectEditorSection(content: string, cursor: number): EditorSection {
-  const match = content.match(
-    /^(\uFEFF)?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/,
-  );
-  if (!match) return "body";
-  return cursor <= match[0].length ? "frontmatter" : "body";
-}
-
-function replaceRange(
-  content: string,
-  start: number,
-  end: number,
-  replacement: string,
-): string {
-  return content.slice(0, start) + replacement + content.slice(end);
-}
-
-function applyEditResult(
-  textarea: HTMLTextAreaElement,
-  setContent: (value: string) => void,
-  result: EditResult,
-) {
-  setContent(result.newContent);
-
-  requestAnimationFrame(() => {
-    textarea.selectionStart = result.selectionStart;
-    textarea.selectionEnd = result.selectionEnd;
-  });
-}
-
-function createSingleInsertionResult(
-  content: string,
-  start: number,
-  end: number,
-  insertion: string,
-): EditResult {
-  return {
-    newContent: replaceRange(content, start, end, insertion),
-    selectionStart: start + insertion.length,
-    selectionEnd: start + insertion.length,
-  };
-}
-
-function handleEnterInFrontmatter(ctx: EditorContext): EditResult {
-  const lineStart = getLineStart(ctx.content, ctx.start);
-  const currentLine = ctx.content.slice(lineStart, ctx.start);
-  const trimmedLine = currentLine.trimEnd();
-  const baseIndent = getLeadingWhitespace(currentLine);
-  const extraIndent = trimmedLine.endsWith(":") ? INDENT : "";
-
-  return createSingleInsertionResult(
-    ctx.content,
-    ctx.start,
-    ctx.end,
-    "\n" + baseIndent + extraIndent,
-  );
-}
-
-function parseMarkdownContinuation(line: string): MarkdownContinuation {
-  const indent = getLeadingWhitespace(line);
-  const normalizedLine = normalizeLeadingIndent(line);
-
-  const taskMatch = normalizedLine.match(
-    /^([ ]*)([-*+])\s+\[(?: |x|X)\](?:\s+(.*))?$/,
-  );
-  if (taskMatch) {
-    const [, taskIndent, marker, text = ""] = taskMatch;
-    return {
-      indent: taskIndent,
-      continuation: `${taskIndent}${marker} [ ] `,
-      isEmptyStructure: text.trim().length === 0,
-    };
-  }
-
-  const bulletMatch = normalizedLine.match(/^([ ]*)([-*+])(?:\s+(.*))?$/);
-  if (bulletMatch) {
-    const [, bulletIndent, marker, text = ""] = bulletMatch;
-    return {
-      indent: bulletIndent,
-      continuation: `${bulletIndent}${marker} `,
-      isEmptyStructure: text.trim().length === 0,
-    };
-  }
-
-  const numberedMatch = normalizedLine.match(/^([ ]*)(\d+)([.)])(?:\s+(.*))?$/);
-  if (numberedMatch) {
-    const [, numberIndent, rawNumber, delimiter, text = ""] = numberedMatch;
-    const nextNumber = Number.parseInt(rawNumber, 10) + 1;
-    return {
-      indent: numberIndent,
-      continuation: `${numberIndent}${nextNumber}${delimiter} `,
-      isEmptyStructure: text.trim().length === 0,
-    };
-  }
-
-  const quoteMatch = normalizedLine.match(/^([ ]*)>(?:\s?(.*))?$/);
-  if (quoteMatch) {
-    const [, quoteIndent, text = ""] = quoteMatch;
-    return {
-      indent: quoteIndent,
-      continuation: `${quoteIndent}> `,
-      isEmptyStructure: text.trim().length === 0,
-    };
-  }
-
-  return {
-    indent,
-    continuation: null,
-    isEmptyStructure: false,
-  };
-}
-
-function handleEnterInMarkdown(ctx: EditorContext): EditResult {
-  const lineStart = getLineStart(ctx.content, ctx.start);
-  const currentLine = ctx.content.slice(lineStart, ctx.start);
-  const parsed = parseMarkdownContinuation(currentLine);
-
-  if (parsed.continuation) {
-    if (parsed.isEmptyStructure) {
-      return {
-        newContent: replaceRange(
-          ctx.content,
-          lineStart,
-          ctx.end,
-          parsed.indent,
-        ),
-        selectionStart: lineStart + parsed.indent.length,
-        selectionEnd: lineStart + parsed.indent.length,
-      };
-    }
-
-    return createSingleInsertionResult(
-      ctx.content,
-      ctx.start,
-      ctx.end,
-      "\n" + parsed.continuation,
-    );
-  }
-
-  return createSingleInsertionResult(
-    ctx.content,
-    ctx.start,
-    ctx.end,
-    "\n" + parsed.indent,
-  );
-}
-
-function handleTabIndent(ctx: EditorContext): EditResult {
-  if (ctx.start !== ctx.end) {
-    const lineStart = getLineStart(ctx.content, ctx.start);
-    const selectedText = ctx.content.slice(lineStart, ctx.end);
-    const lines = selectedText.split("\n");
-    const replacement = lines.map((line) => `${INDENT}${line}`).join("\n");
-
-    return {
-      newContent: replaceRange(ctx.content, lineStart, ctx.end, replacement),
-      selectionStart: lineStart,
-      selectionEnd: lineStart + replacement.length,
-    };
-  }
-
-  return createSingleInsertionResult(ctx.content, ctx.start, ctx.end, INDENT);
-}
-
-function removeSingleIndentStep(line: string): string {
-  if (line.startsWith(INDENT)) return line.slice(INDENT.length);
-  if (line.startsWith("\t")) return line.slice(1);
-  if (line.startsWith(" ")) return line.slice(1);
-  return line;
-}
-
-function handleShiftTabOutdent(ctx: EditorContext): EditResult {
-  const lineStart = getLineStart(ctx.content, ctx.start);
-  const effectiveEnd =
-    ctx.start === ctx.end
-      ? ctx.content.indexOf("\n", ctx.end) === -1
-        ? ctx.content.length
-        : ctx.content.indexOf("\n", ctx.end)
-      : ctx.end;
-  const selectedText = ctx.content.slice(lineStart, effectiveEnd);
-  const lines = selectedText.split("\n");
-  const updatedLines = lines.map(removeSingleIndentStep);
-  const replacement = updatedLines.join("\n");
-  const removed = selectedText.length - replacement.length;
-
-  if (ctx.start === ctx.end) {
-    const removedFromCurrentLine = lines[0].length - updatedLines[0].length;
-    const nextPos = Math.max(lineStart, ctx.start - removedFromCurrentLine);
-    return {
-      newContent: replaceRange(
-        ctx.content,
-        lineStart,
-        effectiveEnd,
-        replacement,
-      ),
-      selectionStart: nextPos,
-      selectionEnd: nextPos,
-    };
-  }
-
-  return {
-    newContent: replaceRange(ctx.content, lineStart, effectiveEnd, replacement),
-    selectionStart: lineStart,
-    selectionEnd: Math.max(lineStart, ctx.end - removed),
-  };
-}
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+});
 
 interface CodeEditorProps {
   content: string;
@@ -314,164 +61,26 @@ export function CodeEditor({
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
-  const isMobile = useIsMobile();
   const [showReplaceTemplateConfirm, setShowReplaceTemplateConfirm] =
     useState(false);
   const [pendingTemplate, setPendingTemplate] =
     useState<ReusableTemplateOption | null>(null);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lineNumbersRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef(initialContent);
-  const historyRef = useRef<HistoryState>({ past: [], future: [] });
-  const typingBatchRef = useRef<TypingBatchState>({
-    active: false,
-    timeoutId: null,
-  });
-  const skipNextTypingBatchRef = useRef(false);
-
-  const syncContent = useCallback((value: string) => {
-    contentRef.current = value;
-    setContent(value);
-  }, []);
-
-  const clearTypingBatchTimer = useCallback(() => {
-    const timeoutId = typingBatchRef.current.timeoutId;
-    if (timeoutId !== null) {
-      window.clearTimeout(timeoutId);
-      typingBatchRef.current.timeoutId = null;
-    }
-  }, []);
-
-  const flushTypingBatch = useCallback(() => {
-    clearTypingBatchTimer();
-    typingBatchRef.current.active = false;
-  }, [clearTypingBatchTimer]);
-
-  const getCurrentSelection = useCallback(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) {
-      const end = contentRef.current.length;
-      return { selectionStart: end, selectionEnd: end };
-    }
-
-    return {
-      selectionStart: textarea.selectionStart,
-      selectionEnd: textarea.selectionEnd,
-    };
-  }, []);
-
-  const createHistoryEntry = useCallback(
-    (
-      snapshotContent = contentRef.current,
-      selection = getCurrentSelection(),
-    ): HistoryEntry => ({
-      content: snapshotContent,
-      selectionStart: selection.selectionStart,
-      selectionEnd: selection.selectionEnd,
-    }),
-    [getCurrentSelection],
-  );
-
-  const pushPastEntry = useCallback((entry: HistoryEntry) => {
-    const history = historyRef.current;
-    const lastEntry = history.past[history.past.length - 1];
-
-    if (
-      lastEntry &&
-      lastEntry.content === entry.content &&
-      lastEntry.selectionStart === entry.selectionStart &&
-      lastEntry.selectionEnd === entry.selectionEnd
-    ) {
-      history.future = [];
-      return;
-    }
-
-    history.past.push(entry);
-    if (history.past.length > MAX_HISTORY) {
-      history.past.splice(0, history.past.length - MAX_HISTORY);
-    }
-    history.future = [];
-  }, []);
-
-  const restoreHistoryEntry = useCallback(
-    (entry: HistoryEntry) => {
-      syncContent(entry.content);
-
-      requestAnimationFrame(() => {
-        const textarea = textareaRef.current;
-        if (!textarea) return;
-
-        textarea.focus();
-        textarea.selectionStart = entry.selectionStart;
-        textarea.selectionEnd = entry.selectionEnd;
-      });
-    },
-    [syncContent],
-  );
-
-  const applyHistoryTrackedEdit = useCallback(
-    (result: EditResult) => {
-      const textarea = textareaRef.current;
-      if (!textarea) return;
-
-      flushTypingBatch();
-      pushPastEntry(createHistoryEntry());
-      applyEditResult(textarea, syncContent, result);
-    },
-    [createHistoryEntry, flushTypingBatch, pushPastEntry, syncContent],
-  );
-
-  const handleUndo = useCallback(() => {
-    flushTypingBatch();
-
-    const history = historyRef.current;
-    const previous = history.past.pop();
-    if (!previous) return;
-
-    history.future.push(createHistoryEntry());
-    restoreHistoryEntry(previous);
-  }, [createHistoryEntry, flushTypingBatch, restoreHistoryEntry]);
-
-  const handleRedo = useCallback(() => {
-    flushTypingBatch();
-
-    const history = historyRef.current;
-    const next = history.future.pop();
-    if (!next) return;
-
-    history.past.push(createHistoryEntry());
-    if (history.past.length > MAX_HISTORY) {
-      history.past.splice(0, history.past.length - MAX_HISTORY);
-    }
-
-    restoreHistoryEntry(next);
-  }, [createHistoryEntry, flushTypingBatch, restoreHistoryEntry]);
-
-  const beginTypingBatchIfNeeded = useCallback(() => {
-    if (!typingBatchRef.current.active) {
-      pushPastEntry(createHistoryEntry());
-      typingBatchRef.current.active = true;
-    }
-
-    clearTypingBatchTimer();
-    typingBatchRef.current.timeoutId = window.setTimeout(() => {
-      typingBatchRef.current.active = false;
-      typingBatchRef.current.timeoutId = null;
-    }, TYPING_BATCH_MS);
-  }, [clearTypingBatchTimer, createHistoryEntry, pushPastEntry]);
+  const isMobile = useIsMobile();
+  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const { resolvedTheme } = useTheme();
+  const [themeMounted, setThemeMounted] = useState(false);
 
   useEffect(() => {
-    syncContent(initialContent);
-    historyRef.current = { past: [], future: [] };
-    flushTypingBatch();
-  }, [flushTypingBatch, initialContent, syncContent]);
+    setThemeMounted(true);
+  }, []);
+
+  const editorTheme =
+    themeMounted && resolvedTheme === "dark" ? "vs-dark" : "vs";
 
   useEffect(() => {
-    return () => {
-      clearTypingBatchTimer();
-    };
-  }, [clearTypingBatchTimer]);
+    setContent(initialContent);
+  }, [initialContent]);
 
   useEffect(() => {
     setNewFileName(fileName);
@@ -480,12 +89,6 @@ export function CodeEditor({
   useEffect(() => {
     setHasChanges(content !== initialContent || newFileName !== fileName);
   }, [content, initialContent, newFileName, fileName]);
-
-  const handleScroll = useCallback(() => {
-    if (textareaRef.current && lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
-    }
-  }, []);
 
   const handleSave = useCallback(async () => {
     if (showNameInput && !newFileName.trim()) {
@@ -511,45 +114,31 @@ export function CodeEditor({
   }, [hasChanges, onClose]);
 
   const handleDelete = useCallback(() => {
-    if (onDelete) {
-      setShowDeleteConfirm(false);
-      onDelete();
-    }
+    if (!onDelete) return;
+    setShowDeleteConfirm(false);
+    onDelete();
   }, [onDelete]);
 
   const applyReusableTemplate = useCallback(
     (template: ReusableTemplateOption) => {
-      flushTypingBatch();
-      pushPastEntry(createHistoryEntry());
-
       const cleanedContent = stripReusableFlag(template.content);
-      syncContent(cleanedContent);
+      setContent(cleanedContent);
 
       if (!newFileName.trim()) {
         setNewFileName(template.name);
       }
 
       requestAnimationFrame(() => {
-        const textarea = textareaRef.current;
-        if (!textarea) return;
+        const editor = editorRef.current;
+        if (!editor) return;
 
-        textarea.focus();
-        textarea.selectionStart = 0;
-        textarea.selectionEnd = 0;
-        textarea.scrollTop = 0;
-
-        if (lineNumbersRef.current) {
-          lineNumbersRef.current.scrollTop = 0;
-        }
+        editor.focus();
+        editor.setPosition({ lineNumber: 1, column: 1 });
+        editor.setScrollTop(0);
+        editor.setScrollLeft(0);
       });
     },
-    [
-      createHistoryEntry,
-      flushTypingBatch,
-      newFileName,
-      pushPastEntry,
-      syncContent,
-    ],
+    [newFileName],
   );
 
   const shouldConfirmTemplateReplace = useCallback(() => {
@@ -584,7 +173,7 @@ export function CodeEditor({
 
       if (ctrl && e.key.toLowerCase() === "s") {
         e.preventDefault();
-        handleSave();
+        void handleSave();
         return;
       }
 
@@ -602,88 +191,163 @@ export function CodeEditor({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, handleClose]);
+  }, [handleClose, handleSave]);
 
-  const handleTextAreaChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      if (skipNextTypingBatchRef.current) {
-        skipNextTypingBatchRef.current = false;
-        syncContent(e.target.value);
-        return;
+  const lineCount = useMemo(() => {
+    return content.length === 0 ? 1 : content.split("\n").length;
+  }, [content]);
+
+  const handleEditorWillMount = useCallback((monaco: typeof Monaco) => {
+    // Register custom language for Markdown with Front Matter support
+    const languageId = "markdown-fm";
+
+    // Register the language
+    monaco.languages.register({ id: languageId });
+
+    // Set Monarch tokenizer for front matter support
+    monaco.languages.setMonarchTokensProvider(languageId, {
+      defaultToken: "",
+      tokenPostfix: ".md",
+
+      // Define tokenizer rules
+      tokenizer: {
+        root: [
+          // Match opening front matter delimiter
+          [/^---\s*$/, { token: "keyword", next: "@frontmatter" }],
+          // Delegate to standard markdown rules for everything else
+          { include: "@markdown" },
+        ],
+
+        frontmatter: [
+          // Match closing front matter delimiter
+          [
+            /^---\s*$/,
+            { token: "keyword", next: "@markdown", nextEmbedded: "text/html" },
+          ],
+          // Match YAML key-value pairs
+          [/^(\s*)([a-zA-Z0-9_-]+)(\s*:)/, ["", "type", "keyword"]],
+          // Match YAML list items
+          [/^\s*-\s+/, "keyword"],
+          // Match numbers
+          [/\b\d+(\.\d+)?\b/, "number"],
+          // Match boolean values
+          [/\b(true|false)\b/, "keyword"],
+          // Match null
+          [/\bnull\b/, "keyword"],
+          // Match strings (including quotes)
+          [/"[^"]*"/, "string"],
+          [/'[^']*'/, "string"],
+          // Match arrays
+          [/\[[^\]]*\]/, "tag"],
+          // Default YAML content
+          [/[^:\s]+(?=\s*:)/, "type"],
+          [/.*/, "string"],
+        ],
+
+        markdown: [
+          // Headers
+          [/^#{1,6}\s.*$/, "keyword"],
+          // Bold
+          [/\*\*[^*]+\*\*/, "strong"],
+          [/__[^_]+__/, "strong"],
+          // Italic
+          [/\*[^*]+\*/, "emphasis"],
+          [/_[^_]+_/, "emphasis"],
+          // Bold + Italic
+          [/\*\*\*[^*]+\*\*\*/, "strong"],
+          [/___[^_]+___/, "strong"],
+          // Inline code
+          [/`[^`]+`/, "string"],
+          // Links
+          [/\[[^\]]+\]\([^)]+\)/, "tag"],
+          // Images
+          [/!\[[^\]]*\]\([^)]+\)/, "tag"],
+          // Horizontal rules
+          [/^[-*_]{3,}\s*$/, "comment"],
+          // Blockquotes
+          [/^>\s+.*$/, "comment"],
+          // Lists
+          [/^\s*[-*+]\s+/, "keyword"],
+          [/^\s*\d+\.\s+/, "keyword"],
+          // Code blocks (fenced)
+          [/^```[\s\S]*?^```$/, "string"],
+          // Code blocks (indented)
+          [/^ {4}.*$/, "string"],
+          // Plain text
+          [/.*/, "text"],
+        ],
+      },
+    });
+
+    // Set language configuration
+    monaco.languages.setLanguageConfiguration(languageId, {
+      comments: {
+        blockComment: ["<!--", "-->"],
+      },
+      brackets: [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"],
+      ],
+      autoClosingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: "(", close: ")" },
+        { open: '"', close: '"' },
+        { open: "'", close: "'" },
+        { open: "`", close: "`" },
+        { open: "**", close: "**" },
+        { open: "__", close: "__" },
+        { open: "*", close: "*" },
+        { open: "_", close: "_" },
+      ],
+      surroundingPairs: [
+        { open: "{", close: "}" },
+        { open: "[", close: "]" },
+        { open: "(", close: ")" },
+        { open: '"', close: '"' },
+        { open: "'", close: "'" },
+        { open: "`", close: "`" },
+      ],
+      folding: {
+        markers: {
+          start: /^---\s*$/,
+          end: /^---\s*$/,
+        },
+      },
+    });
+  }, []);
+
+  const handleEditorDidMount = useCallback(
+    (editor: Monaco.editor.IStandaloneCodeEditor, monaco: typeof Monaco) => {
+      editorRef.current = editor;
+
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+        void handleSave();
+      });
+
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT, () => {
+        setIsTemplatePickerOpen(true);
+      });
+
+      editor.addCommand(monaco.KeyCode.Escape, () => {
+        handleClose();
+      });
+
+      if (!isNew) {
+        const model = editor.getModel();
+        const lastLine = model?.getLineCount() ?? 1;
+        const lastColumn = model?.getLineMaxColumn(lastLine) ?? 1;
+
+        editor.setPosition({ lineNumber: lastLine, column: lastColumn });
       }
 
-      beginTypingBatchIfNeeded();
-      syncContent(e.target.value);
+      requestAnimationFrame(() => {
+        editor.focus();
+      });
     },
-    [beginTypingBatchIfNeeded, syncContent],
+    [handleClose, handleSave, isNew],
   );
-
-  const handlePasteTextarea = useCallback(() => {
-    flushTypingBatch();
-    pushPastEntry(createHistoryEntry());
-    skipNextTypingBatchRef.current = true;
-  }, [createHistoryEntry, flushTypingBatch, pushPastEntry]);
-
-  const handleKeyDownTextarea = (
-    e: React.KeyboardEvent<HTMLTextAreaElement>,
-  ) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const ctrl = e.ctrlKey || e.metaKey;
-    const key = e.key.toLowerCase();
-
-    if (ctrl && !e.shiftKey && key === "z") {
-      e.preventDefault();
-      e.stopPropagation();
-      e.nativeEvent.stopImmediatePropagation?.();
-      handleUndo();
-      return;
-    }
-
-    if ((ctrl && key === "y") || (ctrl && e.shiftKey && key === "z")) {
-      e.preventDefault();
-      e.stopPropagation();
-      e.nativeEvent.stopImmediatePropagation?.();
-      handleRedo();
-      return;
-    }
-
-    const ctx: EditorContext = {
-      content,
-      start: textarea.selectionStart,
-      end: textarea.selectionEnd,
-    };
-
-    if (e.key === "Tab") {
-      e.preventDefault();
-      e.stopPropagation();
-      e.nativeEvent.stopImmediatePropagation?.();
-
-      const result = e.shiftKey
-        ? handleShiftTabOutdent(ctx)
-        : handleTabIndent(ctx);
-
-      applyHistoryTrackedEdit(result);
-      return;
-    }
-
-    if (e.key === "Enter") {
-      e.preventDefault();
-      e.stopPropagation();
-      e.nativeEvent.stopImmediatePropagation?.();
-
-      const section = detectEditorSection(content, ctx.start);
-      const result =
-        section === "frontmatter"
-          ? handleEnterInFrontmatter(ctx)
-          : handleEnterInMarkdown(ctx);
-
-      applyHistoryTrackedEdit(result);
-    }
-  };
-
-  const lineCount = content.split("\n").length;
 
   return (
     <>
@@ -699,7 +363,7 @@ export function CodeEditor({
           onOpenAutoFocus={(e) => {
             e.preventDefault();
 
-            if (isNew) {
+            if (isNew && showNameInput) {
               const filenameInput = document.getElementById("editor-filename");
               if (filenameInput instanceof HTMLInputElement) {
                 filenameInput.focus();
@@ -711,20 +375,9 @@ export function CodeEditor({
               return;
             }
 
-            const textarea = textareaRef.current;
-            if (textarea) {
-              textarea.focus();
-
-              const end = textarea.value.length;
-              textarea.setSelectionRange(end, end);
-
-              requestAnimationFrame(() => {
-                textarea.scrollTop = 0;
-                if (lineNumbersRef.current) {
-                  lineNumbersRef.current.scrollTop = 0;
-                }
-              });
-            }
+            requestAnimationFrame(() => {
+              editorRef.current?.focus();
+            });
           }}
         >
           <DialogHeader className="sr-only">
@@ -802,10 +455,12 @@ export function CodeEditor({
                     Delete
                   </Button>
                 )}
+
                 <Button variant="outline" size="sm" onClick={handleClose}>
                   <X className="mr-1.5 h-4 w-4" />
                   Close
                 </Button>
+
                 <Button size="sm" onClick={handleSave} disabled={isSaving}>
                   <Save className="mr-1.5 h-4 w-4" />
                   {isSaving ? "Saving..." : "Save"}
@@ -813,34 +468,48 @@ export function CodeEditor({
               </div>
             </header>
 
-            <div className="flex min-h-0 flex-1 overflow-hidden">
-              <div
-                ref={lineNumbersRef}
-                className="hidden w-12 shrink-0 select-none overflow-hidden border-r border-border bg-muted/50 md:block"
-                aria-hidden="true"
-              >
-                <div className="px-2 py-3 text-right font-mono text-xs leading-6 text-muted-foreground">
-                  {Array.from({ length: lineCount }, (_, i) => (
-                    <div key={i + 1}>{i + 1}</div>
-                  ))}
-                </div>
-              </div>
-
-              <textarea
-                ref={textareaRef}
+            <div className="min-h-0 flex-1 overflow-hidden bg-background">
+              <MonacoEditor
+                beforeMount={handleEditorWillMount}
+                onMount={handleEditorDidMount}
+                language="markdown-fm"
                 value={content}
-                onChange={handleTextAreaChange}
-                onPaste={handlePasteTextarea}
-                onScroll={handleScroll}
-                onKeyDownCapture={handleKeyDownTextarea}
-                spellCheck={false}
-                className={cn(
-                  "flex-1 min-h-0 resize-none overflow-auto p-3 font-mono text-sm leading-6",
-                  "bg-background text-foreground",
-                  "focus:outline-none",
-                  "placeholder:text-muted-foreground",
-                )}
-                placeholder="Enter your prompt content here..."
+                onChange={(value) => setContent(value ?? "")}
+                loading={
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    Loading editor...
+                  </div>
+                }
+                options={{
+                  automaticLayout: true,
+                  minimap: { enabled: false },
+                  scrollBeyondLastLine: false,
+                  wordWrap: "on",
+                  lineNumbers: "on",
+                  glyphMargin: false,
+                  folding: true,
+                  renderLineHighlight: "none",
+                  tabSize: 2,
+                  insertSpaces: true,
+                  detectIndentation: false,
+                  fontSize: 14,
+                  lineHeight: 24,
+                  fontFamily:
+                    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+                  padding: { top: 12, bottom: 12 },
+                  scrollbar: {
+                    verticalScrollbarSize: 10,
+                    horizontalScrollbarSize: 10,
+                  },
+                  overviewRulerBorder: false,
+                  hideCursorInOverviewRuler: true,
+                  contextmenu: true,
+                  quickSuggestions: false,
+                  suggestOnTriggerCharacters: false,
+                  wordBasedSuggestions: "off",
+                  wrappingIndent: "same",
+                }}
+                theme={editorTheme}
               />
             </div>
 
@@ -855,6 +524,7 @@ export function CodeEditor({
                   <span>{lineCount} lines</span>
                   <span>{content.length} characters</span>
                 </div>
+
                 {!isMobile && (
                   <div className="flex items-center gap-3">
                     <span>
@@ -918,7 +588,8 @@ export function CodeEditor({
               Replace Current Draft
             </DialogTitle>
             <DialogDescription>
-              Replace current draft with selected template?
+              This will replace the current editor content with the selected
+              reusable template.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col sm:flex-row">
@@ -931,8 +602,8 @@ export function CodeEditor({
             >
               Cancel
             </Button>
-            <Button variant="destructive" onClick={confirmReplaceWithTemplate}>
-              Replace
+            <Button onClick={confirmReplaceWithTemplate}>
+              Replace Content
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -943,11 +614,11 @@ export function CodeEditor({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertTriangle className="h-5 w-5 text-destructive" />
-              Delete Prompt
+              Delete Template
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete &quot;{fileName}&quot;? This
-              action cannot be undone.
+              Are you sure you want to delete this template? This action cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-col sm:flex-row">
