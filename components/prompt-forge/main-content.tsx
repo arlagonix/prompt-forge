@@ -131,7 +131,7 @@ function PromptPreview({
                   part.isUserValue ? (
                     <span
                       key={partIndex}
-                      className="rounded border border-primary/25 bg-primary/5 px-0.5 text-foreground [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
+                      className="rounded border border-primary/50 bg-primary/15 px-0.5 text-foreground [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
                       title={
                         part.paramName ? `From: ${part.paramName}` : undefined
                       }
