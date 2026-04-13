@@ -7,11 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Copy, FileText, X } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { Copy, FileText, X } from "lucide-react";
+import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
+import { TemplateMonacoEditor } from "./template-monaco-editor";
 
 interface TemplateModalProps {
   isOpen: boolean;
@@ -24,15 +25,7 @@ export function TemplateModal({
   onClose,
   content,
 }: TemplateModalProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const lineNumbersRef = useRef<HTMLDivElement>(null);
   const isMobile = useIsMobile();
-
-  const handleScroll = useCallback(() => {
-    if (scrollRef.current && lineNumbersRef.current) {
-      lineNumbersRef.current.scrollTop = scrollRef.current.scrollTop;
-    }
-  }, []);
 
   const handleCopy = useCallback(async () => {
     if (!content) {
@@ -57,14 +50,24 @@ export function TemplateModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         showCloseButton={false}
-        className={cn("overflow-hidden p-0", isMobile ? "h-[100dvh] w-screen max-w-none rounded-none border-0" : "h-[92vh]")}
+        className={cn(
+          "overflow-hidden p-0",
+          isMobile
+            ? "h-[100dvh] w-screen max-w-none rounded-none border-0"
+            : "h-[92vh]",
+        )}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Template Source</DialogTitle>
         </DialogHeader>
 
         <div className="flex h-full min-h-0 flex-col bg-background">
-          <header className={cn("shrink-0 border-b border-border bg-card px-4 py-3", isMobile ? "space-y-3" : "flex items-center justify-between")}>
+          <header
+            className={cn(
+              "shrink-0 border-b border-border bg-card px-4 py-3",
+              isMobile ? "space-y-3" : "flex items-center justify-between",
+            )}
+          >
             <div className="flex min-w-0 items-center gap-3">
               <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
               <div className="text-sm font-medium text-foreground">
@@ -72,7 +75,12 @@ export function TemplateModal({
               </div>
             </div>
 
-            <div className={cn("shrink-0 gap-2", isMobile ? "grid grid-cols-2" : "flex items-center")}>
+            <div
+              className={cn(
+                "shrink-0 gap-2",
+                isMobile ? "grid grid-cols-2" : "flex items-center",
+              )}
+            >
               <Button variant="outline" size="sm" onClick={handleCopy}>
                 <Copy className="mr-1.5 h-4 w-4" />
                 Copy
@@ -84,29 +92,23 @@ export function TemplateModal({
             </div>
           </header>
 
-          <div className="flex min-h-0 flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden bg-background">
+            <TemplateMonacoEditor value={content || ""} readOnly />
+          </div>
+
+          <footer className="shrink-0 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
             <div
-              ref={lineNumbersRef}
-              className="hidden w-12 shrink-0 select-none overflow-hidden border-r border-border bg-muted/50 md:block"
-              aria-hidden="true"
+              className={cn(
+                "flex items-center justify-between gap-3",
+                isMobile && "flex-col items-start",
+              )}
             >
-              <div className="px-2 py-3 text-right font-mono text-xs leading-6 text-muted-foreground">
-                {Array.from({ length: lineCount }, (_, i) => (
-                  <div key={i + 1}>{i + 1}</div>
-                ))}
+              <div className="flex items-center gap-4">
+                <span>{lineCount} lines</span>
+                <span>{content.length} characters</span>
               </div>
             </div>
-
-            <div
-              ref={scrollRef}
-              onScroll={handleScroll}
-              className="flex-1 min-h-0 overflow-auto bg-background"
-            >
-              <pre className="min-h-full whitespace-pre-wrap p-3 font-mono text-sm leading-6 text-foreground">
-                {content || "No content"}
-              </pre>
-            </div>
-          </div>
+          </footer>
         </div>
       </DialogContent>
     </Dialog>
