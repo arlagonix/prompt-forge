@@ -174,6 +174,7 @@ export function Sidebar({
   const creatingFolderSubmitRef = useRef(false);
   const ignoreCreateBlurRef = useRef(false);
   const suppressMenuRestoreFocusRef = useRef(false);
+  const rootMenuSuppressRestoreFocusRef = useRef(false);
 
   useEffect(() => {
     if (creatingFolderParentId === null) return;
@@ -356,7 +357,16 @@ export function Sidebar({
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent
+                align="end"
+                className="w-48"
+                onCloseAutoFocus={(e) => {
+                  if (rootMenuSuppressRestoreFocusRef.current) {
+                    e.preventDefault();
+                    rootMenuSuppressRestoreFocusRef.current = false;
+                  }
+                }}
+              >
                 <DropdownMenuItem onClick={onImportRoot}>
                   <Download className="mr-2 h-4 w-4" />
                   Import JSON
@@ -366,7 +376,14 @@ export function Sidebar({
                   Export Workspace
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onEditTemplateStarter}>
+                <DropdownMenuItem
+                  onSelect={() => {
+                    rootMenuSuppressRestoreFocusRef.current = true;
+                    setTimeout(() => {
+                      onEditTemplateStarter();
+                    }, 0);
+                  }}
+                >
                   <Pencil className="mr-2 h-4 w-4" />
                   Edit template starter
                 </DropdownMenuItem>
@@ -1189,6 +1206,7 @@ function FileItem({
   onDragStart,
   onDragEnd,
 }: FileItemProps) {
+  const suppressMenuRestoreFocusRef = useRef(false);
   const isVisible = searchQuery
     ? file.name.toLowerCase().includes(searchQuery.toLowerCase())
     : true;
@@ -1243,8 +1261,24 @@ function FileItem({
             <MoreHorizontal className="h-3.5 w-3.5" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-40">
-          <DropdownMenuItem onClick={onEdit}>
+        <DropdownMenuContent
+          align="end"
+          className="w-40"
+          onCloseAutoFocus={(e) => {
+            if (suppressMenuRestoreFocusRef.current) {
+              e.preventDefault();
+              suppressMenuRestoreFocusRef.current = false;
+            }
+          }}
+        >
+          <DropdownMenuItem
+            onSelect={() => {
+              suppressMenuRestoreFocusRef.current = true;
+              setTimeout(() => {
+                onEdit();
+              }, 0);
+            }}
+          >
             <Pencil className="mr-2 h-4 w-4" />
             Edit
           </DropdownMenuItem>

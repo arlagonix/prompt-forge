@@ -186,6 +186,14 @@ export function CodeEditor({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isEditableTarget =
+        !!target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable ||
+          !!target.closest(".monaco-editor"));
+
       const ctrl = e.ctrlKey || e.metaKey;
 
       if (ctrl && e.key.toLowerCase() === "s") {
@@ -200,7 +208,7 @@ export function CodeEditor({
         return;
       }
 
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && !isEditableTarget) {
         e.preventDefault();
         handleClose();
       }
@@ -326,6 +334,14 @@ export function CodeEditor({
       requestAnimationFrame(() => {
         editor.focus();
       });
+
+      setTimeout(() => {
+        editor.focus();
+      }, 0);
+
+      setTimeout(() => {
+        editor.focus();
+      }, 50);
     },
     [handleClose, handleSave, isNew, wrapCurrentSelection],
   );
@@ -359,6 +375,14 @@ export function CodeEditor({
             requestAnimationFrame(() => {
               editorRef.current?.focus();
             });
+
+            setTimeout(() => {
+              editorRef.current?.focus();
+            }, 0);
+
+            setTimeout(() => {
+              editorRef.current?.focus();
+            }, 50);
           }}
         >
           <DialogHeader className="sr-only">

@@ -56,7 +56,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type PreviewLinePart = {
   text: string;
@@ -417,6 +417,7 @@ export function MainContent({
   const [preview, setPreview] = useState<string>("");
   const [previewSegments, setPreviewSegments] = useState<PromptSegment[]>([]);
   const [showTechnicalNames, setShowTechnicalNames] = useState<boolean>(true);
+  const actionsMenuSuppressRestoreFocusRef = useRef(false);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -678,7 +679,16 @@ export function MainContent({
                       <MoreHorizontal className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuContent
+                    align="end"
+                    className="w-48"
+                    onCloseAutoFocus={(e) => {
+                      if (actionsMenuSuppressRestoreFocusRef.current) {
+                        e.preventDefault();
+                        actionsMenuSuppressRestoreFocusRef.current = false;
+                      }
+                    }}
+                  >
                     {isMobile && (
                       <>
                         <DropdownMenuItem onClick={onOpenDocs}>
@@ -695,7 +705,14 @@ export function MainContent({
                         <DropdownMenuSeparator />
                       </>
                     )}
-                    <DropdownMenuItem onClick={onEditFile}>
+                    <DropdownMenuItem
+                      onSelect={() => {
+                        actionsMenuSuppressRestoreFocusRef.current = true;
+                        setTimeout(() => {
+                          onEditFile();
+                        }, 0);
+                      }}
+                    >
                       <Pencil className="mr-2 h-4 w-4" />
                       Edit
                     </DropdownMenuItem>
