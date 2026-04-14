@@ -63,14 +63,30 @@ export function CodeEditor({
 
   const isMobile = useIsMobile();
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const previousDocumentIdentityRef = useRef<string | null>(null);
+
+  const documentIdentity = useMemo(
+    () => `${isNew ? "new" : "edit"}:${fileName}`,
+    [fileName, isNew],
+  );
+
+  const editorResetKey = useMemo(
+    () => `${documentIdentity}:${initialContent.length}:${initialContent}`,
+    [documentIdentity, initialContent],
+  );
 
   useEffect(() => {
-    setContent(initialContent);
-  }, [initialContent]);
+    const previousIdentity = previousDocumentIdentityRef.current;
 
-  useEffect(() => {
+    if (previousIdentity === null || previousIdentity !== documentIdentity) {
+      setContent(initialContent);
+      setNewFileName(fileName);
+      previousDocumentIdentityRef.current = documentIdentity;
+      return;
+    }
+
     setNewFileName(fileName);
-  }, [fileName]);
+  }, [documentIdentity, fileName, initialContent]);
 
   useEffect(() => {
     setHasChanges(content !== initialContent || newFileName !== fileName);
@@ -110,18 +126,33 @@ export function CodeEditor({
       const cleanedContent = stripReusableFlag(template.content);
       setContent(cleanedContent);
 
+      const editor = editorRef.current;
+      const model = editor?.getModel();
+
+      if (editor && model && model.getValue() !== cleanedContent) {
+        editor.pushUndoStop();
+        editor.executeEdits("apply-reusable-template", [
+          {
+            range: model.getFullModelRange(),
+            text: cleanedContent,
+            forceMoveMarkers: true,
+          },
+        ]);
+        editor.pushUndoStop();
+      }
+
       if (!newFileName.trim()) {
         setNewFileName(template.name);
       }
 
       requestAnimationFrame(() => {
-        const editor = editorRef.current;
-        if (!editor) return;
+        const currentEditor = editorRef.current;
+        if (!currentEditor) return;
 
-        editor.focus();
-        editor.setPosition({ lineNumber: 1, column: 1 });
-        editor.setScrollTop(0);
-        editor.setScrollLeft(0);
+        currentEditor.focus();
+        currentEditor.setPosition({ lineNumber: 1, column: 1 });
+        currentEditor.setScrollTop(0);
+        currentEditor.setScrollLeft(0);
       });
     },
     [newFileName],
@@ -248,6 +279,18 @@ export function CodeEditor({
         wrapCurrentSelection(editor, monaco, "**");
       });
 
+      editor.onDidChangeModelContent(() => {
+        const model = editor.getModel();
+        if (!model) {
+          return;
+        }
+
+        const nextValue = model.getValue();
+        setContent((previousValue) =>
+          previousValue === nextValue ? previousValue : nextValue,
+        );
+      });
+
       editor.onKeyDown((e) => {
         const selection = editor.getSelection();
         const hasSelection = !!selection && !selection.isEmpty();
@@ -328,7 +371,9 @@ export function CodeEditor({
             <header
               className={cn(
                 "shrink-0 border-b border-border bg-card px-4 py-3",
-                isMobile ? "space-y-3" : "flex items-center justify-between gap-4",
+                isMobile
+                  ? "space-y-3"
+                  : "flex items-center justify-between gap-4",
               )}
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -382,7 +427,8 @@ export function CodeEditor({
 
             <div className="min-h-0 flex-1 overflow-hidden bg-background">
               <TemplateMonacoEditor
-                value={content}
+                initialValue={content}
+                resetKey={editorResetKey}
                 onChange={setContent}
                 onMount={handleEditorDidMount}
               />
@@ -419,10 +465,12 @@ export function CodeEditor({
             <footer
               className={cn(
                 "shrink-0 border-t border-border bg-card px-4 py-3",
-                isMobile ? "space-y-3" : "flex items-center justify-between gap-4",
+                isMobile
+                  ? "space-y-3"
+                  : "flex items-center justify-between gap-4",
               )}
             >
-              <div className={cn(isMobile ? "grid" : "flex items-center") }>
+              <div className={cn(isMobile ? "grid" : "flex items-center")}>
                 {!isNew && onDelete ? (
                   <Button
                     variant="ghost"

@@ -3,14 +3,15 @@
 import type * as Monaco from "monaco-editor";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
 });
 
 interface TemplateMonacoEditorProps {
-  value: string;
+  initialValue: string;
+  resetKey?: string;
   readOnly?: boolean;
   onChange?: (value: string) => void;
   onMount?: (
@@ -20,17 +21,59 @@ interface TemplateMonacoEditorProps {
 }
 
 export function TemplateMonacoEditor({
-  value,
+  initialValue,
+  resetKey,
   readOnly = false,
   onChange,
   onMount,
 }: TemplateMonacoEditorProps) {
   const { resolvedTheme } = useTheme();
   const [themeMounted, setThemeMounted] = useState(false);
+  const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
 
   useEffect(() => {
     setThemeMounted(true);
   }, []);
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    const model = editor?.getModel();
+
+    if (!editor || !model) {
+      return;
+    }
+
+    const currentValue = model.getValue();
+    if (currentValue === initialValue) {
+      return;
+    }
+
+    const selection = editor.getSelection();
+    const position = editor.getPosition();
+    const scrollTop = editor.getScrollTop();
+    const scrollLeft = editor.getScrollLeft();
+
+    editor.pushUndoStop();
+    editor.executeEdits("external-reset", [
+      {
+        range: model.getFullModelRange(),
+        text: initialValue,
+        forceMoveMarkers: true,
+      },
+    ]);
+    editor.pushUndoStop();
+
+    if (selection) {
+      editor.setSelection(selection);
+    }
+
+    if (position) {
+      editor.setPosition(position);
+    }
+
+    editor.setScrollTop(scrollTop);
+    editor.setScrollLeft(scrollLeft);
+  }, [initialValue, resetKey]);
 
   const editorTheme =
     themeMounted && resolvedTheme === "dark"
@@ -40,7 +83,9 @@ export function TemplateMonacoEditor({
   const handleEditorWillMount = useCallback((monaco: typeof Monaco) => {
     const languageId = "markdown-fm";
 
-    if (!monaco.languages.getLanguages().some((lang) => lang.id === languageId)) {
+    if (
+      !monaco.languages.getLanguages().some((lang) => lang.id === languageId)
+    ) {
       monaco.languages.register({ id: languageId });
     }
 
@@ -181,6 +226,14 @@ export function TemplateMonacoEditor({
     });
   }, []);
 
+  const handleMount = useCallback(
+    (editor: Monaco.editor.IStandaloneCodeEditor, monaco: typeof Monaco) => {
+      editorRef.current = editor;
+      onMount?.(editor, monaco);
+    },
+    [onMount],
+  );
+
   const options = useMemo(
     () => ({
       automaticLayout: true,
@@ -226,10 +279,11 @@ export function TemplateMonacoEditor({
 
   return (
     <MonacoEditor
+      key={resetKey}
       beforeMount={handleEditorWillMount}
-      onMount={onMount}
+      onMount={handleMount}
       language="markdown-fm"
-      value={value}
+      defaultValue={initialValue}
       onChange={(next) => onChange?.(next ?? "")}
       loading={
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
