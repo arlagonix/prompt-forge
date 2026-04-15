@@ -45,13 +45,31 @@ export interface ClipboardImportConfig {
   defaultFormat: ClipboardImportFormat;
 }
 
+export interface ParameterOption {
+  label: string;
+  value: string;
+}
+
+export interface ParameterOptionGroup {
+  label: string | null;
+  options: ParameterOption[];
+}
+
 export interface Parameter {
   name: string;
-  type: "textarea" | "text" | "number" | "checkbox" | "select" | "radio";
+  type:
+    | "textarea"
+    | "text"
+    | "number"
+    | "checkbox"
+    | "select"
+    | "combobox"
+    | "radio";
   label: string;
   defaultValue: string | null;
   height: number | null;
   values: string[];
+  optionGroups: ParameterOptionGroup[];
   clipboardImport: ClipboardImportConfig | null;
   inline: boolean;
 }
@@ -95,6 +113,7 @@ export interface TemplateFieldDefinition {
   defaultValue: string | null;
   height: number | null;
   values: string[];
+  optionGroups: ParameterOptionGroup[];
   clipboardImport: ClipboardImportConfig | null;
   inline: boolean;
   explicit: boolean;

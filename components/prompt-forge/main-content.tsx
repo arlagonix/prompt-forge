@@ -9,15 +9,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -38,6 +49,8 @@ import {
 } from "@/lib/prompt-forge/parser";
 import type {
   Parameter,
+  ParameterOption,
+  ParameterOptionGroup,
   ParsedFile,
   ParsedTemplate,
   TemplateFieldDefinition,
@@ -48,6 +61,8 @@ import type {
 import { cn } from "@/lib/utils";
 import {
   BookOpen,
+  Check,
+  ChevronsUpDown,
   Code,
   Copy,
   Eye,
@@ -69,6 +84,33 @@ type PreviewLinePart = {
   isUserValue: boolean;
   paramName?: string;
 };
+
+
+function getFieldOptionGroups(param: TemplateFieldDefinition): ParameterOptionGroup[] {
+  if (param.optionGroups.length > 0) {
+    return param.optionGroups;
+  }
+
+  if (param.values.length === 0) {
+    return [];
+  }
+
+  return [{
+    label: null,
+    options: param.values.map((value) => ({ label: value, value })),
+  }];
+}
+
+function findFieldOptionByValue(
+  param: TemplateFieldDefinition,
+  value: string,
+): ParameterOption | null {
+  for (const group of getFieldOptionGroups(param)) {
+    const match = group.options.find((option) => option.value === value);
+    if (match) return match;
+  }
+  return null;
+}
 
 function buildPreviewLines(segments: PromptSegment[]): PreviewLinePart[][] {
   if (segments.length === 0) return [];
@@ -1042,12 +1084,14 @@ function ParameterField({
   showNotification,
 }: ParameterFieldProps) {
   const [isImporting, setIsImporting] = useState(false);
+  const [isComboboxOpen, setIsComboboxOpen] = useState(false);
   const id = `param-${param.name}`;
   const isInlineField =
     param.inline &&
     (param.type === "text" ||
       param.type === "number" ||
       param.type === "select" ||
+      param.type === "combobox" ||
       param.type === "checkbox" ||
       param.type === "radio");
   const fieldContainerClassName = isInlineField
@@ -1238,19 +1282,26 @@ function ParameterField({
   }
 
   if (param.type === "select") {
+    const optionGroups = getFieldOptionGroups(param);
+
     return (
       <div className={fieldContainerClassName}>
         {meta}
-        <div className="min-w-0">
+        <div className="flex-1 min-w-0">
           <Select value={value} onValueChange={onChange}>
             <SelectTrigger className="w-full min-w-0 bg-card border-border">
               <SelectValue placeholder="Select an option" />
             </SelectTrigger>
             <SelectContent>
-              {param.values.map((v) => (
-                <SelectItem key={v} value={v}>
-                  {v}
-                </SelectItem>
+              {optionGroups.map((group, groupIndex) => (
+                <SelectGroup key={`${param.name}-group-${groupIndex}`}>
+                  {group.label && <SelectLabel>{group.label}</SelectLabel>}
+                  {group.options.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               ))}
             </SelectContent>
           </Select>
@@ -1259,7 +1310,82 @@ function ParameterField({
     );
   }
 
+  if (param.type === "combobox") {
+    const optionGroups = getFieldOptionGroups(param);
+    const selectedOption = findFieldOptionByValue(param, value);
+
+    return (
+      <div className={fieldContainerClassName}>
+        {meta}
+        <div className="flex-1 min-w-0">
+          <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                aria-expanded={isComboboxOpen}
+                className="w-full min-w-0 justify-between bg-card border-border px-3 font-normal"
+              >
+                <span className="truncate text-left">
+                  {selectedOption?.label ?? "Select an option"}
+                </span>
+                <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+              <Command
+                filter={(_, search, keywords) => {
+                  const normalizedSearch = search.trim().toLowerCase();
+                  if (!normalizedSearch) return 1;
+                  return (keywords ?? []).some((keyword) =>
+                    keyword.toLowerCase().includes(normalizedSearch)
+                  )
+                    ? 1
+                    : 0;
+                }}
+              >
+                <CommandInput placeholder="Search..." />
+                <CommandList>
+                  <CommandEmpty>No results found.</CommandEmpty>
+                  {optionGroups.map((group, groupIndex) => (
+                    <CommandGroup
+                      key={`${param.name}-combobox-group-${groupIndex}`}
+                      heading={group.label ?? undefined}
+                    >
+                      {group.options.map((option) => (
+                        <CommandItem
+                          key={option.value}
+                          value={option.value}
+                          keywords={[option.label]}
+                          onSelect={(selectedValue) => {
+                            onChange(selectedValue);
+                            setIsComboboxOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "size-4",
+                              value === option.value ? "opacity-100" : "opacity-0",
+                            )}
+                          />
+                          <span className="truncate">{option.label}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
+    );
+  }
+
   if (param.type === "radio") {
+    const options = getFieldOptionGroups(param).flatMap((group) => group.options);
+
     return (
       <div className={fieldContainerClassName}>
         {meta}
@@ -1271,14 +1397,14 @@ function ParameterField({
             isInlineField ? "sm:pt-1" : undefined,
           )}
         >
-          {param.values.map((v) => (
-            <div key={v} className="inline-flex items-center gap-2">
-              <RadioGroupItem value={v} id={`${id}-${v}`} />
+          {options.map((option) => (
+            <div key={option.value} className="inline-flex items-center gap-2">
+              <RadioGroupItem value={option.value} id={`${id}-${option.value}`} />
               <Label
-                htmlFor={`${id}-${v}`}
+                htmlFor={`${id}-${option.value}`}
                 className="text-sm text-foreground cursor-pointer"
               >
-                {v}
+                {option.label}
               </Label>
             </div>
           ))}

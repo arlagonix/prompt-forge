@@ -5,6 +5,8 @@ import type {
   FieldType,
   FrontMatterResult,
   Parameter,
+  ParameterOption,
+  ParameterOptionGroup,
   ParsedTemplate,
   TemplateBodyNode,
   TemplateDefinition,
@@ -29,6 +31,7 @@ const FIELD_TYPES: FieldType[] = [
   "number",
   "checkbox",
   "select",
+  "combobox",
   "radio",
 ];
 
@@ -104,6 +107,121 @@ function normalizeStringArray(value: unknown): string[] {
   return value.map(normalizeScalarToDisplayString).filter(Boolean);
 }
 
+function normalizeOptionEntry(
+  raw: unknown,
+  fieldName: string,
+): ParameterOption {
+  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+    const normalized = normalizeScalarToDisplayString(raw);
+    if (!normalized) {
+      throw new Error(`Field "${fieldName}" contains an empty option.`);
+    }
+    return { label: normalized, value: normalized };
+  }
+
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`Field "${fieldName}" contains an invalid option entry.`);
+  }
+
+  const item = raw as Record<string, unknown>;
+  const label = typeof item.label === "string" ? item.label.trim() : "";
+  if (!label) {
+    throw new Error(`Field "${fieldName}" option objects must include a non-empty label.`);
+  }
+
+  const value = item.value == null
+    ? label
+    : normalizeScalarToDisplayString(item.value);
+
+  if (!value) {
+    throw new Error(`Field "${fieldName}" contains an option with an empty value.`);
+  }
+
+  return { label, value };
+}
+
+function normalizeOptionGroups(
+  fieldType: FieldType,
+  fieldName: string,
+  rawValues: unknown,
+  rawGroups: unknown,
+): ParameterOptionGroup[] {
+  const supportsChoiceOptions =
+    fieldType === "select" || fieldType === "combobox" || fieldType === "radio";
+
+  if (rawValues != null && rawGroups != null) {
+    throw new Error(
+      `Field "${fieldName}" cannot define both values and groups at the same time.`,
+    );
+  }
+
+  if (!supportsChoiceOptions) {
+    return [];
+  }
+
+  const groups: ParameterOptionGroup[] = [];
+
+  if (rawGroups != null) {
+    if (fieldType !== "select" && fieldType !== "combobox") {
+      throw new Error(
+        `Field "${fieldName}" can only use groups with select or combobox type.`,
+      );
+    }
+
+    if (!Array.isArray(rawGroups)) {
+      throw new Error(`Field "${fieldName}" must define groups as an array.`);
+    }
+
+    for (const rawGroup of rawGroups) {
+      if (!rawGroup || typeof rawGroup !== "object" || Array.isArray(rawGroup)) {
+        throw new Error(`Field "${fieldName}" contains an invalid group entry.`);
+      }
+
+      const group = rawGroup as Record<string, unknown>;
+      const label = typeof group.label === "string" ? group.label.trim() : "";
+      if (!label) {
+        throw new Error(`Field "${fieldName}" group entries must include a non-empty label.`);
+      }
+
+      const rawOptions = Array.isArray(group.options) ? group.options : null;
+      if (!rawOptions || rawOptions.length === 0) {
+        throw new Error(`Field "${fieldName}" group "${label}" must include a non-empty options array.`);
+      }
+
+      groups.push({
+        label,
+        options: rawOptions.map((option) => normalizeOptionEntry(option, fieldName)),
+      });
+    }
+  } else if (rawValues != null) {
+    if (!Array.isArray(rawValues)) {
+      throw new Error(`Field "${fieldName}" must define values as an array.`);
+    }
+
+    groups.push({
+      label: null,
+      options: rawValues.map((option) => normalizeOptionEntry(option, fieldName)),
+    });
+  }
+
+  const seenValues = new Set<string>();
+  for (const group of groups) {
+    for (const option of group.options) {
+      const key = option.value.toLowerCase();
+      if (seenValues.has(key)) {
+        throw new Error(`Field "${fieldName}" contains duplicate option value "${option.value}".`);
+      }
+      seenValues.add(key);
+    }
+  }
+
+  return groups;
+}
+
+function flattenOptionGroups(groups: ParameterOptionGroup[]): string[] {
+  return groups.flatMap((group) => group.options.map((option) => option.value));
+}
+
 function defaultValueForType(
   type: FieldType,
   rawDefaultValue: unknown,
@@ -112,7 +230,7 @@ function defaultValueForType(
   if (rawDefaultValue != null) {
     const normalizedDefault = normalizeScalarToDisplayString(rawDefaultValue);
 
-    if ((type === "select" || type === "radio") && values.length > 0) {
+    if ((type === "select" || type === "combobox" || type === "radio") && values.length > 0) {
       const matched = values.find(
         (value) => value.toLowerCase() === normalizedDefault.toLowerCase(),
       );
@@ -123,7 +241,7 @@ function defaultValueForType(
   }
 
   if (type === "checkbox") return "false";
-  if ((type === "select" || type === "radio") && values.length > 0) {
+  if ((type === "select" || type === "combobox" || type === "radio") && values.length > 0) {
     return values[0];
   }
   return null;
@@ -134,7 +252,12 @@ function createFieldDefinition(
   options: Partial<TemplateFieldDefinition> = {},
 ): TemplateFieldDefinition {
   const type = isSupportedParamType(options.type) ? options.type : "textarea";
-  const values = normalizeStringArray(options.values);
+  const optionGroups = Array.isArray(options.optionGroups)
+    ? options.optionGroups
+    : [];
+  const values = optionGroups.length > 0
+    ? flattenOptionGroups(optionGroups)
+    : normalizeStringArray(options.values);
   return {
     kind: "field",
     name,
@@ -151,6 +274,7 @@ function createFieldDefinition(
           ? 4
           : null,
     values,
+    optionGroups,
     clipboardImport: options.clipboardImport ?? null,
     inline: Boolean(options.inline),
     explicit: options.explicit ?? false,
@@ -244,15 +368,35 @@ function normalizeMetadataParam(
   }
 
   const type = isSupportedParamType(item.type) ? item.type : "textarea";
+  const optionGroups = normalizeOptionGroups(type, name, item.values, item.groups);
+  const values = flattenOptionGroups(optionGroups);
+  const rawDefaultValue =
+    item.default == null
+      ? null
+      : normalizeScalarToDisplayString(item.default);
+
+  if (
+    rawDefaultValue != null &&
+    values.length > 0 &&
+    (type === "select" || type === "combobox" || type === "radio")
+  ) {
+    const hasMatch = values.some(
+      (value) => value.toLowerCase() === rawDefaultValue.toLowerCase(),
+    );
+    if (!hasMatch) {
+      throw new Error(
+        `Field "${name}" default value "${rawDefaultValue}" does not match any option value.`,
+      );
+    }
+  }
+
   return createFieldDefinition(name, {
     type,
     label: typeof item.label === "string" ? item.label : undefined,
-    defaultValue:
-      item.default == null
-        ? null
-        : normalizeScalarToDisplayString(item.default),
+    defaultValue: rawDefaultValue,
     height: typeof item.height === "number" ? item.height : undefined,
-    values: normalizeStringArray(item.values),
+    values,
+    optionGroups,
     clipboardImport: normalizeClipboardImportConfig(
       item.clipboard_import,
       type,
@@ -512,6 +656,7 @@ export function extractParameters(content: string | null): Parameter[] {
         defaultValue: item.field.defaultValue,
         height: item.field.height,
         values: item.field.values,
+        optionGroups: item.field.optionGroups,
         clipboardImport: item.field.clipboardImport,
         inline: item.field.inline,
       }));

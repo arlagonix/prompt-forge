@@ -159,6 +159,7 @@ type: text
 type: number
 type: checkbox
 type: select
+type: combobox
 type: radio`}</CodeBlock>
             </DocSection>
 
@@ -206,7 +207,7 @@ params:
               <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                 <li><code>inline</code> defaults to <code>false</code></li>
                 <li>
-                  supported on <code>text</code>, <code>number</code>, <code>select</code>, <code>checkbox</code>, and <code>radio</code>
+                  supported on <code>text</code>, <code>number</code>, <code>select</code>, <code>combobox</code>, <code>checkbox</code>, and <code>radio</code>
                 </li>
                 <li>ignored on unsupported field types</li>
                 <li>mobile always falls back to stacked layout</li>
@@ -214,6 +215,83 @@ params:
                   for radio fields, <code>inline</code> affects only the field
                   layout, not the option layout inside the radio group
                 </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Choice field options">
+              <p className="mb-3 text-sm text-muted-foreground">
+                <code>select</code>, <code>combobox</code>, and <code>radio</code>{" "}
+                fields use <code>values</code>. For <code>select</code> and{" "}
+                <code>combobox</code>, you can also use grouped options through{" "}
+                <code>groups</code>.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: priority
+    type: select
+    values: [low, medium, high]
+
+  - name: model
+    type: combobox
+    values:
+      - GPT-4o
+      - label: GPT-5
+        value: gpt-5
+---`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>option strings use the same text for label and value</li>
+                <li>
+                  object options support <code>label</code> and optional{" "}
+                  <code>value</code>
+                </li>
+                <li>
+                  if <code>value</code> is omitted, the <code>label</code> is
+                  used as the stored value
+                </li>
+                <li>
+                  <code>values</code> and <code>groups</code> are mutually
+                  exclusive
+                </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Grouped select and combobox options">
+              <CodeBlock>{`---
+params:
+  - name: model
+    type: combobox
+    groups:
+      - label: OpenAI
+        options:
+          - label: GPT-4o
+            value: gpt-4o
+          - label: GPT-5
+            value: gpt-5
+      - label: Anthropic
+        options:
+          - Claude Sonnet 4
+          - label: Claude Opus 4
+            value: claude-opus-4
+
+  - name: provider
+    type: select
+    groups:
+      - label: Hosted
+        options: [OpenAI, Anthropic]
+      - label: Local
+        options: [LM Studio, Ollama]
+---`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>group headings are shown as non-selectable labels</li>
+                <li>
+                  grouped options are supported for <code>select</code> and{" "}
+                  <code>combobox</code>
+                </li>
+                <li>
+                  <code>combobox</code> adds a built-in search field and only
+                  allows selecting existing options
+                </li>
+                <li>combobox search matches option labels</li>
               </ul>
             </DocSection>
 
