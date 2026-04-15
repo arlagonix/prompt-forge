@@ -53,6 +53,7 @@ export interface Parameter {
   height: number | null;
   values: string[];
   clipboardImport: ClipboardImportConfig | null;
+  inline: boolean;
 }
 
 export type FieldType = Parameter["type"];
@@ -95,6 +96,7 @@ export interface TemplateFieldDefinition {
   height: number | null;
   values: string[];
   clipboardImport: ClipboardImportConfig | null;
+  inline: boolean;
   explicit: boolean;
 }
 

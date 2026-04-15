@@ -152,6 +152,7 @@ function createFieldDefinition(
           : null,
     values,
     clipboardImport: options.clipboardImport ?? null,
+    inline: Boolean(options.inline),
     explicit: options.explicit ?? false,
   };
 }
@@ -257,6 +258,7 @@ function normalizeMetadataParam(
       type,
       name,
     ),
+    inline: Boolean(item.inline),
     explicit: true,
   });
 }
@@ -511,6 +513,7 @@ export function extractParameters(content: string | null): Parameter[] {
         height: item.field.height,
         values: item.field.values,
         clipboardImport: item.field.clipboardImport,
+        inline: item.field.inline,
       }));
   } catch {
     return [];

@@ -156,7 +156,10 @@ report-title`}</CodeBlock>
             <DocSection title="Supported field types">
               <CodeBlock>{`type: textarea
 type: text
-type: number`}</CodeBlock>
+type: number
+type: checkbox
+type: select
+type: radio`}</CodeBlock>
             </DocSection>
 
             <DocSection title="Declared fields">
@@ -174,6 +177,44 @@ params:
     type: number
     label: Calories
 ---`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Inline field layout">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Supported non-textarea fields can opt into an inline desktop
+                layout with <code>inline: true</code>. When enabled, the label
+                is shown on the left and the control is shown on the right.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: title
+    type: text
+    label: Title
+    inline: true
+
+  - name: priority
+    type: select
+    label: Priority
+    values: [low, medium, high]
+    inline: true
+
+  - name: approved
+    type: checkbox
+    label: Approved
+    inline: true
+---`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li><code>inline</code> defaults to <code>false</code></li>
+                <li>
+                  supported on <code>text</code>, <code>number</code>, <code>select</code>, <code>checkbox</code>, and <code>radio</code>
+                </li>
+                <li>ignored on unsupported field types</li>
+                <li>mobile always falls back to stacked layout</li>
+                <li>
+                  for radio fields, <code>inline</code> affects only the field
+                  layout, not the option layout inside the radio group
+                </li>
+              </ul>
             </DocSection>
 
             <DocSection title="Clipboard import">

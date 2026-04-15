@@ -25,6 +25,11 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
+  readClipboardSource,
+  transformClipboardSource,
+  type ClipboardImportFormat,
+} from "@/lib/prompt-forge/clipboard-import";
+import {
   buildPromptFromTemplate,
   buildPromptSegmentsFromTemplate,
   createInitialScopeState,
@@ -40,6 +45,7 @@ import type {
   TemplateRenderItem,
   TemplateScopeState,
 } from "@/lib/prompt-forge/types";
+import { cn } from "@/lib/utils";
 import {
   BookOpen,
   Code,
@@ -57,11 +63,6 @@ import {
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  readClipboardSource,
-  transformClipboardSource,
-  type ClipboardImportFormat,
-} from "@/lib/prompt-forge/clipboard-import";
 
 type PreviewLinePart = {
   text: string;
@@ -296,7 +297,10 @@ function countRenderedItems(group: TemplateGroupDefinition): number {
 
 interface GroupEditorProps {
   clipboardFormats: Record<string, ClipboardImportFormat>;
-  onClipboardFormatChange: (pathKey: string, format: ClipboardImportFormat) => void;
+  onClipboardFormatChange: (
+    pathKey: string,
+    format: ClipboardImportFormat,
+  ) => void;
   group: TemplateGroupDefinition;
   state: TemplateScopeState;
   path: GroupPathSegment[];
@@ -340,17 +344,17 @@ function GroupEditor({
             key={`field-${item.field.name}`}
             param={item.field}
             pathKey={buildScopePathKey(path, item.field.name)}
-            clipboardFormat={(
+            clipboardFormat={
               item.field.clipboardImport?.formats.includes(
                 clipboardFormats[buildScopePathKey(path, item.field.name)] ??
                   item.field.clipboardImport?.defaultFormat ??
                   "markdown",
               )
-                ? clipboardFormats[buildScopePathKey(path, item.field.name)] ??
+                ? (clipboardFormats[buildScopePathKey(path, item.field.name)] ??
                   item.field.clipboardImport?.defaultFormat ??
-                  "markdown"
-                : item.field.clipboardImport?.defaultFormat ?? "markdown"
-            )}
+                  "markdown")
+                : (item.field.clipboardImport?.defaultFormat ?? "markdown")
+            }
             onClipboardFormatChange={onClipboardFormatChange}
             value={
               state.fields[item.field.name] ?? item.field.defaultValue ?? ""
@@ -1015,7 +1019,10 @@ interface ParameterFieldProps {
   param: TemplateFieldDefinition;
   pathKey: string;
   clipboardFormat: ClipboardImportFormat;
-  onClipboardFormatChange: (pathKey: string, format: ClipboardImportFormat) => void;
+  onClipboardFormatChange: (
+    pathKey: string,
+    format: ClipboardImportFormat,
+  ) => void;
   value: string;
   onChange: (value: string) => void;
   onCopy: () => void;
@@ -1036,6 +1043,19 @@ function ParameterField({
 }: ParameterFieldProps) {
   const [isImporting, setIsImporting] = useState(false);
   const id = `param-${param.name}`;
+  const isInlineField =
+    param.inline &&
+    (param.type === "text" ||
+      param.type === "number" ||
+      param.type === "select" ||
+      param.type === "checkbox" ||
+      param.type === "radio");
+  const fieldContainerClassName = isInlineField
+    ? "flex flex-col gap-2 sm:flex-row sm:items-center"
+    : "space-y-2";
+  const fieldLabelClassName = isInlineField
+    ? "flex items-center gap-2 flex-wrap min-w-0 sm:w-40 sm:min-w-40 sm:flex-none"
+    : "flex items-center gap-2 flex-wrap min-w-0";
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
@@ -1052,10 +1072,16 @@ function ParameterField({
     try {
       setIsImporting(true);
       const source = await readClipboardSource();
-      const nextValue = transformClipboardSource(source, clipboardFormat).trim();
+      const nextValue = transformClipboardSource(
+        source,
+        clipboardFormat,
+      ).trim();
 
       if (!nextValue) {
-        showNotification("Clipboard is empty or could not be converted", "error");
+        showNotification(
+          "Clipboard is empty or could not be converted",
+          "error",
+        );
         return;
       }
 
@@ -1073,7 +1099,7 @@ function ParameterField({
   }, [clipboardFormat, onChange, param.clipboardImport, showNotification]);
 
   const meta = (
-    <div className="flex items-center gap-2 flex-wrap min-w-0 sm:w-56 sm:min-w-56 sm:flex-none">
+    <div className={fieldLabelClassName}>
       <Label htmlFor={id} className="text-sm font-medium text-foreground">
         {param.label}
       </Label>
@@ -1106,7 +1132,10 @@ function ParameterField({
             <Select
               value={clipboardFormat}
               onValueChange={(format) =>
-                onClipboardFormatChange(pathKey, format as ClipboardImportFormat)
+                onClipboardFormatChange(
+                  pathKey,
+                  format as ClipboardImportFormat,
+                )
               }
             >
               <SelectTrigger className="bg-card border-border sm:w-[200px]">
@@ -1155,7 +1184,7 @@ function ParameterField({
 
   if (param.type === "text") {
     return (
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className={fieldContainerClassName}>
         {meta}
         <Input
           id={id}
@@ -1172,7 +1201,7 @@ function ParameterField({
 
   if (param.type === "number") {
     return (
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className={fieldContainerClassName}>
         {meta}
         <Input
           id={id}
@@ -1189,7 +1218,7 @@ function ParameterField({
 
   if (param.type === "checkbox") {
     return (
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className={fieldContainerClassName}>
         {meta}
         <div className="flex flex-1 items-center gap-3 rounded-md border border-border bg-card p-3 min-w-0">
           <Checkbox
@@ -1210,7 +1239,7 @@ function ParameterField({
 
   if (param.type === "select") {
     return (
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className={fieldContainerClassName}>
         {meta}
         <Select value={value} onValueChange={onChange}>
           <SelectTrigger className="bg-card border-border flex-1 min-w-0">
@@ -1230,12 +1259,15 @@ function ParameterField({
 
   if (param.type === "radio") {
     return (
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+      <div className={fieldContainerClassName}>
         {meta}
         <RadioGroup
           value={value}
           onValueChange={onChange}
-          className="flex flex-1 flex-wrap gap-3 min-w-0"
+          className={cn(
+            "flex flex-1 flex-wrap gap-3 min-w-0",
+            isInlineField ? "sm:pt-1" : undefined,
+          )}
         >
           {param.values.map((v) => (
             <div key={v} className="inline-flex items-center gap-2">
