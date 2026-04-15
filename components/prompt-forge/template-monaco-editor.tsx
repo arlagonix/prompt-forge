@@ -204,10 +204,6 @@ export function TemplateMonacoEditor({
         { open: '"', close: '"' },
         { open: "'", close: "'" },
         { open: "`", close: "`" },
-        { open: "**", close: "**" },
-        { open: "__", close: "__" },
-        { open: "*", close: "*" },
-        { open: "_", close: "_" },
       ],
       surroundingPairs: [
         { open: "{", close: "}" },
