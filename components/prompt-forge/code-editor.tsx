@@ -56,10 +56,6 @@ export function CodeEditor({
   const [showConfirmClose, setShowConfirmClose] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
-  const [showReplaceTemplateConfirm, setShowReplaceTemplateConfirm] =
-    useState(false);
-  const [pendingTemplate, setPendingTemplate] =
-    useState<ReusableTemplateOption | null>(null);
 
   const isMobile = useIsMobile();
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
@@ -133,65 +129,55 @@ export function CodeEditor({
   const applyReusableTemplate = useCallback(
     (template: ReusableTemplateOption) => {
       const cleanedContent = stripReusableFlag(template.content);
-      setContent(cleanedContent);
-
       const editor = editorRef.current;
       const model = editor?.getModel();
 
-      if (editor && model && model.getValue() !== cleanedContent) {
-        editor.pushUndoStop();
-        editor.executeEdits("apply-reusable-template", [
-          {
-            range: model.getFullModelRange(),
-            text: cleanedContent,
-            forceMoveMarkers: true,
-          },
-        ]);
-        editor.pushUndoStop();
+      if (editor && model) {
+        const selection = editor.getSelection();
+
+        if (selection) {
+          editor.pushUndoStop();
+          editor.executeEdits("insert-reusable-template", [
+            {
+              range: selection,
+              text: cleanedContent,
+              forceMoveMarkers: true,
+            },
+          ]);
+          editor.pushUndoStop();
+
+          const nextValue = model.getValue();
+          setContent((previousValue) =>
+            previousValue === nextValue ? previousValue : nextValue,
+          );
+
+          requestAnimationFrame(() => {
+            editor.focus();
+          });
+
+          return;
+        }
       }
 
-      if (!newFileName.trim()) {
-        setNewFileName(template.name);
-      }
+      setContent((previousValue) => {
+        const needsLeadingNewline =
+          previousValue.length > 0 && !previousValue.endsWith("\n");
+        return `${previousValue}${needsLeadingNewline ? "\n" : ""}${cleanedContent}`;
+      });
 
       requestAnimationFrame(() => {
-        const currentEditor = editorRef.current;
-        if (!currentEditor) return;
-
-        currentEditor.focus();
-        currentEditor.setPosition({ lineNumber: 1, column: 1 });
-        currentEditor.setScrollTop(0);
-        currentEditor.setScrollLeft(0);
+        editorRef.current?.focus();
       });
     },
-    [newFileName],
+    [],
   );
-
-  const shouldConfirmTemplateReplace = useCallback(() => {
-    if (!isNew) return true;
-    return hasChanges;
-  }, [hasChanges, isNew]);
 
   const handleSelectReusableTemplate = useCallback(
     (template: ReusableTemplateOption) => {
-      if (shouldConfirmTemplateReplace()) {
-        setPendingTemplate(template);
-        setShowReplaceTemplateConfirm(true);
-        return;
-      }
-
       applyReusableTemplate(template);
     },
-    [applyReusableTemplate, shouldConfirmTemplateReplace],
+    [applyReusableTemplate],
   );
-
-  const confirmReplaceWithTemplate = useCallback(() => {
-    if (!pendingTemplate) return;
-
-    applyReusableTemplate(pendingTemplate);
-    setPendingTemplate(null);
-    setShowReplaceTemplateConfirm(false);
-  }, [applyReusableTemplate, pendingTemplate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -455,7 +441,7 @@ export function CodeEditor({
                   onClick={() => setIsTemplatePickerOpen(true)}
                 >
                   <Library className="mr-1.5 h-4 w-4" />
-                  Use template
+                  Insert template
                 </Button>
 
                 <Button
@@ -575,38 +561,6 @@ export function CodeEditor({
             </Button>
             <Button variant="destructive" onClick={onClose}>
               Discard Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={showReplaceTemplateConfirm}
-        onOpenChange={setShowReplaceTemplateConfirm}
-      >
-        <DialogContent showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Replace Current Draft
-            </DialogTitle>
-            <DialogDescription>
-              This will replace the current editor content with the selected
-              reusable template.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex-col sm:flex-row">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setPendingTemplate(null);
-                setShowReplaceTemplateConfirm(false);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button onClick={confirmReplaceWithTemplate}>
-              Replace Content
             </Button>
           </DialogFooter>
         </DialogContent>
