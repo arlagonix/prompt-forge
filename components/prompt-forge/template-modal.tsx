@@ -93,7 +93,7 @@ export function TemplateModal({
           </header>
 
           <div className="min-h-0 flex-1 overflow-hidden bg-background">
-            <TemplateMonacoEditor value={content || ""} readOnly />
+            <TemplateMonacoEditor initialValue={content || ""} readOnly />
           </div>
 
           <footer className="shrink-0 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
