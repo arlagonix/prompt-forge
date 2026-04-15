@@ -3,13 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -17,10 +10,21 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Kbd } from "@/components/ui/kbd";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -85,8 +89,9 @@ type PreviewLinePart = {
   paramName?: string;
 };
 
-
-function getFieldOptionGroups(param: TemplateFieldDefinition): ParameterOptionGroup[] {
+function getFieldOptionGroups(
+  param: TemplateFieldDefinition,
+): ParameterOptionGroup[] {
   if (param.optionGroups.length > 0) {
     return param.optionGroups;
   }
@@ -95,10 +100,12 @@ function getFieldOptionGroups(param: TemplateFieldDefinition): ParameterOptionGr
     return [];
   }
 
-  return [{
-    label: null,
-    options: param.values.map((value) => ({ label: value, value })),
-  }];
+  return [
+    {
+      label: null,
+      options: param.values.map((value) => ({ label: value, value })),
+    },
+  ];
 }
 
 function findFieldOptionByValue(
@@ -1333,13 +1340,16 @@ function ParameterField({
                 <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+            <PopoverContent
+              className="w-[var(--radix-popover-trigger-width)] p-0"
+              align="start"
+            >
               <Command
                 filter={(_, search, keywords) => {
                   const normalizedSearch = search.trim().toLowerCase();
                   if (!normalizedSearch) return 1;
                   return (keywords ?? []).some((keyword) =>
-                    keyword.toLowerCase().includes(normalizedSearch)
+                    keyword.toLowerCase().includes(normalizedSearch),
                   )
                     ? 1
                     : 0;
@@ -1363,13 +1373,17 @@ function ParameterField({
                             setIsComboboxOpen(false);
                           }}
                         >
+                          <span className="min-w-0 flex-1 truncate">
+                            {option.label}
+                          </span>
                           <Check
                             className={cn(
                               "size-4",
-                              value === option.value ? "opacity-100" : "opacity-0",
+                              value === option.value
+                                ? "opacity-100"
+                                : "opacity-0",
                             )}
                           />
-                          <span className="truncate">{option.label}</span>
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -1384,7 +1398,9 @@ function ParameterField({
   }
 
   if (param.type === "radio") {
-    const options = getFieldOptionGroups(param).flatMap((group) => group.options);
+    const options = getFieldOptionGroups(param).flatMap(
+      (group) => group.options,
+    );
 
     return (
       <div className={fieldContainerClassName}>
@@ -1399,7 +1415,10 @@ function ParameterField({
         >
           {options.map((option) => (
             <div key={option.value} className="inline-flex items-center gap-2">
-              <RadioGroupItem value={option.value} id={`${id}-${option.value}`} />
+              <RadioGroupItem
+                value={option.value}
+                id={`${id}-${option.value}`}
+              />
               <Label
                 htmlFor={`${id}-${option.value}`}
                 className="text-sm text-foreground cursor-pointer"
