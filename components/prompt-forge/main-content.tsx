@@ -1372,6 +1372,7 @@ function ParameterField({
                             onChange(selectedValue);
                             setIsComboboxOpen(false);
                           }}
+                          className="cursor-pointer"
                         >
                           <span className="min-w-0 flex-1 truncate">
                             {option.label}
