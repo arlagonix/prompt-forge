@@ -20,12 +20,23 @@ export function DocsModal({ isOpen, onClose }: DocsModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className={cn("p-0", isMobile ? "h-[100dvh] w-screen max-w-none rounded-none border-0" : "max-h-[85vh] max-w-3xl")}>
+      <DialogContent
+        className={cn(
+          "p-0",
+          isMobile
+            ? "h-[100dvh] w-screen max-w-none rounded-none border-0"
+            : "max-h-[85vh] max-w-3xl",
+        )}
+      >
         <DialogHeader className="border-b border-border px-4 py-4 md:px-6">
           <DialogTitle>Template Syntax Guide</DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className={cn(isMobile ? "h-[calc(100dvh-73px)]" : "max-h-[calc(85vh-80px)]")}>
+        <ScrollArea
+          className={cn(
+            isMobile ? "h-[calc(100dvh-73px)]" : "max-h-[calc(85vh-80px)]",
+          )}
+        >
           <div className="space-y-6 px-6 py-4">
             <DocSection title="Overview">
               <p className="mb-3 text-sm text-muted-foreground">
@@ -163,6 +174,80 @@ params:
     type: number
     label: Calories
 ---`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Clipboard import">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Textarea fields can expose an{" "}
+                <strong>Import from clipboard</strong> button with a format
+                picker. This is configured through <code>clipboard_import</code>{" "}
+                in front matter.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: source
+    type: textarea
+    label: Source
+    clipboard_import:
+      enabled: true
+---`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                When enabled, the field shows:
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>a small format select</li>
+                <li>
+                  an <strong>Import from clipboard</strong> button
+                </li>
+                <li>replacement of the current textarea value on import</li>
+                <li>per-field format memory for that file</li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Clipboard import formats">
+              <p className="mb-3 text-sm text-muted-foreground">
+                You can restrict which output formats are allowed and choose the
+                default selected format.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: source
+    type: textarea
+    label: Source
+    clipboard_import:
+      enabled: true
+      formats: [html, minified, markdown]
+      default_format: markdown
+---`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>
+                  <code>html</code> produces cleaned formatted HTML
+                </li>
+                <li>
+                  <code>minified</code> produces cleaned minified HTML
+                </li>
+                <li>
+                  <code>markdown</code> converts cleaned clipboard content to
+                  Markdown
+                </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Clipboard import behavior">
+              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>supported only for declared textarea fields</li>
+                <li>
+                  clipboard HTML is preferred automatically when available
+                </li>
+                <li>plain text is used as a fallback when HTML is absent</li>
+                <li>plain text is converted into paragraphs for HTML output</li>
+                <li>imported content is trimmed before it is stored</li>
+                <li>raw clipboard HTML is not rendered directly in the app</li>
+              </ul>
+              <p className="mt-3 text-sm text-muted-foreground">
+                If clipboard access fails or conversion cannot be completed, the
+                app shows an error notification instead of silently failing.
+              </p>
             </DocSection>
 
             <DocSection title="Groups">

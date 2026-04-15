@@ -37,6 +37,14 @@ export interface EditorState {
   folderId: string | null;
 }
 
+export type ClipboardImportFormat = "html" | "minified" | "markdown";
+
+export interface ClipboardImportConfig {
+  enabled: boolean;
+  formats: ClipboardImportFormat[];
+  defaultFormat: ClipboardImportFormat;
+}
+
 export interface Parameter {
   name: string;
   type: "textarea" | "text" | "number" | "checkbox" | "select" | "radio";
@@ -44,6 +52,7 @@ export interface Parameter {
   defaultValue: string | null;
   height: number | null;
   values: string[];
+  clipboardImport: ClipboardImportConfig | null;
 }
 
 export type FieldType = Parameter["type"];
@@ -85,6 +94,7 @@ export interface TemplateFieldDefinition {
   defaultValue: string | null;
   height: number | null;
   values: string[];
+  clipboardImport: ClipboardImportConfig | null;
   explicit: boolean;
 }
 

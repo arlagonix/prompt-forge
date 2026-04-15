@@ -1,5 +1,7 @@
 import YAML from "yaml";
 import type {
+  ClipboardImportConfig,
+  ClipboardImportFormat,
   FieldType,
   FrontMatterResult,
   Parameter,
@@ -29,6 +31,58 @@ const FIELD_TYPES: FieldType[] = [
   "select",
   "radio",
 ];
+
+const CLIPBOARD_IMPORT_FORMATS: ClipboardImportFormat[] = [
+  "html",
+  "minified",
+  "markdown",
+];
+
+function isClipboardImportFormat(
+  value: unknown,
+): value is ClipboardImportFormat {
+  return CLIPBOARD_IMPORT_FORMATS.includes(value as ClipboardImportFormat);
+}
+
+function normalizeClipboardImportConfig(
+  raw: unknown,
+  fieldType: FieldType,
+  fieldName: string,
+): ClipboardImportConfig | null {
+  if (raw == null) return null;
+
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(
+      `Field "${fieldName}" must define clipboard_import as an object.`,
+    );
+  }
+
+  if (fieldType !== "textarea") {
+    throw new Error(
+      `Field "${fieldName}" can only use clipboard_import with textarea type.`,
+    );
+  }
+
+  const item = raw as Record<string, unknown>;
+  const enabled = item.enabled == null ? true : Boolean(item.enabled);
+
+  const normalizedFormats = Array.isArray(item.formats)
+    ? item.formats.filter(isClipboardImportFormat)
+    : [];
+  const formats = normalizedFormats.length > 0
+    ? normalizedFormats
+    : [...CLIPBOARD_IMPORT_FORMATS];
+
+  const defaultFormat = isClipboardImportFormat(item.default_format)
+    ? item.default_format
+    : formats[0];
+
+  return {
+    enabled,
+    formats,
+    defaultFormat: formats.includes(defaultFormat) ? defaultFormat : formats[0],
+  };
+}
 
 function formatParamName(p: string): string {
   return p.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
@@ -97,6 +151,7 @@ function createFieldDefinition(
           ? 4
           : null,
     values,
+    clipboardImport: options.clipboardImport ?? null,
     explicit: options.explicit ?? false,
   };
 }
@@ -197,6 +252,11 @@ function normalizeMetadataParam(
         : normalizeScalarToDisplayString(item.default),
     height: typeof item.height === "number" ? item.height : undefined,
     values: normalizeStringArray(item.values),
+    clipboardImport: normalizeClipboardImportConfig(
+      item.clipboard_import,
+      type,
+      name,
+    ),
     explicit: true,
   });
 }
@@ -450,6 +510,7 @@ export function extractParameters(content: string | null): Parameter[] {
         defaultValue: item.field.defaultValue,
         height: item.field.height,
         values: item.field.values,
+        clipboardImport: item.field.clipboardImport,
       }));
   } catch {
     return [];

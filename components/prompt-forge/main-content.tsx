@@ -57,6 +57,11 @@ import {
   Upload,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  readClipboardSource,
+  transformClipboardSource,
+  type ClipboardImportFormat,
+} from "@/lib/prompt-forge/clipboard-import";
 
 type PreviewLinePart = {
   text: string;
@@ -171,6 +176,43 @@ interface MainContentProps {
 }
 
 type GroupPathSegment = { groupName: string; index: number };
+type ClipboardUiState = {
+  clipboardFormats: Record<string, ClipboardImportFormat>;
+};
+
+const DEFAULT_CLIPBOARD_UI_STATE: ClipboardUiState = {
+  clipboardFormats: {},
+};
+
+function isClipboardImportFormatValue(
+  value: unknown,
+): value is ClipboardImportFormat {
+  return value === "html" || value === "minified" || value === "markdown";
+}
+
+function normalizeClipboardUiState(raw: unknown): ClipboardUiState {
+  if (!raw || typeof raw !== "object") return DEFAULT_CLIPBOARD_UI_STATE;
+
+  const item = raw as { clipboardFormats?: Record<string, unknown> };
+  const clipboardFormats = Object.fromEntries(
+    Object.entries(item.clipboardFormats ?? {}).filter(([, value]) =>
+      isClipboardImportFormatValue(value),
+    ),
+  ) as Record<string, ClipboardImportFormat>;
+
+  return { clipboardFormats };
+}
+
+function buildScopePathKey(
+  path: GroupPathSegment[],
+  fieldName: string,
+): string {
+  if (path.length === 0) return `root/${fieldName}`;
+
+  return `${path
+    .map((segment) => `${segment.groupName}[${segment.index}]`)
+    .join("/")}/${fieldName}`;
+}
 
 function cloneScopeState(state: TemplateScopeState): TemplateScopeState {
   return {
@@ -253,6 +295,8 @@ function countRenderedItems(group: TemplateGroupDefinition): number {
 }
 
 interface GroupEditorProps {
+  clipboardFormats: Record<string, ClipboardImportFormat>;
+  onClipboardFormatChange: (pathKey: string, format: ClipboardImportFormat) => void;
   group: TemplateGroupDefinition;
   state: TemplateScopeState;
   path: GroupPathSegment[];
@@ -272,6 +316,7 @@ interface GroupEditorProps {
   ) => void;
   onCopy: () => void;
   showTechnicalNames: boolean;
+  showNotification: (message: string, type?: "success" | "error") => void;
 }
 
 function GroupEditor({
@@ -283,6 +328,9 @@ function GroupEditor({
   onRemoveGroupInstance,
   onCopy,
   showTechnicalNames,
+  clipboardFormats,
+  onClipboardFormatChange,
+  showNotification,
 }: GroupEditorProps) {
   const renderItem = useCallback(
     (item: TemplateRenderItem) => {
@@ -291,12 +339,26 @@ function GroupEditor({
           <ParameterField
             key={`field-${item.field.name}`}
             param={item.field}
+            pathKey={buildScopePathKey(path, item.field.name)}
+            clipboardFormat={(
+              item.field.clipboardImport?.formats.includes(
+                clipboardFormats[buildScopePathKey(path, item.field.name)] ??
+                  item.field.clipboardImport?.defaultFormat ??
+                  "markdown",
+              )
+                ? clipboardFormats[buildScopePathKey(path, item.field.name)] ??
+                  item.field.clipboardImport?.defaultFormat ??
+                  "markdown"
+                : item.field.clipboardImport?.defaultFormat ?? "markdown"
+            )}
+            onClipboardFormatChange={onClipboardFormatChange}
             value={
               state.fields[item.field.name] ?? item.field.defaultValue ?? ""
             }
             onChange={(value) => onFieldChange(path, item.field.name, value)}
             onCopy={onCopy}
             showTechnicalNames={showTechnicalNames}
+            showNotification={showNotification}
           />
         );
       }
@@ -341,6 +403,9 @@ function GroupEditor({
                   onRemoveGroupInstance={onRemoveGroupInstance}
                   onCopy={onCopy}
                   showTechnicalNames={showTechnicalNames}
+                  clipboardFormats={clipboardFormats}
+                  onClipboardFormatChange={onClipboardFormatChange}
+                  showNotification={showNotification}
                 />
 
                 {item.group.repeat && (
@@ -385,6 +450,9 @@ function GroupEditor({
       showTechnicalNames,
       state.fields,
       state.groups,
+      clipboardFormats,
+      onClipboardFormatChange,
+      showNotification,
     ],
   );
 
@@ -417,6 +485,9 @@ export function MainContent({
   const [preview, setPreview] = useState<string>("");
   const [previewSegments, setPreviewSegments] = useState<PromptSegment[]>([]);
   const [showTechnicalNames, setShowTechnicalNames] = useState<boolean>(true);
+  const [clipboardUiState, setClipboardUiState] = useState<ClipboardUiState>(
+    DEFAULT_CLIPBOARD_UI_STATE,
+  );
   const actionsMenuSuppressRestoreFocusRef = useRef(false);
   const isMobile = useIsMobile();
 
@@ -466,10 +537,43 @@ export function MainContent({
     [getFormStorageKey],
   );
 
+  const getClipboardUiStorageKey = useCallback((file: ParsedFile | null) => {
+    if (!file?.id) return null;
+    return `prompt-forge-field-ui:${file.id}`;
+  }, []);
+
+  const saveClipboardUiState = useCallback(
+    (file: ParsedFile | null, value: ClipboardUiState) => {
+      const key = getClipboardUiStorageKey(file);
+      if (!key) return;
+      try {
+        localStorage.setItem(key, JSON.stringify(value));
+      } catch {}
+    },
+    [getClipboardUiStorageKey],
+  );
+
+  const loadClipboardUiState = useCallback(
+    (file: ParsedFile | null): ClipboardUiState => {
+      const key = getClipboardUiStorageKey(file);
+      if (!key) return DEFAULT_CLIPBOARD_UI_STATE;
+      try {
+        const raw = localStorage.getItem(key);
+        return raw
+          ? normalizeClipboardUiState(JSON.parse(raw))
+          : DEFAULT_CLIPBOARD_UI_STATE;
+      } catch {
+        return DEFAULT_CLIPBOARD_UI_STATE;
+      }
+    },
+    [getClipboardUiStorageKey],
+  );
+
   useEffect(() => {
     if (!currentFile) {
       setParsedTemplate(null);
       setTemplateState(null);
+      setClipboardUiState(DEFAULT_CLIPBOARD_UI_STATE);
       setParseError(null);
       return;
     }
@@ -483,20 +587,27 @@ export function MainContent({
       );
       setParsedTemplate(nextTemplate);
       setTemplateState(nextState);
+      setClipboardUiState(loadClipboardUiState(currentFile));
       setParseError(null);
     } catch (error) {
       setParsedTemplate(null);
       setTemplateState(null);
+      setClipboardUiState(DEFAULT_CLIPBOARD_UI_STATE);
       setParseError(
         error instanceof Error ? error.message : "Failed to parse template.",
       );
     }
-  }, [currentFile, loadFormValues]);
+  }, [currentFile, loadClipboardUiState, loadFormValues]);
 
   useEffect(() => {
     if (!currentFile || !templateState || parseError) return;
     saveFormValues(currentFile, templateState);
   }, [currentFile, parseError, saveFormValues, templateState]);
+
+  useEffect(() => {
+    if (!currentFile) return;
+    saveClipboardUiState(currentFile, clipboardUiState);
+  }, [clipboardUiState, currentFile, saveClipboardUiState]);
 
   useEffect(() => {
     if (!currentFile) {
@@ -571,6 +682,18 @@ export function MainContent({
           };
         });
       });
+    },
+    [],
+  );
+
+  const handleClipboardFormatChange = useCallback(
+    (pathKey: string, format: ClipboardImportFormat) => {
+      setClipboardUiState((prev) => ({
+        clipboardFormats: {
+          ...prev.clipboardFormats,
+          [pathKey]: format,
+        },
+      }));
     },
     [],
   );
@@ -781,6 +904,9 @@ export function MainContent({
                       onRemoveGroupInstance={removeGroupInstance}
                       onCopy={handleCopy}
                       showTechnicalNames={showTechnicalNames}
+                      clipboardFormats={clipboardUiState.clipboardFormats}
+                      onClipboardFormatChange={handleClipboardFormatChange}
+                      showNotification={showNotification}
                     />
                   )}
 
@@ -887,19 +1013,28 @@ export function MainContent({
 
 interface ParameterFieldProps {
   param: TemplateFieldDefinition;
+  pathKey: string;
+  clipboardFormat: ClipboardImportFormat;
+  onClipboardFormatChange: (pathKey: string, format: ClipboardImportFormat) => void;
   value: string;
   onChange: (value: string) => void;
   onCopy: () => void;
   showTechnicalNames: boolean;
+  showNotification: (message: string, type?: "success" | "error") => void;
 }
 
 function ParameterField({
   param,
+  pathKey,
+  clipboardFormat,
+  onClipboardFormatChange,
   value,
   onChange,
   onCopy,
   showTechnicalNames,
+  showNotification,
 }: ParameterFieldProps) {
+  const [isImporting, setIsImporting] = useState(false);
   const id = `param-${param.name}`;
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -910,6 +1045,32 @@ function ParameterField({
       }
     }
   };
+
+  const handleImportFromClipboard = useCallback(async () => {
+    if (!param.clipboardImport?.enabled) return;
+
+    try {
+      setIsImporting(true);
+      const source = await readClipboardSource();
+      const nextValue = transformClipboardSource(source, clipboardFormat).trim();
+
+      if (!nextValue) {
+        showNotification("Clipboard is empty or could not be converted", "error");
+        return;
+      }
+
+      onChange(nextValue);
+      showNotification("Imported from clipboard");
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to import from clipboard";
+      showNotification(message, "error");
+    } finally {
+      setIsImporting(false);
+    }
+  }, [clipboardFormat, onChange, param.clipboardImport, showNotification]);
 
   const meta = (
     <div className="flex items-center gap-2 flex-wrap min-w-0 sm:w-56 sm:min-w-56 sm:flex-none">
@@ -925,6 +1086,8 @@ function ParameterField({
   );
 
   if (param.type === "textarea") {
+    const clipboardImport = param.clipboardImport;
+
     return (
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
@@ -937,6 +1100,43 @@ function ParameterField({
             </code>
           )}
         </div>
+
+        {clipboardImport?.enabled && (
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Select
+              value={clipboardFormat}
+              onValueChange={(format) =>
+                onClipboardFormatChange(pathKey, format as ClipboardImportFormat)
+              }
+            >
+              <SelectTrigger className="bg-card border-border sm:w-[200px]">
+                <SelectValue placeholder="Select a format" />
+              </SelectTrigger>
+              <SelectContent>
+                {clipboardImport.formats.map((format) => (
+                  <SelectItem key={format} value={format}>
+                    {format === "html"
+                      ? "HTML"
+                      : format === "minified"
+                        ? "Minified HTML"
+                        : "Markdown"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleImportFromClipboard}
+              disabled={isImporting}
+              className="sm:w-auto"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {isImporting ? "Importing..." : "Import from clipboard"}
+            </Button>
+          </div>
+        )}
 
         <Textarea
           id={id}
