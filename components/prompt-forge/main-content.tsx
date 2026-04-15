@@ -1241,18 +1241,20 @@ function ParameterField({
     return (
       <div className={fieldContainerClassName}>
         {meta}
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger className="bg-card border-border flex-1 min-w-0">
-            <SelectValue placeholder="Select an option" />
-          </SelectTrigger>
-          <SelectContent>
-            {param.values.map((v) => (
-              <SelectItem key={v} value={v}>
-                {v}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="min-w-0">
+          <Select value={value} onValueChange={onChange}>
+            <SelectTrigger className="w-full min-w-0 bg-card border-border">
+              <SelectValue placeholder="Select an option" />
+            </SelectTrigger>
+            <SelectContent>
+              {param.values.map((v) => (
+                <SelectItem key={v} value={v}>
+                  {v}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     );
   }
