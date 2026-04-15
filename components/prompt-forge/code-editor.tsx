@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { stripReusableFlag } from "@/lib/prompt-forge/parser";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, FileText, Library, Save, X } from "lucide-react";
+import { AlertTriangle, Library, Save, X } from "lucide-react";
 import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TemplateMonacoEditor } from "./template-monaco-editor";
@@ -63,6 +63,7 @@ export function CodeEditor({
 
   const isMobile = useIsMobile();
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const previousDocumentIdentityRef = useRef<string | null>(null);
 
   const documentIdentity = useMemo(
@@ -106,6 +107,14 @@ export function CodeEditor({
       setIsSaving(false);
     }
   }, [content, newFileName, onSave, showNameInput, showNotification]);
+
+  const requestSave = useCallback(() => {
+    if (isSaving) {
+      return;
+    }
+
+    formRef.current?.requestSubmit();
+  }, [isSaving]);
 
   const handleClose = useCallback(() => {
     if (hasChanges) {
@@ -196,13 +205,13 @@ export function CodeEditor({
 
       const ctrl = e.ctrlKey || e.metaKey;
 
-      if (ctrl && e.key.toLowerCase() === "s") {
+      if (ctrl && e.code === "KeyS") {
         e.preventDefault();
-        void handleSave();
+        requestSave();
         return;
       }
 
-      if (ctrl && e.key.toLowerCase() === "t") {
+      if (ctrl && e.code === "KeyT") {
         e.preventDefault();
         setIsTemplatePickerOpen(true);
         return;
@@ -216,7 +225,7 @@ export function CodeEditor({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleClose, handleSave]);
+  }, [handleClose, requestSave]);
 
   const lineCount = useMemo(() => {
     return content.length === 0 ? 1 : content.split("\n").length;
@@ -268,7 +277,7 @@ export function CodeEditor({
       editorRef.current = editor;
 
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-        void handleSave();
+        requestSave();
       });
 
       editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyT, () => {
@@ -343,7 +352,7 @@ export function CodeEditor({
         editor.focus();
       }, 50);
     },
-    [handleClose, handleSave, isNew, wrapCurrentSelection],
+    [handleClose, isNew, requestSave, wrapCurrentSelection],
   );
 
   return (
@@ -391,7 +400,14 @@ export function CodeEditor({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex h-full min-h-0 flex-col bg-background">
+          <form
+            ref={formRef}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleSave();
+            }}
+            className="flex h-full min-h-0 flex-col bg-background"
+          >
             <header
               className={cn(
                 "shrink-0 border-b border-border bg-card px-4 py-3",
@@ -401,7 +417,6 @@ export function CodeEditor({
               )}
             >
               <div className="flex min-w-0 flex-1 items-center gap-3">
-                <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   {showNameInput ? (
                     <>
@@ -434,6 +449,7 @@ export function CodeEditor({
                 )}
               >
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setIsTemplatePickerOpen(true)}
@@ -442,7 +458,12 @@ export function CodeEditor({
                   Use template
                 </Button>
 
-                <Button variant="outline" size="sm" onClick={handleClose}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClose}
+                >
                   <X className="mr-1.5 h-4 w-4" />
                   Close
                 </Button>
@@ -497,6 +518,7 @@ export function CodeEditor({
               <div className={cn(isMobile ? "grid" : "flex items-center")}>
                 {!isNew && onDelete ? (
                   <Button
+                    type="button"
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowDeleteConfirm(true)}
@@ -515,13 +537,13 @@ export function CodeEditor({
                   isMobile ? "grid grid-cols-1" : "flex items-center",
                 )}
               >
-                <Button size="sm" onClick={handleSave} disabled={isSaving}>
+                <Button type="submit" size="sm" disabled={isSaving}>
                   <Save className="mr-1.5 h-4 w-4" />
                   {isSaving ? "Saving..." : "Save"}
                 </Button>
               </div>
             </footer>
-          </div>
+          </form>
         </DialogContent>
       </Dialog>
 
