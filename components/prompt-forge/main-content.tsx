@@ -817,7 +817,7 @@ export function MainContent({
     parsedTemplate != null && countRenderedItems(parsedTemplate.rootGroup) > 0;
 
   const centeredMainContentClassName =
-    !isMobile && !isPreviewOpen ? "mx-auto w-full max-w-4xl" : undefined;
+    !isMobile && !isPreviewOpen ? "mx-auto w-full max-w-3xl" : undefined;
 
   return (
     <main className="flex-1 min-h-0 overflow-hidden">
@@ -974,13 +974,10 @@ export function MainContent({
                           : "Show tech names"}
                       </DropdownMenuItem>
                       {!isSidebarOpen && (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={onToggleSidebar}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            Show menu
-                          </DropdownMenuItem>
-                        </>
+                        <DropdownMenuItem onClick={onToggleSidebar}>
+                          <Eye className="mr-2 h-4 w-4" />
+                          Show menu
+                        </DropdownMenuItem>
                       )}
                       {!isPreviewOpen && (
                         <DropdownMenuItem
