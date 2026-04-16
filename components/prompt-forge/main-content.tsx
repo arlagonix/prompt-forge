@@ -75,6 +75,7 @@ import {
   Folder,
   Highlighter,
   MoreHorizontal,
+  PanelLeftOpen,
   Pencil,
   Plus,
   RotateCcw,
@@ -851,7 +852,20 @@ export function MainContent({
                   centeredMainContentClassName,
                 )}
               >
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  {isMobile && !isSidebarOpen && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onToggleSidebar}
+                      className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                      aria-label="Show menu"
+                      title="Show menu"
+                    >
+                      <PanelLeftOpen className="h-4 w-4" />
+                    </Button>
+                  )}
+
                   <div className="min-w-0">
                     <h2 className="truncate text-base font-semibold text-foreground md:text-lg">
                       {currentFile.name}
@@ -1147,7 +1161,20 @@ export function MainContent({
       ) : (
         <div className="flex h-full min-h-0 flex-col">
           <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:px-6 md:py-4 shrink-0">
-            <div className="flex min-w-0 items-center gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              {isMobile && !isSidebarOpen && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggleSidebar}
+                  className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label="Show menu"
+                  title="Show menu"
+                >
+                  <PanelLeftOpen className="h-4 w-4" />
+                </Button>
+              )}
+
               <div className="min-w-0">
                 <h2 className="truncate text-base font-semibold text-foreground md:text-lg">
                   Prompt Forge
