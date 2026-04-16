@@ -372,6 +372,78 @@ function outerHtml(node: Node): string {
   return node.textContent ?? "";
 }
 
+function prettyPrintHtmlFragment(node: Node): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    return node.textContent?.trim() ?? "";
+  }
+
+  if (node.nodeType !== Node.ELEMENT_NODE) {
+    return "";
+  }
+
+  return prettyPrint(node, 0).trim();
+}
+
+function escapeMarkdownTableCell(text: string): string {
+  return text.replace(/\|/g, "\\|").replace(/\n/g, "<br>");
+}
+
+function getSimpleTableRows(table: HTMLTableElement): HTMLElement[][] {
+  const sectionRows = Array.from(
+    table.querySelectorAll(
+      ":scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr",
+    ),
+  ) as HTMLElement[];
+
+  const directRows = Array.from(table.children).filter(
+    (child) =>
+      child instanceof HTMLElement && child.tagName.toLowerCase() === "tr",
+  ) as HTMLElement[];
+
+  const rows = (sectionRows.length > 0 ? sectionRows : directRows).map(
+    (row) =>
+      Array.from(row.children).filter(
+        (cell) =>
+          cell instanceof HTMLElement &&
+          TABLE_CELL_ELEMENTS.has(cell.tagName.toLowerCase()),
+      ) as HTMLElement[],
+  );
+
+  return rows.filter((row) => row.length > 0);
+}
+
+function simpleTableToMarkdown(table: HTMLTableElement): string {
+  const rows = getSimpleTableRows(table);
+  if (rows.length === 0) return "";
+
+  const columnCount = Math.max(...rows.map((row) => row.length));
+  if (columnCount === 0) return "";
+
+  const normalizedRows = rows.map((row) =>
+    Array.from({ length: columnCount }, (_, index) => {
+      const cell = row[index];
+      const text = cell?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+      return escapeMarkdownTableCell(text);
+    }),
+  );
+
+  const firstRowHasHeader = rows[0].every(
+    (cell) => cell.tagName.toLowerCase() === "th",
+  );
+
+  const header = firstRowHasHeader
+    ? normalizedRows[0]
+    : Array.from({ length: columnCount }, (_, index) => `Column ${index + 1}`);
+
+  const body = firstRowHasHeader ? normalizedRows.slice(1) : normalizedRows;
+
+  const headerLine = `| ${header.join(" | ")} |`;
+  const separatorLine = `| ${header.map(() => "---").join(" | ")} |`;
+  const bodyLines = body.map((row) => `| ${row.join(" | ")} |`);
+
+  return [headerLine, separatorLine, ...bodyLines].join("\n").trim();
+}
+
 function createTurndownService(): TurndownService {
   const service = new TurndownService({
     headingStyle: "atx",
@@ -380,6 +452,7 @@ function createTurndownService(): TurndownService {
     emDelimiter: "*",
     strongDelimiter: "**",
     linkStyle: "inlined",
+    hr: "---",
   });
 
   service.remove([
@@ -392,6 +465,20 @@ function createTurndownService(): TurndownService {
     "embed",
   ]);
 
+  service.addRule("simpleTables", {
+    filter(node) {
+      return (
+        node instanceof HTMLElement &&
+        node.tagName.toLowerCase() === "table" &&
+        isSimpleTable(node as HTMLTableElement)
+      );
+    },
+    replacement(_content, node) {
+      const markdownTable = simpleTableToMarkdown(node as HTMLTableElement);
+      return markdownTable ? `\n\n${markdownTable}\n\n` : "";
+    },
+  });
+
   service.addRule("preserveComplexTables", {
     filter(node) {
       if (!(node instanceof HTMLElement)) return false;
@@ -399,7 +486,8 @@ function createTurndownService(): TurndownService {
       return !isSimpleTable(node as HTMLTableElement);
     },
     replacement(_content, node) {
-      return `\n\n${outerHtml(node)}\n\n`;
+      const prettyHtml = prettyPrintHtmlFragment(node);
+      return prettyHtml ? `\n\n${prettyHtml}\n\n` : "";
     },
   });
 
