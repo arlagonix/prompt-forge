@@ -1,5 +1,3 @@
-import TurndownService from "turndown";
-
 export type ClipboardImportFormat = "html" | "minified" | "markdown";
 
 export interface ClipboardImportSource {
@@ -21,14 +19,6 @@ const ATTR_WHITELIST: Record<string, string[]> = {
   ol: ["type", "start"],
   li: ["value"],
   code: ["class"],
-  table: [],
-  thead: [],
-  tbody: [],
-  tfoot: [],
-  tr: [],
-  p: [],
-  summary: [],
-  time: [],
 };
 
 const VOID_ELEMENTS = new Set([
@@ -105,33 +95,6 @@ const FORBIDDEN_TAGS = new Set([
   "meta",
 ]);
 
-const UI_UNWRAP_TAGS = new Set(["span", "button"]);
-
-const UI_ROLE_HINTS = new Set([
-  "button",
-  "menu",
-  "menuitem",
-  "tab",
-  "tooltip",
-  "dialog",
-]);
-
-const UI_CLASS_HINTS = [
-  "dropdown",
-  "menu",
-  "toolbar",
-  "popover",
-  "tooltip",
-  "modal",
-  "dialog",
-  "controls",
-  "actions",
-  "button",
-  "btn",
-];
-
-const UI_REMOVE_TAGS = new Set(["img"]);
-
 function canUseDom(): boolean {
   return typeof document !== "undefined";
 }
@@ -160,64 +123,9 @@ function decodeEncodedText(text: string): string {
   });
 }
 
-function hasUiClassHint(element: HTMLElement): boolean {
-  const className = element.getAttribute("class") ?? "";
-  const id = element.getAttribute("id") ?? "";
-  const value = `${className} ${id}`.toLowerCase();
-  return UI_CLASS_HINTS.some((hint) => value.includes(hint));
-}
-
-function isProbablyUiOnlyElement(element: HTMLElement): boolean {
-  const tag = element.tagName.toLowerCase();
-
-  if (tag === "img") {
-    const src = (element.getAttribute("src") ?? "").toLowerCase();
-    const alt = (element.getAttribute("alt") ?? "").trim().toLowerCase();
-    const width = Number.parseInt(element.getAttribute("width") ?? "", 10);
-    const height = Number.parseInt(element.getAttribute("height") ?? "", 10);
-
-    const looksLikeIconSrc =
-      src.includes("/edit") ||
-      src.includes("icon") ||
-      src.includes("button") ||
-      src.includes("toolbar") ||
-      src.includes("menu");
-
-    const looksTiny =
-      (Number.isFinite(width) && width > 0 && width <= 24) ||
-      (Number.isFinite(height) && height > 0 && height <= 24);
-
-    const altSuggestsUi =
-      alt === "" ||
-      alt === "edit" ||
-      alt === "menu" ||
-      alt === "button" ||
-      alt === "icon";
-
-    return looksLikeIconSrc || looksTiny || altSuggestsUi;
-  }
-
-  return false;
-}
-
-function unwrapElement(element: HTMLElement): DocumentFragment {
-  const fragment = document.createDocumentFragment();
-  Array.from(element.childNodes).forEach((child) => {
-    const cleaned = cleanNode(child);
-    if (cleaned) {
-      fragment.appendChild(cleaned);
-    }
-  });
-  return fragment;
-}
-
 function cleanNode(node: Node): Node | DocumentFragment | null {
   if (node.nodeType === Node.TEXT_NODE) {
-    const decoded = decodeEncodedText(node.textContent ?? "");
-    if (!decoded.trim()) {
-      return null;
-    }
-    node.textContent = decoded;
+    node.textContent = decodeEncodedText(node.textContent ?? "");
     return node;
   }
 
@@ -230,28 +138,15 @@ function cleanNode(node: Node): Node | DocumentFragment | null {
     return null;
   }
 
-  if (
-    element.hasAttribute("hidden") ||
-    element.getAttribute("aria-hidden") === "true"
-  ) {
-    return null;
-  }
-
-  if (UI_REMOVE_TAGS.has(tag) && isProbablyUiOnlyElement(element)) {
-    return null;
-  }
-
-  const role = (element.getAttribute("role") ?? "").toLowerCase();
-  if (role && UI_ROLE_HINTS.has(role)) {
-    return unwrapElement(element);
-  }
-
-  if (UI_UNWRAP_TAGS.has(tag)) {
-    return unwrapElement(element);
-  }
-
-  if (["div", "aside", "nav"].includes(tag) && hasUiClassHint(element)) {
-    return unwrapElement(element);
+  if (tag === "span") {
+    const fragment = document.createDocumentFragment();
+    Array.from(element.childNodes).forEach((child) => {
+      const cleaned = cleanNode(child);
+      if (cleaned) {
+        fragment.appendChild(cleaned);
+      }
+    });
+    return fragment;
   }
 
   Array.from(element.attributes).forEach((attribute) => {
@@ -286,7 +181,7 @@ function cleanNode(node: Node): Node | DocumentFragment | null {
     !VOID_ELEMENTS.has(tag) &&
     !TABLE_CELL_ELEMENTS.has(tag) &&
     element.textContent?.trim() === "" &&
-    !element.querySelector("img, br, hr")
+    !element.querySelector("img, br, hr, input")
   ) {
     return null;
   }
@@ -352,9 +247,7 @@ function minifyHtml(html: string): string {
 function isSimpleTable(tableNode: HTMLTableElement): boolean {
   const cells = tableNode.querySelectorAll("td, th");
   for (const cell of Array.from(cells)) {
-    if (cell.hasAttribute("colspan") || cell.hasAttribute("rowspan")) {
-      return false;
-    }
+    if (cell.hasAttribute("colspan") || cell.hasAttribute("rowspan")) return false;
     for (const child of Array.from(cell.childNodes)) {
       if (child.nodeType === Node.ELEMENT_NODE) {
         const tag = (child as HTMLElement).tagName.toLowerCase();
@@ -365,162 +258,209 @@ function isSimpleTable(tableNode: HTMLTableElement): boolean {
   return true;
 }
 
-function outerHtml(node: Node): string {
-  if (node.nodeType === Node.ELEMENT_NODE) {
-    return (node as HTMLElement).outerHTML;
-  }
-  return node.textContent ?? "";
-}
-
-function prettyPrintHtmlFragment(node: Node): string {
+function inlineToMarkdown(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) {
-    return node.textContent?.trim() ?? "";
+    return node.textContent ?? "";
   }
 
-  if (node.nodeType !== Node.ELEMENT_NODE) {
-    return "";
+  if (node.nodeType !== Node.ELEMENT_NODE) return "";
+
+  const element = node as HTMLElement;
+  const tag = element.tagName.toLowerCase();
+  const inner = Array.from(element.childNodes).map(inlineToMarkdown).join("");
+
+  switch (tag) {
+    case "strong":
+    case "b":
+      return `**${inner}**`;
+    case "em":
+    case "i":
+      return `*${inner}*`;
+    case "a": {
+      const href = element.getAttribute("href") ?? "";
+      return `[${inner}](${href})`;
+    }
+    case "code":
+      return `\`${inner}\``;
+    case "br":
+      return "\n";
+    case "img": {
+      const alt = element.getAttribute("alt") ?? "";
+      const src = element.getAttribute("src") ?? "";
+      return `![${alt}](${src})`;
+    }
+    default:
+      return inner;
   }
-
-  return prettyPrint(node, 0).trim();
 }
 
-function escapeMarkdownTableCell(text: string): string {
-  return text.replace(/\|/g, "\\|").replace(/\n/g, "<br>");
-}
-
-function getSimpleTableRows(table: HTMLTableElement): HTMLElement[][] {
-  const sectionRows = Array.from(
-    table.querySelectorAll(
-      ":scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr",
-    ),
-  ) as HTMLElement[];
-
-  const directRows = Array.from(table.children).filter(
-    (child) =>
-      child instanceof HTMLElement && child.tagName.toLowerCase() === "tr",
-  ) as HTMLElement[];
-
-  const rows = (sectionRows.length > 0 ? sectionRows : directRows).map(
-    (row) =>
-      Array.from(row.children).filter(
-        (cell) =>
-          cell instanceof HTMLElement &&
-          TABLE_CELL_ELEMENTS.has(cell.tagName.toLowerCase()),
-      ) as HTMLElement[],
-  );
-
-  return rows.filter((row) => row.length > 0);
-}
-
-function simpleTableToMarkdown(table: HTMLTableElement): string {
-  const rows = getSimpleTableRows(table);
+function tableToMarkdown(tableNode: HTMLTableElement): string {
+  const rows = Array.from(tableNode.querySelectorAll("tr"));
   if (rows.length === 0) return "";
 
-  const columnCount = Math.max(...rows.map((row) => row.length));
-  if (columnCount === 0) return "";
+  const markdownRows = rows.map((row) => {
+    const cells = Array.from(row.querySelectorAll("th, td"));
+    return cells.map((cell) =>
+      Array.from(cell.childNodes)
+        .map(inlineToMarkdown)
+        .join("")
+        .replace(/\n/g, " ")
+        .replace(/\|/g, "\\|")
+        .trim(),
+    );
+  });
 
-  const normalizedRows = rows.map((row) =>
-    Array.from({ length: columnCount }, (_, index) => {
-      const cell = row[index];
-      const text = cell?.textContent?.replace(/\s+/g, " ").trim() ?? "";
-      return escapeMarkdownTableCell(text);
-    }),
-  );
+  const columnCount = Math.max(...markdownRows.map((row) => row.length));
+  markdownRows.forEach((row) => {
+    while (row.length < columnCount) row.push("");
+  });
 
-  const firstRowHasHeader = rows[0].every(
-    (cell) => cell.tagName.toLowerCase() === "th",
-  );
+  const lines: string[] = [];
+  lines.push(`| ${markdownRows[0].join(" | ")} |`);
+  lines.push(`| ${Array(columnCount).fill("---").join(" | ")} |`);
 
-  const header = firstRowHasHeader
-    ? normalizedRows[0]
-    : Array.from({ length: columnCount }, (_, index) => `Column ${index + 1}`);
+  for (let index = 1; index < markdownRows.length; index += 1) {
+    lines.push(`| ${markdownRows[index].join(" | ")} |`);
+  }
 
-  const body = firstRowHasHeader ? normalizedRows.slice(1) : normalizedRows;
-
-  const headerLine = `| ${header.join(" | ")} |`;
-  const separatorLine = `| ${header.map(() => "---").join(" | ")} |`;
-  const bodyLines = body.map((row) => `| ${row.join(" | ")} |`);
-
-  return [headerLine, separatorLine, ...bodyLines].join("\n").trim();
+  return lines.join("\n");
 }
 
-function createTurndownService(): TurndownService {
-  const service = new TurndownService({
-    headingStyle: "atx",
-    codeBlockStyle: "fenced",
-    bulletListMarker: "-",
-    emDelimiter: "*",
-    strongDelimiter: "**",
-    linkStyle: "inlined",
-    hr: "---",
-  });
+function nodeToMarkdown(
+  node: Node,
+  listDepth = 0,
+  listType: string | null = null,
+): string {
+  if (node.nodeType === Node.TEXT_NODE) {
+    const text = node.textContent?.trim() ?? "";
+    return text || "";
+  }
 
-  service.remove([
-    "script",
-    "style",
-    "noscript",
-    "template",
-    "iframe",
-    "object",
-    "embed",
-  ]);
+  if (node.nodeType !== Node.ELEMENT_NODE) return "";
 
-  service.addRule("simpleTables", {
-    filter(node) {
-      return (
-        node instanceof HTMLElement &&
-        node.tagName.toLowerCase() === "table" &&
-        isSimpleTable(node as HTMLTableElement)
-      );
-    },
-    replacement(_content, node) {
-      const markdownTable = simpleTableToMarkdown(node as HTMLTableElement);
-      return markdownTable ? `\n\n${markdownTable}\n\n` : "";
-    },
-  });
+  const element = node as HTMLElement;
+  const tag = element.tagName.toLowerCase();
 
-  service.addRule("preserveComplexTables", {
-    filter(node) {
-      if (!(node instanceof HTMLElement)) return false;
-      if (node.tagName.toLowerCase() !== "table") return false;
-      return !isSimpleTable(node as HTMLTableElement);
-    },
-    replacement(_content, node) {
-      const prettyHtml = prettyPrintHtmlFragment(node);
-      return prettyHtml ? `\n\n${prettyHtml}\n\n` : "";
-    },
-  });
+  if (/^h[1-6]$/.test(tag)) {
+    const level = Number.parseInt(tag[1] ?? "1", 10);
+    const prefix = "#".repeat(level);
+    const text = Array.from(element.childNodes).map(inlineToMarkdown).join("").trim();
+    return `${prefix} ${text}`;
+  }
 
-  service.addRule("simpleTime", {
-    filter(node) {
-      return (
-        node instanceof HTMLElement && node.tagName.toLowerCase() === "time"
-      );
-    },
-    replacement(content) {
-      return content;
-    },
-  });
+  if (tag === "p") {
+    return Array.from(element.childNodes).map(inlineToMarkdown).join("").trim();
+  }
 
-  service.addRule("summaryAsBlock", {
-    filter(node) {
-      return (
-        node instanceof HTMLElement && node.tagName.toLowerCase() === "summary"
-      );
-    },
-    replacement(content) {
-      const trimmed = content.trim();
-      return trimmed ? `\n\n${trimmed}\n\n` : "";
-    },
-  });
+  if (tag === "blockquote") {
+    const inner = Array.from(element.childNodes)
+      .map((child) => nodeToMarkdown(child, listDepth, listType))
+      .filter(Boolean)
+      .join("\n\n");
+    return inner
+      .split("\n")
+      .map((line) => `> ${line}`)
+      .join("\n");
+  }
 
-  return service;
+  if (tag === "hr") return "---";
+
+  if (tag === "pre") {
+    const codeElement = element.querySelector("code");
+    const content = codeElement ?? element;
+    let language = "";
+    if (codeElement) {
+      const match = (codeElement.getAttribute("class") ?? "").match(/language-(\w+)/);
+      if (match) language = match[1] ?? "";
+    }
+    const text = content.textContent ?? "";
+    return `\`\`\`${language}\n${text}\n\`\`\``;
+  }
+
+  if (tag === "code") return `\`${element.textContent ?? ""}\``;
+
+  if (tag === "ul") {
+    return Array.from(element.children)
+      .filter((child) => child.tagName.toLowerCase() === "li")
+      .map((child) => nodeToMarkdown(child, listDepth, "ul"))
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (tag === "ol") {
+    let index = Number.parseInt(element.getAttribute("start") ?? "1", 10);
+    return Array.from(element.children)
+      .filter((child) => child.tagName.toLowerCase() === "li")
+      .map((child) => {
+        const result = nodeToMarkdown(child, listDepth, `ol:${index}`);
+        index += 1;
+        return result;
+      })
+      .filter(Boolean)
+      .join("\n");
+  }
+
+  if (tag === "li") {
+    const indent = "  ".repeat(listDepth);
+    const bullet = listType?.startsWith("ol:") ? `${listType.split(":")[1]}.` : "-";
+    const inlineParts: string[] = [];
+    const nestedLists: HTMLElement[] = [];
+
+    Array.from(element.childNodes).forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+        const childTag = (child as HTMLElement).tagName.toLowerCase();
+        if (childTag === "ul" || childTag === "ol") {
+          nestedLists.push(child as HTMLElement);
+          return;
+        }
+      }
+      inlineParts.push(inlineToMarkdown(child));
+    });
+
+    const inlineText = inlineParts.join("").trim();
+    const lines = [`${indent}${bullet} ${inlineText}`.trimEnd()];
+
+    nestedLists.forEach((nested) => {
+      const nestedTag = nested.tagName.toLowerCase();
+      let nestedIndex = Number.parseInt(nested.getAttribute("start") ?? "1", 10);
+      Array.from(nested.children)
+        .filter((child) => child.tagName.toLowerCase() === "li")
+        .forEach((child) => {
+          const nestedType = nestedTag === "ol" ? `ol:${nestedIndex}` : "ul";
+          lines.push(nodeToMarkdown(child, listDepth + 1, nestedType));
+          if (nestedTag === "ol") nestedIndex += 1;
+        });
+    });
+
+    return lines.join("\n");
+  }
+
+  if (tag === "table") {
+    return isSimpleTable(element as HTMLTableElement)
+      ? tableToMarkdown(element as HTMLTableElement)
+      : prettyPrint(element, 0);
+  }
+
+  if (["strong", "b", "em", "i", "a", "img"].includes(tag)) {
+    return inlineToMarkdown(element);
+  }
+
+  if (["div", "section", "article", "main", "header", "footer"].includes(tag)) {
+    return Array.from(element.childNodes)
+      .map((child) => nodeToMarkdown(child, listDepth, listType))
+      .filter(Boolean)
+      .join("\n\n");
+  }
+
+  const inlineFallback = inlineToMarkdown(element).trim();
+  return inlineFallback || "";
 }
 
 function convertToMarkdown(container: HTMLElement): string {
-  const turndown = createTurndownService();
-  return turndown
-    .turndown(container)
+  return Array.from(container.childNodes)
+    .map((child) => nodeToMarkdown(child).trim())
+    .filter(Boolean)
+    .join("\n\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
