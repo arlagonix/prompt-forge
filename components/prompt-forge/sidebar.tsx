@@ -36,6 +36,7 @@ import {
   FileText,
   Folder,
   FolderPlus,
+  EyeOff,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -392,6 +393,11 @@ export function Sidebar({
                   <DropdownMenuItem onClick={onRefresh} disabled={isLoading}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Refresh
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onToggle}>
+                    <EyeOff className="mr-2 h-4 w-4" />
+                    Hide menu
                   </DropdownMenuItem>
                   <ThemeToggle mode="menu-item" />
                 </DropdownMenuContent>

@@ -816,7 +816,7 @@ export function MainContent({
     parsedTemplate != null && countRenderedItems(parsedTemplate.rootGroup) > 0;
 
   const centeredMainContentClassName =
-    !isMobile && !isPreviewOpen ? "mx-auto w-full max-w-5xl" : undefined;
+    !isMobile && !isPreviewOpen ? "mx-auto w-full max-w-4xl" : undefined;
 
   return (
     <main className="flex-1 min-h-0 overflow-hidden">
@@ -834,13 +834,13 @@ export function MainContent({
             isMobile
               ? "grid grid-cols-1"
               : isPreviewOpen
-                ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,42%)]"
+                ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
                 : "block",
           )}
         >
           <section
             className={cn(
-              "min-w-0 min-h-0 flex flex-col bg-background",
+              "min-w-0 min-h-0 h-full flex flex-col bg-background",
               isPreviewOpen ? "border-r border-border" : "w-full",
             )}
           >
@@ -944,6 +944,11 @@ export function MainContent({
                         <Copy className="mr-2 h-4 w-4" />
                         Copy source
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={onExportFile}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Export
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleToggleTechnicalNames}>
                         {showTechnicalNames ? (
                           <EyeOff className="mr-2 h-4 w-4" />
@@ -954,15 +959,15 @@ export function MainContent({
                           ? "Hide tech names"
                           : "Show tech names"}
                       </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={onToggleSidebar}>
-                        {isSidebarOpen ? (
-                          <EyeOff className="mr-2 h-4 w-4" />
-                        ) : (
-                          <Eye className="mr-2 h-4 w-4" />
-                        )}
-                        {isSidebarOpen ? "Hide menu" : "Show menu"}
-                      </DropdownMenuItem>
+                      {!isSidebarOpen && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={onToggleSidebar}>
+                            <Eye className="mr-2 h-4 w-4" />
+                            Show menu
+                          </DropdownMenuItem>
+                        </>
+                      )}
                       {!isPreviewOpen && (
                         <DropdownMenuItem
                           onClick={() => onSetPreviewOpen(true)}
@@ -971,11 +976,6 @@ export function MainContent({
                           Show preview
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={onExportFile}>
-                        <Upload className="mr-2 h-4 w-4" />
-                        Export
-                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         onClick={onDeleteFile}
@@ -1166,14 +1166,12 @@ export function MainContent({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={onToggleSidebar}>
-                  {isSidebarOpen ? (
-                    <EyeOff className="mr-2 h-4 w-4" />
-                  ) : (
+                {!isSidebarOpen && (
+                  <DropdownMenuItem onClick={onToggleSidebar}>
                     <Eye className="mr-2 h-4 w-4" />
-                  )}
-                  {isSidebarOpen ? "Hide menu" : "Show menu"}
-                </DropdownMenuItem>
+                    Show menu
+                  </DropdownMenuItem>
+                )}
                 {!isPreviewOpen && (
                   <DropdownMenuItem onClick={() => onSetPreviewOpen(true)}>
                     <Eye className="mr-2 h-4 w-4" />
