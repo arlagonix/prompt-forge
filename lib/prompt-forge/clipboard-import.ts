@@ -18,7 +18,7 @@ const ATTR_WHITELIST: Record<string, string[]> = {
   th: ["colspan", "rowspan"],
   ol: ["type", "start"],
   li: ["value"],
-  code: ["class"],
+  // code: ["class"],
 };
 
 const VOID_ELEMENTS = new Set([
@@ -247,7 +247,8 @@ function minifyHtml(html: string): string {
 function isSimpleTable(tableNode: HTMLTableElement): boolean {
   const cells = tableNode.querySelectorAll("td, th");
   for (const cell of Array.from(cells)) {
-    if (cell.hasAttribute("colspan") || cell.hasAttribute("rowspan")) return false;
+    if (cell.hasAttribute("colspan") || cell.hasAttribute("rowspan"))
+      return false;
     for (const child of Array.from(cell.childNodes)) {
       if (child.nodeType === Node.ELEMENT_NODE) {
         const tag = (child as HTMLElement).tagName.toLowerCase();
@@ -344,7 +345,10 @@ function nodeToMarkdown(
   if (/^h[1-6]$/.test(tag)) {
     const level = Number.parseInt(tag[1] ?? "1", 10);
     const prefix = "#".repeat(level);
-    const text = Array.from(element.childNodes).map(inlineToMarkdown).join("").trim();
+    const text = Array.from(element.childNodes)
+      .map(inlineToMarkdown)
+      .join("")
+      .trim();
     return `${prefix} ${text}`;
   }
 
@@ -370,7 +374,9 @@ function nodeToMarkdown(
     const content = codeElement ?? element;
     let language = "";
     if (codeElement) {
-      const match = (codeElement.getAttribute("class") ?? "").match(/language-(\w+)/);
+      const match = (codeElement.getAttribute("class") ?? "").match(
+        /language-(\w+)/,
+      );
       if (match) language = match[1] ?? "";
     }
     const text = content.textContent ?? "";
@@ -402,7 +408,9 @@ function nodeToMarkdown(
 
   if (tag === "li") {
     const indent = "  ".repeat(listDepth);
-    const bullet = listType?.startsWith("ol:") ? `${listType.split(":")[1]}.` : "-";
+    const bullet = listType?.startsWith("ol:")
+      ? `${listType.split(":")[1]}.`
+      : "-";
     const inlineParts: string[] = [];
     const nestedLists: HTMLElement[] = [];
 
@@ -422,7 +430,10 @@ function nodeToMarkdown(
 
     nestedLists.forEach((nested) => {
       const nestedTag = nested.tagName.toLowerCase();
-      let nestedIndex = Number.parseInt(nested.getAttribute("start") ?? "1", 10);
+      let nestedIndex = Number.parseInt(
+        nested.getAttribute("start") ?? "1",
+        10,
+      );
       Array.from(nested.children)
         .filter((child) => child.tagName.toLowerCase() === "li")
         .forEach((child) => {

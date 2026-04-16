@@ -1353,8 +1353,30 @@ function ParameterField({
           )}
         </div>
 
+        <Textarea
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={`Enter ${param.label.toLowerCase()}...`}
+          rows={param.height ?? 4}
+          className="bg-card border-border resize-y min-h-[100px]"
+          style={{
+            minHeight: param.height ? `${param.height * 1.5}rem` : undefined,
+          }}
+        />
+
         {clipboardImport?.enabled && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleImportFromClipboard}
+              disabled={isImporting}
+              className="sm:w-auto grow"
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {isImporting ? "Importing..." : "Import from clipboard"}
+            </Button>
             <Select
               value={clipboardFormat}
               onValueChange={(format) =>
@@ -1379,31 +1401,8 @@ function ParameterField({
                 ))}
               </SelectContent>
             </Select>
-
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleImportFromClipboard}
-              disabled={isImporting}
-              className="sm:w-auto"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              {isImporting ? "Importing..." : "Import from clipboard"}
-            </Button>
           </div>
         )}
-
-        <Textarea
-          id={id}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={`Enter ${param.label.toLowerCase()}...`}
-          rows={param.height ?? 4}
-          className="bg-card border-border resize-y min-h-[100px]"
-          style={{
-            minHeight: param.height ? `${param.height * 1.5}rem` : undefined,
-          }}
-        />
       </div>
     );
   }
