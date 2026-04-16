@@ -334,102 +334,106 @@ export function Sidebar({
           : "w-96 border-r border-border",
       )}
     >
-      <div className="border-b border-border p-4">
-        <div className="mb-4 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-foreground">
-            Prompt Forge
-          </h1>
-          <div className="flex items-center gap-1">
-            {isMobile && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onToggle}
-                className="h-8 w-8 rounded-md transition-colors hover:bg-accent"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
+      <div className="border-b border-border">
+        <div className="p-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-semibold text-foreground">
+              Prompt Forge
+            </h1>
+            <div className="flex items-center gap-1">
+              {isMobile && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onToggle}
+                  className="h-8 w-8 rounded-md transition-colors hover:bg-accent"
+                >
+                  <X className="h-4 w-4" />
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-48"
-                onCloseAutoFocus={(e) => {
-                  if (rootMenuSuppressRestoreFocusRef.current) {
-                    e.preventDefault();
-                    rootMenuSuppressRestoreFocusRef.current = false;
-                  }
-                }}
-              >
-                <DropdownMenuItem onClick={onImportRoot}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Import JSON
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onExportRoot}>
-                  <Upload className="mr-2 h-4 w-4" />
-                  Export Workspace
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={() => {
-                    rootMenuSuppressRestoreFocusRef.current = true;
-                    setTimeout(() => {
-                      onEditTemplateStarter();
-                    }, 0);
+              )}
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  className="w-48"
+                  onCloseAutoFocus={(e) => {
+                    if (rootMenuSuppressRestoreFocusRef.current) {
+                      e.preventDefault();
+                      rootMenuSuppressRestoreFocusRef.current = false;
+                    }
                   }}
                 >
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit template starter
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onRefresh} disabled={isLoading}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh
-                </DropdownMenuItem>
-                <ThemeToggle mode="menu-item" />
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  <DropdownMenuItem onClick={onImportRoot}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Import JSON
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onExportRoot}>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Export Workspace
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      rootMenuSuppressRestoreFocusRef.current = true;
+                      setTimeout(() => {
+                        onEditTemplateStarter();
+                      }, 0);
+                    }}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit template starter
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={onRefresh} disabled={isLoading}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Refresh
+                  </DropdownMenuItem>
+                  <ThemeToggle mode="menu-item" />
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
 
-        <div className="space-y-2">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Search templates..."
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              className="border-border bg-background pl-9"
-            />
-          </div>
+        <div className="border-t border-border p-4">
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search templates..."
+                value={searchQuery}
+                onChange={(e) => onSearchChange(e.target.value)}
+                className="border-border bg-background pl-9"
+              />
+            </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onCreateFile()}
-              className="justify-start"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Template
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onCreateFile()}
+                className="justify-start"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Template
+              </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={startCreatingRootFolder}
-              className="justify-start"
-            >
-              <FolderPlus className="mr-2 h-4 w-4" />
-              Folder
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startCreatingRootFolder}
+                className="justify-start"
+              >
+                <FolderPlus className="mr-2 h-4 w-4" />
+                Folder
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -444,7 +448,7 @@ export function Sidebar({
           <div className="p-2">
             <div
               className={cn(
-                "mb-1 min-h-[calc(100vh-180px)] rounded-md transition-colors",
+                "mb-1 min-h-full rounded-md transition-colors",
                 draggedItemId && canDropToRoot && isHoveringRoot
                   ? "bg-accent ring-1 ring-primary"
                   : "",
@@ -509,6 +513,7 @@ export function Sidebar({
                 onOpenTemplate={onOpenTemplate}
                 onMoveFile={onMoveFile}
                 onDeleteFile={onDeleteFile}
+                onCopyFile={onCopyFile}
                 onExportFile={onExportFile}
                 onCreateFile={onCreateFile}
                 onImportFolder={onImportFolder}

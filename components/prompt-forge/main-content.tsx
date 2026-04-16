@@ -73,8 +73,8 @@ import {
   EyeOff,
   FileText,
   Folder,
+  Highlighter,
   MoreHorizontal,
-  PanelLeft,
   Pencil,
   Plus,
   RotateCcw,
@@ -155,10 +155,12 @@ function PromptPreview({
   segments,
   preview,
   className = "",
+  showHighlights = true,
 }: {
   segments: PromptSegment[];
   preview: string;
   className?: string;
+  showHighlights?: boolean;
 }) {
   if (!preview) {
     return (
@@ -186,7 +188,10 @@ function PromptPreview({
                   part.isUserValue ? (
                     <span
                       key={partIndex}
-                      className="rounded border border-primary/50 bg-primary/15 px-0.5 text-foreground [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
+                      className={cn(
+                        showHighlights &&
+                          "rounded border border-primary/50 bg-primary/15 px-0.5 text-foreground [box-decoration-break:clone] [-webkit-box-decoration-break:clone]",
+                      )}
                       title={
                         part.paramName ? `From: ${part.paramName}` : undefined
                       }
@@ -223,6 +228,8 @@ interface MainContentProps {
   showNotification: (message: string, type?: "success" | "error") => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
+  onSetPreviewOpen: (isOpen: boolean) => void;
+  isPreviewOpen: boolean;
 }
 
 type GroupPathSegment = { groupName: string; index: number };
@@ -526,6 +533,8 @@ export function MainContent({
   showNotification,
   onToggleSidebar,
   isSidebarOpen,
+  onSetPreviewOpen,
+  isPreviewOpen,
   onCreateFile,
 }: MainContentProps) {
   const [parsedTemplate, setParsedTemplate] = useState<ParsedTemplate | null>(
@@ -541,6 +550,8 @@ export function MainContent({
   const [clipboardUiState, setClipboardUiState] = useState<ClipboardUiState>(
     DEFAULT_CLIPBOARD_UI_STATE,
   );
+  const [showPreviewHighlights, setShowPreviewHighlights] =
+    useState<boolean>(true);
   const actionsMenuSuppressRestoreFocusRef = useRef(false);
   const isMobile = useIsMobile();
 
@@ -559,6 +570,22 @@ export function MainContent({
       );
     } catch {}
   }, [showTechnicalNames]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("prompt-forge-show-preview-highlights");
+      if (raw != null) setShowPreviewHighlights(raw === "true");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "prompt-forge-show-preview-highlights",
+        showPreviewHighlights ? "true" : "false",
+      );
+    } catch {}
+  }, [showPreviewHighlights]);
 
   const getFormStorageKey = useCallback((file: ParsedFile | null) => {
     if (!file?.id) return null;
@@ -788,6 +815,9 @@ export function MainContent({
   const hasVisibleInputs =
     parsedTemplate != null && countRenderedItems(parsedTemplate.rootGroup) > 0;
 
+  const centeredMainContentClassName =
+    !isMobile && !isPreviewOpen ? "mx-auto w-full max-w-5xl" : undefined;
+
   return (
     <main className="flex-1 min-h-0 overflow-hidden">
       {isLoading ? (
@@ -798,143 +828,176 @@ export function MainContent({
           </div>
         </div>
       ) : currentFile ? (
-        <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-2">
-          <section className="min-w-0 min-h-0 flex flex-col lg:border-r border-border">
-            <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:px-6 md:py-4 shrink-0">
-              <div className="flex min-w-0 items-center gap-3">
-                {!isSidebarOpen && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onToggleSidebar}
-                    className="h-8 w-8 shrink-0"
-                  >
-                    <PanelLeft className="h-4 w-4" />
-                  </Button>
+        <div
+          className={cn(
+            "h-full min-h-0",
+            isMobile
+              ? "grid grid-cols-1"
+              : isPreviewOpen
+                ? "grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,42%)]"
+                : "block",
+          )}
+        >
+          <section
+            className={cn(
+              "min-w-0 min-h-0 flex flex-col bg-background",
+              isPreviewOpen ? "border-r border-border" : "w-full",
+            )}
+          >
+            <header className="border-b border-border shrink-0">
+              <div
+                className={cn(
+                  "flex items-center justify-between gap-3 px-4 py-3 md:px-6 md:py-4",
+                  centeredMainContentClassName,
                 )}
-                <div className="min-w-0">
-                  <h2 className="truncate text-base font-semibold text-foreground md:text-lg">
-                    {currentFile.name}
-                  </h2>
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-semibold text-foreground md:text-lg">
+                      {currentFile.name}
+                    </h2>
+                  </div>
                 </div>
-              </div>
 
-              <div className="flex shrink-0 items-center gap-2">
-                {!isMobile && (
-                  <>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={onOpenDocs}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      <BookOpen className="mr-2 h-4 w-4" />
-                      Docs
-                    </Button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {!isMobile && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onOpenDocs}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <BookOpen className="mr-2 h-4 w-4" />
+                        Docs
+                      </Button>
 
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleClear}
-                      className="text-muted-foreground hover:text-foreground"
-                      disabled={!parsedTemplate || !!parseError}
-                    >
-                      <RotateCcw className="mr-2 h-4 w-4" />
-                      Reset
-                    </Button>
-                  </>
-                )}
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClear}
+                        className="text-muted-foreground hover:text-foreground"
+                        disabled={!parsedTemplate || !!parseError}
+                      >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Reset
+                      </Button>
+                    </>
+                  )}
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="end"
-                    className="w-48"
-                    onCloseAutoFocus={(e) => {
-                      if (actionsMenuSuppressRestoreFocusRef.current) {
-                        e.preventDefault();
-                        actionsMenuSuppressRestoreFocusRef.current = false;
-                      }
-                    }}
-                  >
-                    {isMobile && (
-                      <>
-                        <DropdownMenuItem onClick={onOpenDocs}>
-                          <BookOpen className="mr-2 h-4 w-4" />
-                          Docs
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={handleClear}
-                          disabled={!parsedTemplate || !!parseError}
-                        >
-                          <RotateCcw className="mr-2 h-4 w-4" />
-                          Reset
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                      </>
-                    )}
-                    <DropdownMenuItem
-                      onSelect={() => {
-                        actionsMenuSuppressRestoreFocusRef.current = true;
-                        setTimeout(() => {
-                          onEditFile();
-                        }, 0);
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="w-48"
+                      onCloseAutoFocus={(e) => {
+                        if (actionsMenuSuppressRestoreFocusRef.current) {
+                          e.preventDefault();
+                          actionsMenuSuppressRestoreFocusRef.current = false;
+                        }
                       }}
                     >
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onOpenTemplate}>
-                      <Code className="mr-2 h-4 w-4" />
-                      Template
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onMoveFile}>
-                      <Folder className="mr-2 h-4 w-4" />
-                      Move to…
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onCopyTemplate}>
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy source
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleToggleTechnicalNames}>
-                      {showTechnicalNames ? (
-                        <EyeOff className="mr-2 h-4 w-4" />
-                      ) : (
-                        <Eye className="mr-2 h-4 w-4" />
+                      {isMobile && (
+                        <>
+                          <DropdownMenuItem onClick={onOpenDocs}>
+                            <BookOpen className="mr-2 h-4 w-4" />
+                            Docs
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={handleClear}
+                            disabled={!parsedTemplate || !!parseError}
+                          >
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                            Reset
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                        </>
                       )}
-                      {showTechnicalNames
-                        ? "Hide tech names"
-                        : "Show tech names"}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={onExportFile}>
-                      <Upload className="mr-2 h-4 w-4" />
-                      Export
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={onDeleteFile}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          actionsMenuSuppressRestoreFocusRef.current = true;
+                          setTimeout(() => {
+                            onEditFile();
+                          }, 0);
+                        }}
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={onOpenTemplate}>
+                        <Code className="mr-2 h-4 w-4" />
+                        Template
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={onMoveFile}>
+                        <Folder className="mr-2 h-4 w-4" />
+                        Move to…
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={onCopyTemplate}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy source
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleToggleTechnicalNames}>
+                        {showTechnicalNames ? (
+                          <EyeOff className="mr-2 h-4 w-4" />
+                        ) : (
+                          <Eye className="mr-2 h-4 w-4" />
+                        )}
+                        {showTechnicalNames
+                          ? "Hide tech names"
+                          : "Show tech names"}
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={onToggleSidebar}>
+                        {isSidebarOpen ? (
+                          <EyeOff className="mr-2 h-4 w-4" />
+                        ) : (
+                          <Eye className="mr-2 h-4 w-4" />
+                        )}
+                        {isSidebarOpen ? "Hide menu" : "Show menu"}
+                      </DropdownMenuItem>
+                      {!isPreviewOpen && (
+                        <DropdownMenuItem
+                          onClick={() => onSetPreviewOpen(true)}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          Show preview
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={onExportFile}>
+                        <Upload className="mr-2 h-4 w-4" />
+                        Export
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={onDeleteFile}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
             </header>
 
             <div className="min-h-0 flex-1 overflow-hidden">
               <ScrollArea className="h-full">
-                <div className="p-4 md:p-6 space-y-6">
+                <div
+                  className={cn(
+                    "p-4 md:p-6 space-y-6",
+                    centeredMainContentClassName,
+                  )}
+                >
                   {parseError ? (
                     <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-sm text-destructive">
                       <div className="font-medium mb-1">
@@ -975,18 +1038,52 @@ export function MainContent({
                     )}
                   </div>
 
-                  {isMobile && (
+                  {isMobile && isPreviewOpen && (
                     <section className="rounded-xl border border-border bg-muted/30">
                       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
                         <h2 className="text-base font-semibold text-foreground">
                           Preview
                         </h2>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                            >
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setShowPreviewHighlights((value) => !value)
+                              }
+                            >
+                              {showPreviewHighlights ? (
+                                <EyeOff className="mr-2 h-4 w-4" />
+                              ) : (
+                                <Highlighter className="mr-2 h-4 w-4" />
+                              )}
+                              {showPreviewHighlights
+                                ? "Hide highlights"
+                                : "Show highlights"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => onSetPreviewOpen(false)}
+                            >
+                              <EyeOff className="mr-2 h-4 w-4" />
+                              Hide preview
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
 
                       <div className="max-h-[50vh] overflow-auto p-4">
                         <PromptPreview
                           preview={preview}
                           segments={previewSegments}
+                          showHighlights={showPreviewHighlights}
                         />
                       </div>
                     </section>
@@ -996,39 +1093,95 @@ export function MainContent({
             </div>
           </section>
 
-          <aside className="hidden min-w-0 min-h-0 flex-col bg-muted/30 lg:flex">
-            <div className="border-b border-border px-6 py-4.5 shrink-0">
-              <h2 className="text-lg font-semibold text-foreground">Preview</h2>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-auto">
-              <div className="min-h-full p-6">
-                <PromptPreview preview={preview} segments={previewSegments} />
+          {isPreviewOpen && (
+            <aside className="hidden min-w-0 min-h-0 flex-col bg-muted/30 lg:flex">
+              <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 shrink-0">
+                <h2 className="text-lg font-semibold text-foreground">
+                  Preview
+                </h2>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem
+                      onClick={() =>
+                        setShowPreviewHighlights((value) => !value)
+                      }
+                    >
+                      {showPreviewHighlights ? (
+                        <EyeOff className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Highlighter className="mr-2 h-4 w-4" />
+                      )}
+                      {showPreviewHighlights
+                        ? "Hide highlights"
+                        : "Show highlights"}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => onSetPreviewOpen(false)}>
+                      <EyeOff className="mr-2 h-4 w-4" />
+                      Hide preview
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-            </div>
-          </aside>
+
+              <div className="min-h-0 flex-1 overflow-auto">
+                <div className="min-h-full p-6">
+                  <PromptPreview
+                    preview={preview}
+                    segments={previewSegments}
+                    showHighlights={showPreviewHighlights}
+                  />
+                </div>
+              </div>
+            </aside>
+          )}
         </div>
       ) : (
         <div className="flex h-full min-h-0 flex-col">
           <header className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 md:px-6 md:py-4 shrink-0">
             <div className="flex min-w-0 items-center gap-3">
-              {!isSidebarOpen && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onToggleSidebar}
-                  className="h-8 w-8 shrink-0"
-                >
-                  <PanelLeft className="h-4 w-4" />
-                </Button>
-              )}
-
               <div className="min-w-0">
                 <h2 className="truncate text-base font-semibold text-foreground md:text-lg">
                   Prompt Forge
                 </h2>
               </div>
             </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={onToggleSidebar}>
+                  {isSidebarOpen ? (
+                    <EyeOff className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Eye className="mr-2 h-4 w-4" />
+                  )}
+                  {isSidebarOpen ? "Hide menu" : "Show menu"}
+                </DropdownMenuItem>
+                {!isPreviewOpen && (
+                  <DropdownMenuItem onClick={() => onSetPreviewOpen(true)}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    Show preview
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </header>
 
           <div className="flex flex-1 items-center justify-center p-6">

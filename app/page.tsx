@@ -94,6 +94,7 @@ export default function PromptForge() {
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(true);
   const [editorState, setEditorState] = useState<EditorState>({
     isOpen: false,
     isNew: false,
@@ -159,8 +160,46 @@ export default function PromptForge() {
   }, []);
 
   useEffect(() => {
-    setIsSidebarOpen(!isMobile);
-  }, [isMobile]);
+    if (!mounted) return;
+
+    try {
+      const savedSidebar = localStorage.getItem("prompt-forge-sidebar-open");
+      if (savedSidebar != null) {
+        setIsSidebarOpen(savedSidebar === "true");
+      } else {
+        setIsSidebarOpen(!isMobile);
+      }
+    } catch {
+      setIsSidebarOpen(!isMobile);
+    }
+
+    try {
+      const savedPreview = localStorage.getItem("prompt-forge-preview-open");
+      if (savedPreview != null) {
+        setIsPreviewOpen(savedPreview === "true");
+      }
+    } catch {}
+  }, [isMobile, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      localStorage.setItem(
+        "prompt-forge-sidebar-open",
+        isSidebarOpen ? "true" : "false",
+      );
+    } catch {}
+  }, [isSidebarOpen, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    try {
+      localStorage.setItem(
+        "prompt-forge-preview-open",
+        isPreviewOpen ? "true" : "false",
+      );
+    } catch {}
+  }, [isPreviewOpen, mounted]);
 
   const showNotification = useCallback(
     (message: string, type: "success" | "error" = "success") => {
@@ -1165,8 +1204,10 @@ export default function PromptForge() {
         onExportFile={() => currentFile && handleExportTemplate(currentFile.id)}
         onCreateFile={() => createNewFile(ROOT_FOLDER_ID)}
         showNotification={showNotification}
-        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+        onToggleSidebar={() => setIsSidebarOpen((value) => !value)}
         isSidebarOpen={mounted ? isSidebarOpen : false}
+        onSetPreviewOpen={setIsPreviewOpen}
+        isPreviewOpen={mounted ? isPreviewOpen : true}
       />
       <CommandPalette
         isOpen={isPaletteOpen}
