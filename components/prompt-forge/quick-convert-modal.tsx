@@ -295,7 +295,7 @@ export function QuickConvertModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent
         className={cn(
-          "flex flex-col gap-0 p-0",
+          "flex flex-col gap-0 overflow-hidden p-0",
           isMobile
             ? "h-[100dvh] w-screen max-w-none rounded-none border-0"
             : "h-[97vh] w-[98vw] max-h-[97vh] sm:max-w-[98vw]",
@@ -305,18 +305,20 @@ export function QuickConvertModal({
           pasteBoxRef.current?.focus();
         }}
       >
-        <DialogHeader className="border-b border-border px-4 py-4">
+        <DialogHeader className="shrink-0 border-b border-border px-4 py-4">
           <DialogTitle>Quick convert</DialogTitle>
         </DialogHeader>
 
         <div
           className={cn(
-            "grid min-h-0 flex-1 gap-0",
-            isMobile ? "grid-rows-[1fr_1fr]" : "grid-cols-2",
+            "grid min-h-0 flex-1 gap-0 overflow-hidden",
+            isMobile
+              ? "grid-rows-[minmax(0,1fr)_minmax(0,1fr)]"
+              : "grid-cols-2",
           )}
         >
-          <div className="flex min-h-0 flex-col border-b border-border md:border-b-0 md:border-r">
-            <div className="border-b border-border px-4 py-3">
+          <div className="flex min-h-0 flex-col overflow-hidden border-b border-border md:border-b-0 md:border-r">
+            <div className="shrink-0 border-b border-border px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <SectionTitle>Input</SectionTitle>
@@ -336,14 +338,14 @@ export function QuickConvertModal({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 p-4">
+            <div className="min-h-0 flex-1 overflow-hidden p-4">
               <div
                 ref={pasteBoxRef}
                 contentEditable
                 suppressContentEditableWarning
                 onInput={syncFromPasteBox}
                 className={cn(
-                  "h-full min-h-[16rem] overflow-y-auto rounded-lg border bg-background px-4 py-3 text-sm leading-6 text-foreground outline-none transition-[border-color,box-shadow]",
+                  "h-full min-h-0 overflow-y-auto rounded-lg border bg-background px-4 py-3 text-sm leading-6 text-foreground outline-none transition-[border-color,box-shadow]",
                   "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                   "empty:text-muted-foreground before:pointer-events-none before:text-muted-foreground before:content-[attr(data-placeholder)]",
                 )}
@@ -352,8 +354,11 @@ export function QuickConvertModal({
             </div>
           </div>
 
-          <div ref={outputPanelRef} className="flex min-h-0 flex-col">
-            <div className="border-b border-border px-4 py-3">
+          <div
+            ref={outputPanelRef}
+            className="flex min-h-0 flex-col overflow-hidden"
+          >
+            <div className="shrink-0 border-b border-border px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <SectionTitle>Output</SectionTitle>
@@ -379,13 +384,13 @@ export function QuickConvertModal({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 p-4">
+            <div className="min-h-0 flex-1 overflow-hidden p-4">
               <Tabs
                 value={activeTab}
                 onValueChange={(value) => setActiveTab(value as OutputTab)}
-                className="flex h-full min-h-0 flex-col gap-0"
+                className="flex h-full min-h-0 flex-col gap-0 overflow-hidden"
               >
-                <TabsList className="mb-4 grid h-auto grid-cols-2 sm:grid-cols-4">
+                <TabsList className="mb-4 shrink-0 grid h-auto grid-cols-2 sm:grid-cols-4">
                   <TabsTrigger value="html">
                     <FileCode2 className="size-4" />
                     HTML
@@ -404,30 +409,39 @@ export function QuickConvertModal({
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="html" className="min-h-0 flex-1">
+                <TabsContent
+                  value="html"
+                  className="min-h-0 flex-1 overflow-hidden"
+                >
                   <Textarea
                     value={result.pretty}
                     readOnly
                     spellCheck={false}
-                    className="h-full min-h-[16rem] resize-none font-mono text-sm leading-6"
+                    className="h-full min-h-0 resize-none font-mono text-sm leading-6"
                   />
                 </TabsContent>
 
-                <TabsContent value="minified" className="min-h-0 flex-1">
+                <TabsContent
+                  value="minified"
+                  className="min-h-0 flex-1 overflow-hidden"
+                >
                   <Textarea
                     value={result.minified}
                     readOnly
                     spellCheck={false}
-                    className="h-full min-h-[16rem] resize-none font-mono text-sm leading-6"
+                    className="h-full min-h-0 resize-none font-mono text-sm leading-6"
                   />
                 </TabsContent>
 
-                <TabsContent value="markdown" className="min-h-0 flex-1">
+                <TabsContent
+                  value="markdown"
+                  className="min-h-0 flex-1 overflow-hidden"
+                >
                   <Textarea
                     value={result.markdown}
                     readOnly
                     spellCheck={false}
-                    className="h-full min-h-[16rem] resize-none font-mono text-sm leading-6"
+                    className="h-full min-h-0 resize-none font-mono text-sm leading-6"
                   />
                 </TabsContent>
 
@@ -439,7 +453,7 @@ export function QuickConvertModal({
                     title="Quick convert preview"
                     sandbox="allow-same-origin"
                     srcDoc={previewDocument}
-                    className="h-full min-h-[16rem] w-full bg-white"
+                    className="h-full min-h-0 w-full bg-white"
                   />
                 </TabsContent>
               </Tabs>
