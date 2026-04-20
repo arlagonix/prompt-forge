@@ -1,4 +1,4 @@
-const CACHE_NAME = "prompt-forge-v2.1";
+const CACHE_NAME = "prompt-forge-v2.2";
 const BASE_PATH = "/prompt-forge";
 const APP_SHELL = [
   `${BASE_PATH}/`,
@@ -30,32 +30,96 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const req = event.request;
-  const url = new URL(req.url);
 
-  if (url.origin !== self.location.origin) {
+  if (req.method !== "GET") {
     return;
   }
 
-  event.respondWith(
-    fetch(req)
-      .then((response) => {
-        if (response && response.status === 200) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            if (req.mode === "navigate") {
-              cache.put(`${BASE_PATH}/`, copy);
-            } else {
-              cache.put(req, copy);
-            }
-          });
-        }
-        return response;
-      })
-      .catch(() => {
-        if (req.mode === "navigate") {
-          return caches.match(`${BASE_PATH}/`);
-        }
-        return caches.match(req);
-      }),
-  );
+  const url = new URL(req.url);
+
+  // HTML navigations: network first
+  if (req.mode === "navigate") {
+    event.respondWith(networkFirst(req, `${BASE_PATH}/`));
+    return;
+  }
+
+  // Fonts: cache first with background update
+  if (
+    req.destination === "font" ||
+    url.pathname.endsWith(".woff") ||
+    url.pathname.endsWith(".woff2") ||
+    url.pathname.endsWith(".ttf") ||
+    url.pathname.endsWith(".otf")
+  ) {
+    event.respondWith(staleWhileRevalidate(req));
+    return;
+  }
+
+  // CSS from font providers can also be cached
+  if (
+    url.pathname.endsWith(".css") ||
+    url.hostname === "fonts.googleapis.com"
+  ) {
+    event.respondWith(staleWhileRevalidate(req));
+    return;
+  }
+
+  // Same-origin app assets: network first
+  if (url.origin === self.location.origin) {
+    event.respondWith(networkFirst(req));
+  }
 });
+
+async function networkFirst(req, fallbackKey) {
+  try {
+    const response = await fetch(req);
+
+    if (isCacheable(response)) {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(fallbackKey || req, response.clone());
+    }
+
+    return response;
+  } catch {
+    const cached = await caches.match(fallbackKey || req);
+    if (cached) {
+      return cached;
+    }
+
+    if (req.mode === "navigate") {
+      return caches.match(`${BASE_PATH}/`);
+    }
+
+    throw new Error("Network error and no cache entry found.");
+  }
+}
+
+async function staleWhileRevalidate(req) {
+  const cache = await caches.open(CACHE_NAME);
+  const cached = await cache.match(req);
+
+  const networkPromise = fetch(req)
+    .then(async (response) => {
+      if (isCacheable(response)) {
+        await cache.put(req, response.clone());
+      }
+      return response;
+    })
+    .catch(() => null);
+
+  if (cached) {
+    networkPromise.catch(() => {});
+    return cached;
+  }
+
+  const networkResponse = await networkPromise;
+  if (networkResponse) {
+    return networkResponse;
+  }
+
+  throw new Error("Network error and no cache entry found.");
+}
+
+function isCacheable(response) {
+  return response && (response.status === 200 || response.status === 0);
+}
