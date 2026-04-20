@@ -349,7 +349,7 @@ export function QuickConvertModal({
                   "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
                   "empty:text-muted-foreground before:pointer-events-none before:text-muted-foreground before:content-[attr(data-placeholder)]",
                 )}
-                data-placeholder="Paste page content here…"
+                // data-placeholder="Paste page content here…"
               />
             </div>
           </div>
