@@ -9,7 +9,7 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "/prompt-forge/icon.png",
+      "src": "/prompt-forge/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
@@ -24,7 +24,7 @@
       "url": "/prompt-forge/",
       "icons": [
         {
-          "src": "/prompt-forge/icon.png",
+          "src": "/prompt-forge/icon.svg",
           "sizes": "any",
           "type": "image/svg+xml"
         }

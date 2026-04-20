@@ -3,7 +3,7 @@ const BASE_PATH = "/prompt-forge";
 const APP_SHELL = [
   `${BASE_PATH}/`,
   `${BASE_PATH}/manifest.webmanifest`,
-  `${BASE_PATH}/icon.png`,
+  `${BASE_PATH}/icon.svg`,
 ];
 
 self.addEventListener("install", (event) => {
