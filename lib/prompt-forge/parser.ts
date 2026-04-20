@@ -39,6 +39,7 @@ const CLIPBOARD_IMPORT_FORMATS: ClipboardImportFormat[] = [
   "html",
   "minified",
   "markdown",
+  "plain_text",
 ];
 
 function isClipboardImportFormat(

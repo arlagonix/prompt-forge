@@ -37,7 +37,7 @@ export interface EditorState {
   folderId: string | null;
 }
 
-export type ClipboardImportFormat = "html" | "minified" | "markdown";
+export type ClipboardImportFormat = "html" | "minified" | "markdown" | "plain_text";
 
 export interface ClipboardImportConfig {
   enabled: boolean;

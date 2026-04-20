@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   readClipboardSource,
+  readClipboardSourceFromDataTransfer,
   transformClipboardSource,
   type ClipboardImportFormat,
 } from "@/lib/prompt-forge/clipboard-import";
@@ -245,7 +246,7 @@ const DEFAULT_CLIPBOARD_UI_STATE: ClipboardUiState = {
 function isClipboardImportFormatValue(
   value: unknown,
 ): value is ClipboardImportFormat {
-  return value === "html" || value === "minified" || value === "markdown";
+  return value === "html" || value === "minified" || value === "markdown" || value === "plain_text";
 }
 
 function normalizeClipboardUiState(raw: unknown): ClipboardUiState {
@@ -1267,6 +1268,7 @@ function ParameterField({
 }: ParameterFieldProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const id = `param-${param.name}`;
   const isInlineField =
     param.inline &&
@@ -1292,18 +1294,23 @@ function ParameterField({
     }
   };
 
+  const isClipboardImportResultEmpty = useCallback(
+    (nextValue: string) =>
+      clipboardFormat === "plain_text"
+        ? nextValue.length === 0
+        : nextValue.trim().length === 0,
+    [clipboardFormat],
+  );
+
   const handleImportFromClipboard = useCallback(async () => {
     if (!param.clipboardImport?.enabled) return;
 
     try {
       setIsImporting(true);
       const source = await readClipboardSource();
-      const nextValue = transformClipboardSource(
-        source,
-        clipboardFormat,
-      ).trim();
+      const nextValue = transformClipboardSource(source, clipboardFormat);
 
-      if (!nextValue) {
+      if (isClipboardImportResultEmpty(nextValue)) {
         showNotification(
           "Clipboard is empty or could not be converted",
           "error",
@@ -1322,7 +1329,67 @@ function ParameterField({
     } finally {
       setIsImporting(false);
     }
-  }, [clipboardFormat, onChange, param.clipboardImport, showNotification]);
+  }, [
+    clipboardFormat,
+    isClipboardImportResultEmpty,
+    onChange,
+    param.clipboardImport,
+    showNotification,
+  ]);
+
+  const handleTextareaPaste = useCallback(
+    (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      if (!param.clipboardImport?.enabled) return;
+
+      e.preventDefault();
+
+      try {
+        const source = readClipboardSourceFromDataTransfer(e.clipboardData);
+        const insertedValue = transformClipboardSource(source, clipboardFormat);
+
+        if (isClipboardImportResultEmpty(insertedValue)) {
+          showNotification(
+            "Clipboard is empty or could not be converted",
+            "error",
+          );
+          return;
+        }
+
+        const target = e.currentTarget;
+        const selectionStart = target.selectionStart ?? value.length;
+        const selectionEnd = target.selectionEnd ?? value.length;
+        const nextValue =
+          value.slice(0, selectionStart) +
+          insertedValue +
+          value.slice(selectionEnd);
+
+        onChange(nextValue);
+
+        requestAnimationFrame(() => {
+          const textarea = textareaRef.current;
+          if (!textarea) return;
+
+          const nextCaretPosition = selectionStart + insertedValue.length;
+          textarea.focus();
+          textarea.setSelectionRange(nextCaretPosition, nextCaretPosition);
+        });
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to import from clipboard";
+        showNotification(message, "error");
+      }
+    },
+    [
+      clipboardFormat,
+      isClipboardImportResultEmpty,
+      onChange,
+      param.clipboardImport,
+      showNotification,
+      value,
+    ],
+  );
 
   const meta = (
     <div className={fieldLabelClassName}>
@@ -1354,9 +1421,11 @@ function ParameterField({
         </div>
 
         <Textarea
+          ref={textareaRef}
           id={id}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onPaste={handleTextareaPaste}
           placeholder={`Enter ${param.label.toLowerCase()}...`}
           rows={param.height ?? 4}
           className="bg-card border-border resize-y min-h-[100px]"
@@ -1396,7 +1465,9 @@ function ParameterField({
                       ? "HTML"
                       : format === "minified"
                         ? "Minified HTML"
-                        : "Markdown"}
+                        : format === "markdown"
+                          ? "Markdown"
+                          : "Plain text"}
                   </SelectItem>
                 ))}
               </SelectContent>

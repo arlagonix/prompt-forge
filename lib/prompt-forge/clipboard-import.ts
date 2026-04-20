@@ -1,4 +1,4 @@
-export type ClipboardImportFormat = "html" | "minified" | "markdown";
+export type ClipboardImportFormat = "html" | "minified" | "markdown" | "plain_text";
 
 export interface ClipboardImportSource {
   html: string | null;
@@ -9,6 +9,7 @@ const SUPPORTED_FORMATS: ClipboardImportFormat[] = [
   "html",
   "minified",
   "markdown",
+  "plain_text",
 ];
 
 const ATTR_WHITELIST: Record<string, string[]> = {
@@ -543,6 +544,24 @@ function assertSupportedFormat(format: ClipboardImportFormat): void {
   }
 }
 
+
+
+export function readClipboardSourceFromDataTransfer(
+  data: DataTransfer | null,
+): ClipboardImportSource {
+  if (!data) {
+    return { html: null, text: null };
+  }
+
+  const html = data.getData("text/html");
+  const text = data.getData("text/plain");
+
+  return {
+    html: html ? html : null,
+    text: text ? text : null,
+  };
+}
+
 export async function readClipboardSource(): Promise<ClipboardImportSource> {
   assertBrowserApis();
 
@@ -576,8 +595,8 @@ export async function readClipboardSource(): Promise<ClipboardImportSource> {
   }
 
   return {
-    html: html?.trim() ? html : null,
-    text: text?.trim() ? text : null,
+    html: html != null && html !== "" ? html : null,
+    text: text != null && text !== "" ? text : null,
   };
 }
 
@@ -586,6 +605,10 @@ export function transformClipboardSource(
   format: ClipboardImportFormat,
 ): string {
   assertSupportedFormat(format);
+
+  if (format === "plain_text") {
+    return source.text ?? "";
+  }
 
   if (source.html) {
     const result = processHtml(source.html);
