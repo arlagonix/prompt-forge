@@ -33,10 +33,10 @@ import {
   Code,
   Copy,
   Download,
+  EyeOff,
   FileText,
   Folder,
   FolderPlus,
-  EyeOff,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -387,7 +387,7 @@ export function Sidebar({
                     }}
                   >
                     <Pencil className="mr-2 h-4 w-4" />
-                    Edit template starter
+                    Default template
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onRefresh} disabled={isLoading}>
@@ -427,7 +427,7 @@ export function Sidebar({
                 className="justify-start"
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Template
+                New template
               </Button>
 
               <Button
@@ -1295,7 +1295,7 @@ function FileItem({
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onOpenTemplate}>
             <Code className="mr-2 h-4 w-4" />
-            Template
+            View source
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onMove}>
             <Folder className="mr-2 h-4 w-4" />

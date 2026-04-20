@@ -483,7 +483,7 @@ export function CodeEditor({
                       <Kbd>Ctrl</Kbd>+<Kbd>S</Kbd> Save
                     </span>
                     <span>
-                      <Kbd>Ctrl</Kbd>+<Kbd>T</Kbd> Use template
+                      <Kbd>Ctrl</Kbd>+<Kbd>T</Kbd> Insert template
                     </span>
                     <span>
                       <Kbd>Esc</Kbd> Close

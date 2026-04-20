@@ -948,7 +948,7 @@ export function MainContent({
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={onOpenTemplate}>
                         <Code className="mr-2 h-4 w-4" />
-                        Template
+                        View source
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={onMoveFile}>
                         <Folder className="mr-2 h-4 w-4" />
@@ -956,7 +956,7 @@ export function MainContent({
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={onCopyTemplate}>
                         <Copy className="mr-2 h-4 w-4" />
-                        Copy source
+                        Copy template source
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={onExportFile}>
                         <Upload className="mr-2 h-4 w-4" />
@@ -1210,10 +1210,10 @@ export function MainContent({
             <div className="max-w-sm text-center">
               <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
               <h3 className="mb-2 text-lg font-medium text-foreground">
-                Select a template
+                Open a template
               </h3>
               <p className="mb-4 text-sm text-muted-foreground">
-                Choose a markdown template from the sidebar to get started
+                Choose a template from the sidebar to fill its fields, preview the rendered result, and copy the final prompt.
               </p>
 
               <div className="mb-5 flex justify-center">

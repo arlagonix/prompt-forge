@@ -35,7 +35,7 @@ export function DocsModal({ isOpen, onClose }: DocsModalProps) {
         }}
       >
         <DialogHeader className="border-b border-border px-4 py-4 md:px-6">
-          <DialogTitle>Template Syntax Guide</DialogTitle>
+          <DialogTitle>Prompt Forge Guide</DialogTitle>
         </DialogHeader>
 
         <ScrollArea
@@ -48,119 +48,207 @@ export function DocsModal({ isOpen, onClose }: DocsModalProps) {
             tabIndex={-1}
             className="space-y-6 px-6 py-4 outline-none"
           >
-            <DocSection title="Overview">
+            <DocSection title="What Prompt Forge does">
               <p className="mb-3 text-sm text-muted-foreground">
-                Prompt Forge templates use a Markdown body with optional YAML
-                front matter. Plain fields can be written directly in the body,
-                while groups must be declared in front matter.
+                Prompt Forge stores prompts as Markdown templates. The template
+                can contain placeholders like <code>{`{{task}}`}</code>. The app
+                turns those placeholders into form fields, lets you fill them in,
+                shows the final rendered result in Preview, and lets you copy the
+                finished prompt.
               </p>
-              <CodeBlock>{`---
-params:
-  - name: reportTitle
-    type: text
-    label: Report title
+              <CodeBlock>{`Template source
+----------------
+Write a summary for:
+{{topic}}
 
-  - name: days
-    type: group
-    label: Days
-    repeat: true
-    fields:
-      - name: date
-        type: text
-        label: Date
+Audience:
+{{audience}}
 
-      - name: meals
-        type: group
-        label: Meals
-        repeat: true
-        fields:
-          - name: name
-            type: text
-            label: Meal
-          - name: calories
-            type: number
-            label: Calories
----
+UI generated from the template
+------------------------------
+topic    -> input field
+ audience -> input field
 
-Report: {{reportTitle}}
+Preview output
+--------------
+Write a summary for:
+Release notes for v1.29
 
-{{ days:start }}
-Date: {{date}}
-
-{{ meals:start }}
-Meal: {{name}}
-Calories: {{calories}}
-{{ meals:end }}
-
-{{ days:end }}`}</CodeBlock>
+Audience:
+Developers`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Simple placeholders">
+            <DocSection title="The basic workflow">
+              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>Choose a template from the sidebar or create a new one.</li>
+                <li>
+                  Click <strong>Edit</strong> if you want to change the template
+                  source.
+                </li>
+                <li>
+                  Put placeholders like <code>{`{{task}}`}</code> in the body.
+                </li>
+                <li>Save the template.</li>
+                <li>Fill the generated fields in the main panel.</li>
+                <li>Review the result in <strong>Preview</strong>.</li>
+                <li>
+                  Click <strong>Copy Prompt</strong> to copy the rendered output.
+                </li>
+              </ol>
+            </DocSection>
+
+            <DocSection title="How the UI is organized">
+              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>
+                  <strong>Sidebar:</strong> browse folders, create templates,
+                  move items, rename items, import, and export.
+                </li>
+                <li>
+                  <strong>Main panel:</strong> fill the fields generated from the
+                  currently selected template.
+                </li>
+                <li>
+                  <strong>Preview:</strong> shows the final rendered prompt before
+                  you copy it.
+                </li>
+                <li>
+                  <strong>Editor:</strong> used to write or change the template
+                  source.
+                </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Important terms">
+              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+                <li>
+                  <strong>Template source:</strong> the raw Markdown file,
+                  optionally with YAML front matter.
+                </li>
+                <li>
+                  <strong>Rendered prompt:</strong> the final text after all
+                  placeholders are replaced with values.
+                </li>
+                <li>
+                  <strong>View source:</strong> opens the raw template in a
+                  read-only view.
+                </li>
+                <li>
+                  <strong>Copy template source:</strong> copies the raw template
+                  file exactly as written.
+                </li>
+                <li>
+                  <strong>Copy Prompt:</strong> copies the rendered output shown
+                  in Preview.
+                </li>
+                <li>
+                  <strong>Reusable template:</strong> a starter template that can
+                  be inserted into the editor from the picker.
+                </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Your first template">
               <p className="mb-3 text-sm text-muted-foreground">
-                A placeholder uses <code>{`{{name}}`}</code>. If it is not
-                declared in front matter, it is still valid and becomes a
-                textarea automatically.
+                You can start with plain Markdown and placeholders only. Front
+                matter is optional until you need richer field types or groups.
               </p>
-              <CodeBlock>{`Task:
+              <CodeBlock>{`You are helping with the following task.
+
+Task:
 {{task}}
+
+Context:
+{{context}}
+
+Constraints:
+{{constraints}}`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                This creates three fields automatically. Undeclared placeholders
+                default to textarea inputs.
+              </p>
+            </DocSection>
+
+            <DocSection title="When to use front matter">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Add YAML front matter when you want labels, field types, choice
+                fields, clipboard import, reusable templates, or nested groups.
+              </p>
+              <CodeBlock>{`---
+title: Blog summary
+params:
+  - name: topic
+    type: text
+    label: Topic
+
+  - name: audience
+    type: select
+    label: Audience
+    values: [developers, managers, customers]
+---
+
+Summarize:
+{{topic}}
 
 Audience:
 {{audience}}`}</CodeBlock>
-              <p className="mt-3 text-sm text-muted-foreground">
-                In this example, both <code>task</code> and{" "}
-                <code>audience</code> become implicit textarea fields.
-              </p>
             </DocSection>
 
-            <DocSection title="Front matter">
+            <DocSection title="Source vs output">
               <p className="mb-3 text-sm text-muted-foreground">
-                Front matter is optional for plain fields and required for
-                groups. It is used to refine field metadata and define nested
-                structure.
+                A common source of confusion is that the app works with two
+                representations of the same template.
               </p>
-              <CodeBlock>{`---
-params:
-  - name: reportTitle
-    type: text
-    label: Report title
-
-  - name: intro
-    type: textarea
-    label: Introduction
----`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Name rules">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Field and group names are technical identifiers. Use{" "}
-                <code>label</code> for human-readable UI text.
-              </p>
-              <CodeBlock>{`Valid pattern:
-^[a-zA-Z0-9_-]+$
-
-Examples:
-task
-current_state
-report-title`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Field defaults">
-              <p className="mb-3 text-sm text-muted-foreground">
-                If a field is declared in front matter:
-              </p>
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
                 <li>
-                  missing <code>type</code> becomes <code>textarea</code>
+                  The <strong>source</strong> is the Markdown template that you
+                  edit.
                 </li>
                 <li>
-                  missing <code>label</code> is derived from <code>name</code>
+                  The <strong>output</strong> is the rendered prompt produced from
+                  the source and the current field values.
                 </li>
-                <li>unknown metadata keys are ignored</li>
               </ul>
               <p className="mt-3 text-sm text-muted-foreground">
-                If a declared field is never used in the body, it is not
-                rendered in the form UI.
+                Use <strong>View source</strong> when you want to inspect the
+                template itself. Use <strong>Preview</strong> and
+                <strong> Copy Prompt</strong> when you want the final result.
               </p>
+            </DocSection>
+
+            <DocSection title="Common actions">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="text-muted-foreground">Create template</div>
+                <div>Sidebar menu → New Template</div>
+                <div className="text-muted-foreground">Edit template</div>
+                <div>Main panel menu → Edit</div>
+                <div className="text-muted-foreground">View source</div>
+                <div>Main panel menu → View source</div>
+                <div className="text-muted-foreground">Copy final prompt</div>
+                <div>Main panel → Copy Prompt</div>
+                <div className="text-muted-foreground">Copy raw source</div>
+                <div>Main panel menu → Copy template source</div>
+                <div className="text-muted-foreground">Reset field values</div>
+                <div>Main panel → Reset</div>
+                <div className="text-muted-foreground">Insert reusable starter</div>
+                <div>Editor → Insert template</div>
+                <div className="text-muted-foreground">Export template</div>
+                <div>Main panel menu → Export</div>
+              </div>
+            </DocSection>
+
+            <DocSection title="Template syntax basics">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Simple placeholders use double curly braces.
+              </p>
+              <CodeBlock>{`{{task}}
+{{audience}}
+{{tone}}`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>undeclared placeholders are valid</li>
+                <li>undeclared placeholders default to textarea fields</li>
+                <li>field names are technical identifiers</li>
+                <li>use <code>label</code> for user-facing names</li>
+              </ul>
             </DocSection>
 
             <DocSection title="Supported field types">
@@ -171,466 +259,55 @@ type: checkbox
 type: select
 type: combobox
 type: radio`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Declared fields">
-              <CodeBlock>{`---
-params:
-  - name: title
-    type: text
-    label: Title
-
-  - name: notes
-    type: textarea
-    label: Notes
-
-  - name: calories
-    type: number
-    label: Calories
----`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Inline field layout">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Supported non-textarea fields can opt into an inline desktop
-                layout with <code>inline: true</code>. When enabled, the label
-                is shown on the left and the control is shown on the right.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: title
-    type: text
-    label: Title
-    inline: true
-
-  - name: priority
-    type: select
-    label: Priority
-    values: [low, medium, high]
-    inline: true
-
-  - name: approved
-    type: checkbox
-    label: Approved
-    inline: true
----`}</CodeBlock>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>
-                  <code>inline</code> defaults to <code>false</code>
-                </li>
-                <li>
-                  supported on <code>text</code>, <code>number</code>,{" "}
-                  <code>select</code>, <code>combobox</code>,{" "}
-                  <code>checkbox</code>, and <code>radio</code>
-                </li>
-                <li>ignored on unsupported field types</li>
-                <li>mobile always falls back to stacked layout</li>
-                <li>
-                  for radio fields, <code>inline</code> affects only the field
-                  layout, not the option layout inside the radio group
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Choice field options">
-              <p className="mb-3 text-sm text-muted-foreground">
-                <code>select</code>, <code>combobox</code>, and{" "}
-                <code>radio</code> fields use <code>values</code>. For{" "}
-                <code>select</code> and <code>combobox</code>, you can also use
-                grouped options through <code>groups</code>.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: priority
-    type: select
-    values: [low, medium, high]
-
-  - name: model
-    type: combobox
-    values:
-      - GPT-4o
-      - label: GPT-5
-        value: gpt-5
----`}</CodeBlock>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>option strings use the same text for label and value</li>
-                <li>
-                  object options support <code>label</code> and optional{" "}
-                  <code>value</code>
-                </li>
-                <li>
-                  if <code>value</code> is omitted, the <code>label</code> is
-                  used as the stored value
-                </li>
-                <li>
-                  <code>values</code> and <code>groups</code> are mutually
-                  exclusive
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Grouped select and combobox options">
-              <CodeBlock>{`---
-params:
-  - name: model
-    type: combobox
-    groups:
-      - label: OpenAI
-        options:
-          - label: GPT-4o
-            value: gpt-4o
-          - label: GPT-5
-            value: gpt-5
-      - label: Anthropic
-        options:
-          - Claude Sonnet 4
-          - label: Claude Opus 4
-            value: claude-opus-4
-
-  - name: provider
-    type: select
-    groups:
-      - label: Hosted
-        options: [OpenAI, Anthropic]
-      - label: Local
-        options: [LM Studio, Ollama]
----`}</CodeBlock>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>group headings are shown as non-selectable labels</li>
-                <li>
-                  grouped options are supported for <code>select</code> and{" "}
-                  <code>combobox</code>
-                </li>
-                <li>
-                  <code>combobox</code> adds a built-in search field and only
-                  allows selecting existing options
-                </li>
-                <li>combobox search matches option labels</li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Clipboard import">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Textarea fields can expose an{" "}
-                <strong>Import from clipboard</strong> button with a format
-                picker. This is configured through <code>clipboard_import</code>{" "}
-                in front matter.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: source
-    type: textarea
-    label: Source
-    clipboard_import:
-      enabled: true
----`}</CodeBlock>
               <p className="mt-3 text-sm text-muted-foreground">
-                When enabled, the field shows:
+                If <code>type</code> is omitted for a declared field, it defaults
+                to <code>textarea</code>.
               </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>a small format select</li>
-                <li>
-                  an <strong>Import from clipboard</strong> button
-                </li>
-                <li>replacement of the current textarea value on import</li>
-                <li>per-field format memory for that file</li>
-              </ul>
             </DocSection>
 
-            <DocSection title="Clipboard import formats">
+            <DocSection title="Groups and repeatable blocks">
               <p className="mb-3 text-sm text-muted-foreground">
-                You can restrict which output formats are allowed and choose the
-                default selected format.
+                Use groups when one section contains nested fields or when users
+                should be able to add multiple repeated blocks.
               </p>
               <CodeBlock>{`---
 params:
-  - name: source
-    type: textarea
-    label: Source
-    clipboard_import:
-      enabled: true
-      formats: [html, minified, markdown]
-      default_format: markdown
----`}</CodeBlock>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>
-                  <code>html</code> produces cleaned formatted HTML
-                </li>
-                <li>
-                  <code>minified</code> produces cleaned minified HTML
-                </li>
-                <li>
-                  <code>markdown</code> converts cleaned clipboard content to
-                  Markdown
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Clipboard import behavior">
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>supported only for declared textarea fields</li>
-                <li>
-                  clipboard HTML is preferred automatically when available
-                </li>
-                <li>plain text is used as a fallback when HTML is absent</li>
-                <li>plain text is converted into paragraphs for HTML output</li>
-                <li>imported content is trimmed before it is stored</li>
-                <li>raw clipboard HTML is not rendered directly in the app</li>
-              </ul>
-              <p className="mt-3 text-sm text-muted-foreground">
-                If clipboard access fails or conversion cannot be completed, the
-                app shows an error notification instead of silently failing.
-              </p>
-            </DocSection>
-
-            <DocSection title="Groups">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Groups are structural blocks that can contain fields and nested
-                groups. Groups must be declared in front matter.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: meals
+  - name: steps
     type: group
-    label: Meals
+    label: Steps
     repeat: true
     fields:
-      - name: date
+      - name: title
         type: text
-        label: Date
-
-      - name: calories
-        type: number
-        label: Calories
----`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Group body syntax">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Use <code>{`{{ group:start }}`}</code> and{" "}
-                <code>{`{{ group:end }}`}</code> to enter and leave a group
-                block.
-              </p>
-              <CodeBlock>{`{{ meals:start }}
-Date: {{date}}
-Calories: {{calories}}
-{{ meals:end }}`}</CodeBlock>
-              <p className="mt-3 text-sm text-muted-foreground">
-                If a group block appears in the body but the group is not
-                declared in front matter, that is a validation error.
-              </p>
-            </DocSection>
-
-            <DocSection title="Group defaults">
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>
-                  missing <code>repeat</code> becomes <code>false</code>
-                </li>
-                <li>
-                  missing <code>label</code> is derived from <code>name</code>
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Implicit fields inside groups">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Child fields inside a declared group do not have to be declared
-                in <code>fields</code>. If they are missing, they are inferred
-                from the body in that group scope and default to textarea.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: meals
-    type: group
-    label: Meals
-    repeat: true
+        label: Title
+      - name: details
+        type: textarea
+        label: Details
 ---
 
-{{ meals:start }}
-Date: {{date}}
-Calories: {{calories}}
-{{ meals:end }}`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Repeatable groups">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Set <code>repeat: true</code> on a group to let the user create
-                multiple instances through the UI.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: meals
-    type: group
-    repeat: true
----`}</CodeBlock>
+{{ steps:start }}
+Step: {{title}}
+{{details}}
+{{ steps:end }}`}</CodeBlock>
               <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>every group starts with one instance by default</li>
+                <li>groups must be declared in front matter</li>
                 <li>
-                  <code>repeat: false</code> means exactly one instance
+                  use <code>{`{{ group:start }}`}</code> and
+                  <code>{` {{ group:end }}`}</code> in the body
                 </li>
                 <li>
-                  <code>repeat: true</code> shows a full-width Add button
+                  <code>repeat: true</code> lets the user add multiple instances
                 </li>
-                <li>the last remaining instance cannot be removed</li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Nested groups">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Nested groups are supported when they are declared inside the
-                parent group.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: days
-    type: group
-    label: Days
-    repeat: true
-    fields:
-      - name: date
-        type: text
-        label: Date
-
-      - name: meals
-        type: group
-        label: Meals
-        repeat: true
-        fields:
-          - name: name
-            type: text
-            label: Meal
-
-          - name: calories
-            type: number
-            label: Calories
----
-
-{{ days:start }}
-Date: {{date}}
-
-{{ meals:start }}
-Meal: {{name}}
-Calories: {{calories}}
-{{ meals:end }}
-
-{{ days:end }}`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Scope resolution">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Field references use nearest-scope lookup.
-              </p>
-              <CodeBlock>{`{{date}}`}</CodeBlock>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Resolution order:
-              </p>
-              <ol className="list-decimal space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>current scope</li>
-                <li>parent scope</li>
-                <li>higher parent scopes</li>
-                <li>root scope</li>
-              </ol>
-              <p className="mt-3 text-sm text-muted-foreground">
-                First match wins.
-              </p>
-            </DocSection>
-
-            <DocSection title="Scope example">
-              <CodeBlock>{`---
-params:
-  - name: reportTitle
-    type: text
-    label: Report title
-
-  - name: days
-    type: group
-    label: Days
-    repeat: true
-    fields:
-      - name: date
-        type: text
-
-      - name: meals
-        type: group
-        label: Meals
-        repeat: true
-        fields:
-          - name: name
-            type: text
-          - name: calories
-            type: number
----
-
-Report: {{reportTitle}}
-
-{{ days:start }}
-Date: {{date}}
-
-{{ meals:start }}
-Meal: {{name}}
-Calories: {{calories}}
-Report again: {{reportTitle}}
-{{ meals:end }}
-
-{{ days:end }}`}</CodeBlock>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>
-                  <code>{`{{name}}`}</code> resolves to <code>meals.name</code>
-                </li>
-                <li>
-                  <code>{`{{calories}}`}</code> resolves to{" "}
-                  <code>meals.calories</code>
-                </li>
-                <li>
-                  <code>{`{{date}}`}</code> falls back to <code>days.date</code>
-                </li>
-                <li>
-                  <code>{`{{reportTitle}}`}</code> falls back to root
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Rendering rules">
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>the same field may appear multiple times in the body</li>
-                <li>all occurrences render the same value</li>
-                <li>declared but unused fields are not shown in the form UI</li>
-                <li>
-                  repeated group instances are separated cleanly in output
-                </li>
-                <li>
-                  boundary newlines around group blocks are trimmed during
-                  rendering
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Group UI behavior">
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>every group is shown with border and padding</li>
-                <li>
-                  root-level groups and nested groups use the same visual model
-                </li>
-                <li>
-                  Add button for repeat groups is full-width and placed at the
-                  bottom of the group
-                </li>
-                <li>
-                  Remove button for repeat instances is full-width and placed at
-                  the bottom of the instance
-                </li>
-                <li>repeat group instances do not show numbered titles</li>
               </ul>
             </DocSection>
 
             <DocSection title="Reusable templates">
               <p className="mb-3 text-sm text-muted-foreground">
-                Add <code>reusable: true</code> in front matter if you want a
-                template to appear in the <strong>Use template</strong> picker.
+                Set <code>reusable: true</code> in front matter if the template
+                should appear in the reusable template picker inside the editor.
               </p>
               <CodeBlock>{`---
-title: Role + Task Template
-description: Reusable starter
+title: Role + Task starter
 reusable: true
 params:
   - name: role
@@ -645,24 +322,35 @@ Role:
 Task:
 {{task}}`}</CodeBlock>
               <p className="mt-3 text-sm text-muted-foreground">
-                When you choose <strong>Use template</strong>, the selected
-                template is loaded into the editor as a starting point. The{" "}
-                <code>reusable: true</code> flag is removed from the inserted
-                content automatically.
+                When inserted, the reusable template becomes the starting content
+                of the current editor and the <code>reusable: true</code> flag is
+                removed automatically.
               </p>
             </DocSection>
 
-            <DocSection title="Import / export">
+            <DocSection title="Clipboard import">
               <p className="mb-3 text-sm text-muted-foreground">
-                Prompt Forge supports JSON-only import and export.
+                Declared textarea fields can expose an <strong>Import from
+                clipboard</strong> button.
               </p>
+              <CodeBlock>{`---
+params:
+  - name: source
+    type: textarea
+    label: Source
+    clipboard_import:
+      enabled: true
+      formats: [html, minified, markdown]
+      default_format: markdown
+---`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Import and export">
               <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>JSON only</li>
                 <li>export types: template, folder, workspace</li>
-                <li>import targets: workspace/root or a specific folder</li>
-                <li>JSON content is the source of truth</li>
-                <li>file name is not used by the logic</li>
                 <li>import is merge-only</li>
-                <li>imported nodes always receive new internal IDs</li>
+                <li>imported nodes receive new internal IDs</li>
                 <li>duplicate names are allowed</li>
               </ul>
               <CodeBlock>{`{
@@ -670,19 +358,7 @@ Task:
   "exportedAt": "2026-03-30T09:44:12.317Z",
   "root": {
     "type": "root",
-    "children": [
-      {
-        "type": "folder",
-        "name": "Writing",
-        "children": [
-          {
-            "type": "template",
-            "name": "Blog prompt",
-            "content": "Write about {{topic}}"
-          }
-        ]
-      }
-    ]
+    "children": []
   }
 }`}</CodeBlock>
             </DocSection>
@@ -691,9 +367,13 @@ Task:
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="text-muted-foreground">Open folder</div>
                 <div className="font-mono">Ctrl+O</div>
-                <div className="text-muted-foreground">Quick open file</div>
+                <div className="text-muted-foreground">Quick open</div>
                 <div className="font-mono">Ctrl+K</div>
-                <div className="text-muted-foreground">Use template</div>
+                <div className="text-muted-foreground">New template</div>
+                <div className="font-mono">Ctrl+N</div>
+                <div className="text-muted-foreground">Edit current template</div>
+                <div className="font-mono">Ctrl+E</div>
+                <div className="text-muted-foreground">Insert reusable template</div>
                 <div className="font-mono">Ctrl+T</div>
                 <div className="text-muted-foreground">Copy prompt</div>
                 <div className="font-mono">Ctrl+Enter</div>

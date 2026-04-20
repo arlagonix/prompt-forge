@@ -43,8 +43,8 @@ export function TemplatePickerDialog({
     <CommandDialog
       open={isOpen}
       onOpenChange={(open) => !open && onClose()}
-      title="Use Template"
-      description="Choose a reusable template"
+      title="Insert Template"
+      description="Choose a reusable template starter"
       className={cn(isMobile ? "h-[100dvh] w-screen max-w-none rounded-none" : "sm:max-w-2xl")}
       showCloseButton={false}
     >

@@ -58,7 +58,7 @@ export function TemplateModal({
         )}
       >
         <DialogHeader className="sr-only">
-          <DialogTitle>Template Source</DialogTitle>
+          <DialogTitle>Template source</DialogTitle>
         </DialogHeader>
 
         <div className="flex h-full min-h-0 flex-col bg-background">
@@ -71,7 +71,7 @@ export function TemplateModal({
             <div className="flex min-w-0 items-center gap-3">
               <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
               <div className="text-sm font-medium text-foreground">
-                Template Source
+                Template source
               </div>
             </div>
 

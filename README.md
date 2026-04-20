@@ -2,16 +2,159 @@
 
 Prompt Forge is a local-first app for building prompts from Markdown templates.
 
-It helps you:
+It is designed around one simple idea:
 
-- organize templates in a folder tree
-- create and edit templates directly in the app
-- fill templates through generated forms
-- preview the rendered prompt
-- copy the result
-- import and export templates, folders, or the full root as JSON
-- work with repeatable and nested groups
-- use the app comfortably on desktop and mobile
+1. Write a template in Markdown.
+2. Add placeholders like `{{task}}`.
+3. Let the app generate the form UI for those placeholders.
+4. Fill the fields.
+5. Preview and copy the final rendered prompt.
+
+## What users should understand first
+
+Prompt Forge works with two different things:
+
+- **template source**: the raw Markdown file, optionally with YAML front matter
+- **rendered prompt**: the final text produced from that template and the current field values
+
+If a user understands that distinction, the rest of the UI becomes much easier to use.
+
+## How the app works
+
+A template can be as small as this:
+
+```md
+Write a summary for:
+{{topic}}
+
+Audience:
+{{audience}}
+```
+
+In the UI:
+
+- `topic` becomes an input field
+- `audience` becomes an input field
+- Preview shows the final rendered output
+- **Copy Prompt** copies the rendered result
+- **View source** shows the raw template
+- **Copy template source** copies the raw template file
+
+Undeclared placeholders are valid. They become textarea fields automatically.
+
+## Quick start
+
+### Use an existing template
+
+1. Open or import a workspace folder.
+2. Select a template in the sidebar.
+3. Fill the generated fields in the main panel.
+4. Check the Preview.
+5. Click **Copy Prompt**.
+
+### Create a new template
+
+1. Click **New Template**.
+2. Open **Edit**.
+3. Write Markdown and add placeholders like `{{task}}`.
+4. Save.
+5. Fill the generated fields.
+6. Copy the rendered result.
+
+## UI map
+
+### Sidebar
+
+Use the sidebar to:
+
+- browse templates and folders
+- create templates and folders
+- rename, move, and delete items
+- import and export JSON
+- search templates
+
+### Main panel
+
+Use the main panel to:
+
+- fill the fields generated from the selected template
+- reset current values
+- open docs
+- edit the current template
+- view the raw source
+- copy the final prompt
+
+### Preview
+
+Preview shows the final rendered prompt. This is the text that will be copied by **Copy Prompt**.
+
+### Editor
+
+The editor is where you write template source. You can also insert a reusable template starter from inside the editor.
+
+## Common actions
+
+| Action | Where to find it |
+| --- | --- |
+| Create template | Sidebar menu → New Template |
+| Edit current template | Main panel menu → Edit |
+| View raw source | Main panel menu → View source |
+| Copy rendered output | Main panel → Copy Prompt |
+| Copy raw source | Main panel menu → Copy template source |
+| Reset current values | Main panel → Reset |
+| Insert reusable starter | Editor → Insert template |
+| Export template | Main panel menu → Export |
+
+## First template example
+
+```md
+You are helping with the following task.
+
+Task:
+{{task}}
+
+Context:
+{{context}}
+
+Constraints:
+{{constraints}}
+```
+
+This template creates three fields automatically.
+
+## When to use front matter
+
+Use YAML front matter when you want:
+
+- labels
+- explicit field types
+- choice fields
+- clipboard import
+- reusable templates
+- groups and nested groups
+
+Example:
+
+```md
+---
+title: Blog summary
+params:
+  - name: topic
+    type: text
+    label: Topic
+
+  - name: audience
+    type: select
+    label: Audience
+    values: [developers, managers, customers]
+---
+
+Summarize:
+{{topic}}
+
+Audience:
+{{audience}}
+```
 
 ## Screenshots
 
@@ -27,17 +170,6 @@ It helps you:
 
 <img width="2559" height="1268" alt="image" src="https://github.com/user-attachments/assets/06e9a501-fd51-4dcd-b76f-e5ff5f9dbee8" />
 
-## Main ideas
-
-Prompt Forge treats a template as:
-
-- Markdown body
-- optional frontmatter for metadata and richer field definitions
-
-Simple templates can be written with only placeholders in the body.
-
-Structured templates can define fields and groups in frontmatter and use group blocks in the body.
-
 ## Features
 
 - local-first template management
@@ -47,8 +179,8 @@ Structured templates can define fields and groups in frontmatter and use group b
 - mobile-friendly responsive layout
 - mobile preview support
 - template search
-- quick template picking / "Use template"
-- dynamic form generation from template body and frontmatter
+- reusable template picker in the editor
+- dynamic form generation from template body and front matter
 - live preview
 - copy rendered prompt
 - grouped fields
