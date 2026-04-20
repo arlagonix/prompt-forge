@@ -501,7 +501,7 @@ function plainTextToParagraphHtml(text: string): string {
     .join("\n");
 }
 
-function processHtml(rawHtml: string): {
+export function processClipboardHtml(rawHtml: string): {
   pretty: string;
   minified: string;
   markdown: string;
@@ -536,6 +536,68 @@ function processHtml(rawHtml: string): {
     minified: minifyHtml(pretty),
     markdown: convertToMarkdown(container),
   };
+}
+
+export function sanitizePastedHtml(html: string): string {
+  if (!canUseDom()) {
+    return html;
+  }
+
+  const container = document.createElement("div");
+  container.innerHTML = html;
+
+  container.querySelectorAll("*").forEach((element) => {
+    const tag = element.tagName.toLowerCase();
+    if (FORBIDDEN_TAGS.has(tag)) {
+      element.remove();
+      return;
+    }
+
+    element.removeAttribute("style");
+    Array.from(element.attributes).forEach((attribute) => {
+      if (attribute.name.startsWith("on")) {
+        element.removeAttribute(attribute.name);
+      }
+    });
+  });
+
+  return container.innerHTML;
+}
+
+const PREVIEW_STYLES = `
+<style>
+  :root {
+    color-scheme: light;
+  }
+  body {
+    margin: 0;
+    padding: 20px;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #111827;
+    background: #ffffff;
+    line-height: 1.6;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+  table {
+    border-collapse: collapse;
+  }
+  th, td {
+    border: 1px solid #d1d5db;
+    padding: 6px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  pre {
+    white-space: pre-wrap;
+  }
+</style>
+`;
+
+export function buildClipboardPreviewDocument(html: string): string {
+  return `${PREVIEW_STYLES}${html}`;
 }
 
 function assertSupportedFormat(format: ClipboardImportFormat): void {
@@ -611,7 +673,7 @@ export function transformClipboardSource(
   }
 
   if (source.html) {
-    const result = processHtml(source.html);
+    const result = processClipboardHtml(source.html);
     const htmlResult =
       format === "html"
         ? result.pretty.trim()

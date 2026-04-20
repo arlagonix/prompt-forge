@@ -71,6 +71,7 @@ interface SidebarProps {
   onImportRoot: () => void;
   onExportRoot: () => void;
   onEditTemplateStarter: () => void;
+  onOpenQuickConvert: () => void;
   onRenameFolder: (folderId: string, name: string) => void | Promise<void>;
   onDeleteFolder: (folderId: string) => void | Promise<void>;
   onGetFolderDeleteSummary: (folderId: string) => Promise<{
@@ -121,6 +122,7 @@ export function Sidebar({
   onImportRoot,
   onExportRoot,
   onEditTemplateStarter,
+  onOpenQuickConvert,
   onRenameFolder,
   onDeleteFolder,
   onGetFolderDeleteSummary,
@@ -388,6 +390,17 @@ export function Sidebar({
                   >
                     <Pencil className="mr-2 h-4 w-4" />
                     Default template
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      rootMenuSuppressRestoreFocusRef.current = true;
+                      setTimeout(() => {
+                        onOpenQuickConvert();
+                      }, 0);
+                    }}
+                  >
+                    <Code className="mr-2 h-4 w-4" />
+                    Quick convert
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onRefresh} disabled={isLoading}>

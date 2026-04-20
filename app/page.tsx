@@ -4,6 +4,7 @@ import { CodeEditor } from "@/components/prompt-forge/code-editor";
 import { CommandPalette } from "@/components/prompt-forge/command-palette";
 import { DocsModal } from "@/components/prompt-forge/docs-modal";
 import { MainContent } from "@/components/prompt-forge/main-content";
+import { QuickConvertModal } from "@/components/prompt-forge/quick-convert-modal";
 import { MoveFolderDialog } from "@/components/prompt-forge/move-folder-dialog";
 import { MovePromptDialog } from "@/components/prompt-forge/move-prompt-dialog";
 import { Sidebar } from "@/components/prompt-forge/sidebar";
@@ -93,6 +94,7 @@ export default function PromptForge() {
   const [isPaletteOpen, setIsPaletteOpen] = useState(false);
   const [isDocsOpen, setIsDocsOpen] = useState(false);
   const [isTemplateOpen, setIsTemplateOpen] = useState(false);
+  const [isQuickConvertOpen, setIsQuickConvertOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isPreviewOpen, setIsPreviewOpen] = useState(true);
   const [editorState, setEditorState] = useState<EditorState>({
@@ -1161,6 +1163,7 @@ export default function PromptForge() {
         onImportRoot={() => openImportPicker(ROOT_FOLDER_ID)}
         onExportRoot={handleExportWorkspace}
         onEditTemplateStarter={openTemplateStarterEditor}
+        onOpenQuickConvert={() => setIsQuickConvertOpen(true)}
         onRenameFolder={renameExistingFolder}
         onMoveFolder={openMoveFolderDialog}
         onImportFolder={(folderId) => openImportPicker(folderId)}
@@ -1225,6 +1228,12 @@ export default function PromptForge() {
         isOpen={isTemplateOpen}
         onClose={() => setIsTemplateOpen(false)}
         content={currentFile?.content ?? currentFile?.bodyContent ?? ""}
+      />
+
+      <QuickConvertModal
+        isOpen={isQuickConvertOpen}
+        onClose={() => setIsQuickConvertOpen(false)}
+        showNotification={showNotification}
       />
 
       {editorState.isOpen && (
