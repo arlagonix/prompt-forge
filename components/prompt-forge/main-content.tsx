@@ -46,6 +46,11 @@ import {
   type ClipboardImportFormat,
 } from "@/lib/prompt-forge/clipboard-import";
 import {
+  buildFolderImportValue,
+  readDroppedFolderImportContents,
+  readFolderImportContents,
+} from "@/lib/prompt-forge/folder-import";
+import {
   buildPromptFromTemplate,
   buildPromptSegmentsFromTemplate,
   createInitialScopeState,
@@ -1267,6 +1272,8 @@ function ParameterField({
   showNotification,
 }: ParameterFieldProps) {
   const [isImporting, setIsImporting] = useState(false);
+  const [isImportingFolder, setIsImportingFolder] = useState(false);
+  const [isFolderDragActive, setIsFolderDragActive] = useState(false);
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const id = `param-${param.name}`;
@@ -1337,6 +1344,88 @@ function ParameterField({
     showNotification,
   ]);
 
+  const applyImportedFolderBlocks = useCallback(
+    (blocks: Awaited<ReturnType<typeof readFolderImportContents>>) => {
+      if (blocks.length === 0) {
+        showNotification("No matching files found in selected folder", "error");
+        return;
+      }
+
+      onChange(buildFolderImportValue(blocks));
+      showNotification(
+        `Imported ${blocks.length} file${blocks.length === 1 ? "" : "s"} from folder`,
+      );
+    },
+    [onChange, showNotification],
+  );
+
+  const handleImportFromFolder = useCallback(async () => {
+    if (!param.folderImport?.enabled) return;
+
+    try {
+      setIsImportingFolder(true);
+      const blocks = await readFolderImportContents(param.folderImport.formats);
+      applyImportedFolderBlocks(blocks);
+    } catch (error) {
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to import from folder";
+      showNotification(message, "error");
+    } finally {
+      setIsImportingFolder(false);
+    }
+  }, [applyImportedFolderBlocks, param.folderImport, showNotification]);
+
+  const handleFolderDragOver = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      if (!param.folderImport?.enabled || isImportingFolder) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      setIsFolderDragActive(true);
+    },
+    [isImportingFolder, param.folderImport],
+  );
+
+  const handleFolderDragLeave = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      if (!param.folderImport?.enabled) return;
+      const nextTarget = e.relatedTarget;
+      if (nextTarget instanceof Node && e.currentTarget.contains(nextTarget)) {
+        return;
+      }
+      setIsFolderDragActive(false);
+    },
+    [param.folderImport],
+  );
+
+  const handleFolderDrop = useCallback(
+    async (e: React.DragEvent<HTMLDivElement>) => {
+      if (!param.folderImport?.enabled || isImportingFolder) return;
+
+      e.preventDefault();
+      setIsFolderDragActive(false);
+
+      try {
+        setIsImportingFolder(true);
+        const blocks = await readDroppedFolderImportContents(
+          e.dataTransfer.items,
+          param.folderImport.formats,
+        );
+        applyImportedFolderBlocks(blocks);
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : "Failed to import from folder";
+        showNotification(message, "error");
+      } finally {
+        setIsImportingFolder(false);
+      }
+    },
+    [applyImportedFolderBlocks, isImportingFolder, param.folderImport, showNotification],
+  );
+
   const handleTextareaPaste = useCallback(
     (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
       if (!param.clipboardImport?.enabled) return;
@@ -1406,6 +1495,7 @@ function ParameterField({
 
   if (param.type === "textarea") {
     const clipboardImport = param.clipboardImport;
+    const folderImport = param.folderImport;
 
     return (
       <div className="space-y-2">
@@ -1433,6 +1523,44 @@ function ParameterField({
             minHeight: param.height ? `${param.height * 1.5}rem` : undefined,
           }}
         />
+
+        {folderImport?.enabled && (
+          <button
+            type="button"
+            onClick={handleImportFromFolder}
+            onDragOver={handleFolderDragOver}
+            onDragEnter={handleFolderDragOver}
+            onDragLeave={handleFolderDragLeave}
+            onDrop={handleFolderDrop}
+            disabled={isImportingFolder}
+            className={cn(
+              "flex min-h-[84px] w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed px-4 py-5 text-center transition-colors",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              isImportingFolder && "pointer-events-none opacity-60",
+              isFolderDragActive
+                ? "border-primary bg-primary/10 text-foreground"
+                : "border-border bg-muted/30 text-muted-foreground hover:border-primary/50 hover:bg-muted/50 hover:text-foreground",
+            )}
+          >
+            <div className="flex items-center justify-center gap-2 text-sm font-medium text-foreground">
+              <Folder className="h-4 w-4" />
+              <span>
+                {isImportingFolder
+                  ? "Importing..."
+                  : isFolderDragActive
+                    ? "Drop folder to import"
+                    : "Insert folder contents"}
+              </span>
+            </div>
+            <div className="text-xs sm:text-sm">
+              {isImportingFolder
+                ? "Reading matching files from the selected folder"
+                : isFolderDragActive
+                  ? "Release to replace this field"
+                  : "Click to choose or drag a folder here"}
+            </div>
+          </button>
+        )}
 
         {clipboardImport?.enabled && (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">

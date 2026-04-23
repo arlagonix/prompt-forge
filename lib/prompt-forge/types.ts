@@ -45,6 +45,11 @@ export interface ClipboardImportConfig {
   defaultFormat: ClipboardImportFormat;
 }
 
+export interface FolderImportConfig {
+  enabled: boolean;
+  formats: string[];
+}
+
 export interface ParameterOption {
   label: string;
   value: string;
@@ -71,6 +76,7 @@ export interface Parameter {
   values: string[];
   optionGroups: ParameterOptionGroup[];
   clipboardImport: ClipboardImportConfig | null;
+  folderImport: FolderImportConfig | null;
   inline: boolean;
 }
 
@@ -115,6 +121,7 @@ export interface TemplateFieldDefinition {
   values: string[];
   optionGroups: ParameterOptionGroup[];
   clipboardImport: ClipboardImportConfig | null;
+  folderImport: FolderImportConfig | null;
   inline: boolean;
   explicit: boolean;
 }

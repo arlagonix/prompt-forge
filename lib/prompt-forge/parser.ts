@@ -2,6 +2,7 @@ import YAML from "yaml";
 import type {
   ClipboardImportConfig,
   ClipboardImportFormat,
+  FolderImportConfig,
   FieldType,
   FrontMatterResult,
   Parameter,
@@ -85,6 +86,68 @@ function normalizeClipboardImportConfig(
     enabled,
     formats,
     defaultFormat: formats.includes(defaultFormat) ? defaultFormat : formats[0],
+  };
+}
+
+function normalizeFolderImportFormats(rawFormats: unknown): string[] {
+  if (rawFormats == null) return [".md"];
+
+  if (!Array.isArray(rawFormats) || rawFormats.length === 0) {
+    throw new Error(
+      'folder_import.formats must be a non-empty array of extensions like [".md", ".txt"].',
+    );
+  }
+
+  const seen = new Set<string>();
+  const formats: string[] = [];
+
+  for (const entry of rawFormats) {
+    if (typeof entry !== "string") {
+      throw new Error(
+        'folder_import.formats must be a non-empty array of extensions like [".md", ".txt"].',
+      );
+    }
+
+    const normalized = entry.trim().toLowerCase();
+    if (!/^\.[a-z0-9]+(?:[._-][a-z0-9]+)*$/.test(normalized)) {
+      throw new Error(
+        'folder_import.formats must be a non-empty array of extensions like [".md", ".txt"].',
+      );
+    }
+
+    if (!seen.has(normalized)) {
+      seen.add(normalized);
+      formats.push(normalized);
+    }
+  }
+
+  return formats.length > 0 ? formats : [".md"];
+}
+
+function normalizeFolderImportConfig(
+  raw: unknown,
+  fieldType: FieldType,
+  fieldName: string,
+): FolderImportConfig | null {
+  if (raw == null) return null;
+
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(
+      `Field "${fieldName}" must define folder_import as an object.`,
+    );
+  }
+
+  if (fieldType !== "textarea") {
+    throw new Error(
+      `Field "${fieldName}" can only use folder_import with textarea type.`,
+    );
+  }
+
+  const item = raw as Record<string, unknown>;
+
+  return {
+    enabled: item.enabled == null ? true : Boolean(item.enabled),
+    formats: normalizeFolderImportFormats(item.formats),
   };
 }
 
@@ -277,6 +340,7 @@ function createFieldDefinition(
     values,
     optionGroups,
     clipboardImport: options.clipboardImport ?? null,
+    folderImport: options.folderImport ?? null,
     inline: Boolean(options.inline),
     explicit: options.explicit ?? false,
   };
@@ -400,6 +464,11 @@ function normalizeMetadataParam(
     optionGroups,
     clipboardImport: normalizeClipboardImportConfig(
       item.clipboard_import,
+      type,
+      name,
+    ),
+    folderImport: normalizeFolderImportConfig(
+      item.folder_import,
       type,
       name,
     ),
@@ -659,6 +728,7 @@ export function extractParameters(content: string | null): Parameter[] {
         values: item.field.values,
         optionGroups: item.field.optionGroups,
         clipboardImport: item.field.clipboardImport,
+        folderImport: item.field.folderImport,
         inline: item.field.inline,
       }));
   } catch {

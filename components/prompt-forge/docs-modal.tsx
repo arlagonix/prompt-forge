@@ -345,6 +345,26 @@ params:
 ---`}</CodeBlock>
             </DocSection>
 
+            <DocSection title="Folder import">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Declared textarea fields can expose an <strong>Insert folder contents</strong> button and a
+                drag-and-drop area that recursively read matching files and replace the whole textarea.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: context
+    type: textarea
+    label: Context
+    folder_import:
+      enabled: true
+      formats: [.md, .txt]
+---`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                When <code>formats</code> is omitted it defaults to <code>[.md]</code>. Imported files are
+                sorted by relative path and rendered as <code>[File: path/to/file.md]</code> blocks.
+              </p>
+            </DocSection>
+
             <DocSection title="Import and export">
               <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                 <li>JSON only</li>
