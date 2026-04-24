@@ -385,7 +385,7 @@ params:
 
             <DocSection title="Keyboard shortcuts">
               <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="text-muted-foreground">Open folder</div>
+                <div className="text-muted-foreground">Quick convert</div>
                 <div className="font-mono">Ctrl+O</div>
                 <div className="text-muted-foreground">Quick open</div>
                 <div className="font-mono">Ctrl+K</div>

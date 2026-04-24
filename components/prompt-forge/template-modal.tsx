@@ -12,7 +12,6 @@ import { cn } from "@/lib/utils";
 import { Copy, FileText, X } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { toast } from "sonner";
-import { MobileTemplateTextarea } from "./mobile-template-textarea";
 import { TemplateMonacoEditor } from "./template-monaco-editor";
 
 interface TemplateModalProps {
@@ -54,7 +53,7 @@ export function TemplateModal({
         className={cn(
           "overflow-hidden p-0",
           isMobile
-            ? "fixed inset-0 top-0 left-0 h-[100svh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0"
+            ? "h-[100dvh] w-screen max-w-none rounded-none border-0"
             : "h-[92vh]",
         )}
       >
@@ -94,19 +93,10 @@ export function TemplateModal({
           </header>
 
           <div className="min-h-0 flex-1 overflow-hidden bg-background">
-            {isMobile ? (
-              <MobileTemplateTextarea value={content || ""} readOnly />
-            ) : (
-              <TemplateMonacoEditor initialValue={content || ""} readOnly />
-            )}
+            <TemplateMonacoEditor initialValue={content || ""} readOnly />
           </div>
 
-          <footer
-            className={cn(
-              "shrink-0 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground",
-              isMobile && "hidden",
-            )}
-          >
+          <footer className="shrink-0 border-t border-border bg-card px-4 py-2 text-xs text-muted-foreground">
             <div
               className={cn(
                 "flex items-center justify-between gap-3",

@@ -14,6 +14,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -401,6 +402,7 @@ export function Sidebar({
                   >
                     <Code className="mr-2 h-4 w-4" />
                     Quick convert
+                    <DropdownMenuShortcut>Ctrl+O</DropdownMenuShortcut>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={onRefresh} disabled={isLoading}>
