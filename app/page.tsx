@@ -1091,7 +1091,7 @@ export default function PromptForge() {
 
       if (ctrl && e.code === "KeyO") {
         e.preventDefault();
-        selectFolder();
+        setIsQuickConvertOpen(true);
         return;
       }
 
