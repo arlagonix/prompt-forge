@@ -1231,7 +1231,7 @@ export function MainContent({
 
               <div className="flex flex-wrap justify-center gap-2 text-xs text-muted-foreground">
                 <span>
-                  <Kbd>Ctrl</Kbd>+<Kbd>O</Kbd> Quick convert
+                  <Kbd>Ctrl</Kbd>+<Kbd>O</Kbd> Open folder
                 </span>
                 <span>
                   <Kbd>Ctrl</Kbd>+<Kbd>K</Kbd> Quick open
