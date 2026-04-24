@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { AlertTriangle, Library, Save, X } from "lucide-react";
 import type * as Monaco from "monaco-editor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { MobileTemplateTextarea } from "./mobile-template-textarea";
 import { TemplateMonacoEditor } from "./template-monaco-editor";
 import {
   ReusableTemplateOption,
@@ -59,6 +60,7 @@ export function CodeEditor({
 
   const isMobile = useIsMobile();
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const previousDocumentIdentityRef = useRef<string | null>(null);
 
@@ -129,6 +131,37 @@ export function CodeEditor({
   const applyReusableTemplate = useCallback(
     (template: ReusableTemplateOption) => {
       const cleanedContent = stripReusableFlag(template.content);
+
+      if (isMobile) {
+        const textarea = textareaRef.current;
+
+        if (textarea) {
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const nextValue =
+            content.slice(0, start) + cleanedContent + content.slice(end);
+
+          setContent(nextValue);
+
+          requestAnimationFrame(() => {
+            textarea.focus();
+
+            const nextCaretPosition = start + cleanedContent.length;
+            textarea.setSelectionRange(nextCaretPosition, nextCaretPosition);
+          });
+
+          return;
+        }
+
+        setContent((previousValue) => {
+          const needsLeadingNewline =
+            previousValue.length > 0 && !previousValue.endsWith("\n");
+          return `${previousValue}${needsLeadingNewline ? "\n" : ""}${cleanedContent}`;
+        });
+
+        return;
+      }
+
       const editor = editorRef.current;
       const model = editor?.getModel();
 
@@ -169,7 +202,7 @@ export function CodeEditor({
         editorRef.current?.focus();
       });
     },
-    [],
+    [content, isMobile],
   );
 
   const handleSelectReusableTemplate = useCallback(
@@ -329,14 +362,6 @@ export function CodeEditor({
       requestAnimationFrame(() => {
         editor.focus();
       });
-
-      setTimeout(() => {
-        editor.focus();
-      }, 0);
-
-      setTimeout(() => {
-        editor.focus();
-      }, 50);
     },
     [handleClose, isNew, requestSave, wrapCurrentSelection],
   );
@@ -349,7 +374,7 @@ export function CodeEditor({
           className={cn(
             "overflow-hidden p-0",
             isMobile
-              ? "h-[100dvh] w-screen max-w-none rounded-none border-0"
+              ? "fixed inset-0 top-0 left-0 h-[100svh] w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0"
               : "h-[92vh]",
           )}
           onOpenAutoFocus={(e) => {
@@ -367,17 +392,11 @@ export function CodeEditor({
               return;
             }
 
-            requestAnimationFrame(() => {
-              editorRef.current?.focus();
-            });
-
-            setTimeout(() => {
-              editorRef.current?.focus();
-            }, 0);
-
-            setTimeout(() => {
-              editorRef.current?.focus();
-            }, 50);
+            if (!isMobile) {
+              requestAnimationFrame(() => {
+                editorRef.current?.focus();
+              });
+            }
           }}
         >
           <DialogHeader className="sr-only">
@@ -457,15 +476,29 @@ export function CodeEditor({
             </header>
 
             <div className="min-h-0 flex-1 overflow-hidden bg-background">
-              <TemplateMonacoEditor
-                initialValue={content}
-                resetKey={editorResetKey}
-                onChange={setContent}
-                onMount={handleEditorDidMount}
-              />
+              {isMobile ? (
+                <MobileTemplateTextarea
+                  ref={textareaRef}
+                  value={content}
+                  onChange={setContent}
+                  placeholder="Write your template..."
+                />
+              ) : (
+                <TemplateMonacoEditor
+                  initialValue={content}
+                  resetKey={editorResetKey}
+                  onChange={setContent}
+                  onMount={handleEditorDidMount}
+                />
+              )}
             </div>
 
-            <div className="shrink-0 border-t border-border px-4 py-2 text-xs text-muted-foreground">
+            <div
+              className={cn(
+                "shrink-0 border-t border-border px-4 py-2 text-xs text-muted-foreground",
+                isMobile && "hidden",
+              )}
+            >
               <div
                 className={cn(
                   "flex items-center justify-between gap-3",
