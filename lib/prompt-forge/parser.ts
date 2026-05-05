@@ -608,6 +608,40 @@ function findNextTemplateToken(body: string, cursor: number): TemplateToken | nu
   };
 }
 
+function isStandaloneTrimmedControl(inner: string): boolean {
+  return /^(?:group\s+[a-zA-Z0-9_-]+|end_group|if\s+[\s\S]+|else_if\s+[\s\S]+|else|end_if)$/i.test(
+    inner.trim(),
+  );
+}
+
+function getStandaloneControlLineRange(
+  body: string,
+  token: TemplateToken,
+): { start: number; end: number } | null {
+  if (token.kind !== "control" || !isStandaloneTrimmedControl(token.inner)) {
+    return null;
+  }
+
+  const lineStart = body.lastIndexOf("\n", token.start - 1) + 1;
+  const nextLineBreak = body.indexOf("\n", token.end);
+  const lineContentEnd =
+    nextLineBreak === -1
+      ? body.length
+      : body[nextLineBreak - 1] === "\r"
+        ? nextLineBreak - 1
+        : nextLineBreak;
+  const lineEnd = nextLineBreak === -1 ? body.length : nextLineBreak + 1;
+
+  const beforeToken = body.slice(lineStart, token.start);
+  const afterToken = body.slice(token.end, lineContentEnd);
+
+  if (/^[ \t]*$/.test(beforeToken) && /^[ \t]*$/.test(afterToken)) {
+    return { start: lineStart, end: lineEnd };
+  }
+
+  return null;
+}
+
 function parseConditionValue(raw: string): string | boolean {
   const trimmed = raw.trim();
   if (/^true$/i.test(trimmed)) return true;
@@ -775,8 +809,12 @@ export function parseTemplate(content: string | null): ParsedTemplate {
       break;
     }
 
-    if (token.start > cursor) {
-      currentNodes().push({ kind: "text", text: body.slice(cursor, token.start) });
+    const standaloneControlLine = getStandaloneControlLineRange(body, token);
+    const textEnd = standaloneControlLine?.start ?? token.start;
+    const nextCursor = standaloneControlLine?.end ?? token.end;
+
+    if (textEnd > cursor) {
+      currentNodes().push({ kind: "text", text: body.slice(cursor, textEnd) });
     }
 
     if (token.kind === "field") {
@@ -796,7 +834,7 @@ export function parseTemplate(content: string | null): ParsedTemplate {
       } else {
         currentNodes().push({ kind: "text", text: body.slice(token.start, token.end) });
       }
-      cursor = token.end;
+      cursor = nextCursor;
       continue;
     }
 
@@ -823,7 +861,7 @@ export function parseTemplate(content: string | null): ParsedTemplate {
       currentNodes().push(groupNode);
       frameStack.push({ kind: "group", name: groupName, node: groupNode, nodes: groupNode.children });
       scopeStack.push(childGroup);
-      cursor = token.end;
+      cursor = nextCursor;
       continue;
     }
 
@@ -834,7 +872,7 @@ export function parseTemplate(content: string | null): ParsedTemplate {
       }
       frameStack.pop();
       scopeStack.pop();
-      cursor = token.end;
+      cursor = nextCursor;
       continue;
     }
 
@@ -853,7 +891,7 @@ export function parseTemplate(content: string | null): ParsedTemplate {
         nodes: ifNode.branches[0].children,
         inElse: false,
       });
-      cursor = token.end;
+      cursor = nextCursor;
       continue;
     }
 
@@ -870,7 +908,7 @@ export function parseTemplate(content: string | null): ParsedTemplate {
       const branch = { condition, children: [] as TemplateBodyNode[] };
       frame.node.branches.push(branch);
       frame.nodes = branch.children;
-      cursor = token.end;
+      cursor = nextCursor;
       continue;
     }
 
@@ -884,7 +922,7 @@ export function parseTemplate(content: string | null): ParsedTemplate {
       }
       frame.inElse = true;
       frame.nodes = frame.node.elseChildren;
-      cursor = token.end;
+      cursor = nextCursor;
       continue;
     }
 
@@ -894,12 +932,12 @@ export function parseTemplate(content: string | null): ParsedTemplate {
         throw new Error("Unexpected end_if.");
       }
       frameStack.pop();
-      cursor = token.end;
+      cursor = nextCursor;
       continue;
     }
 
     currentNodes().push({ kind: "text", text: body.slice(token.start, token.end) });
-    cursor = token.end;
+    cursor = nextCursor;
   }
 
   const openFrame = frameStack[frameStack.length - 1];
