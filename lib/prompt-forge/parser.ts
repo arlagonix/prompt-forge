@@ -15,6 +15,8 @@ import type {
   TemplateFieldReferenceNode,
   TemplateGroupDefinition,
   TemplateGroupNode,
+  TemplateIfNode,
+  TemplateCondition,
   TemplateRenderItem,
   TemplateScopeState,
 } from "./types";
@@ -571,6 +573,160 @@ function resolveFieldReference(
   return { definition: implicitField, lookupDepth: 0, owner: currentScope };
 }
 
+type TemplateToken =
+  | { kind: "field"; start: number; end: number; inner: string }
+  | { kind: "control"; start: number; end: number; inner: string };
+
+function findNextTemplateToken(body: string, cursor: number): TemplateToken | null {
+  const fieldStart = body.indexOf("{{", cursor);
+  const controlStart = body.indexOf("{%", cursor);
+
+  if (fieldStart === -1 && controlStart === -1) return null;
+
+  if (controlStart !== -1 && (fieldStart === -1 || controlStart < fieldStart)) {
+    const end = body.indexOf("%}", controlStart + 2);
+    if (end === -1) {
+      return null;
+    }
+    return {
+      kind: "control",
+      start: controlStart,
+      end: end + 2,
+      inner: body.slice(controlStart + 2, end).trim(),
+    };
+  }
+
+  const end = body.indexOf("}}", fieldStart + 2);
+  if (end === -1) {
+    return null;
+  }
+  return {
+    kind: "field",
+    start: fieldStart,
+    end: end + 2,
+    inner: body.slice(fieldStart + 2, end).trim(),
+  };
+}
+
+function parseConditionValue(raw: string): string | boolean {
+  const trimmed = raw.trim();
+  if (/^true$/i.test(trimmed)) return true;
+  if (/^false$/i.test(trimmed)) return false;
+
+  const quoted = trimmed.match(/^("([\s\S]*)"|'([\s\S]*)')$/);
+  if (quoted) {
+    return quoted[2] ?? quoted[3] ?? "";
+  }
+
+  return trimmed;
+}
+
+function resolveConditionReference(
+  scopeStack: TemplateGroupDefinition[],
+  name: string,
+): {
+  definition: TemplateFieldDefinition | TemplateGroupDefinition;
+  lookupDepth: number;
+  owner: TemplateGroupDefinition;
+} {
+  for (let depth = 0; depth < scopeStack.length; depth += 1) {
+    const group = scopeStack[scopeStack.length - 1 - depth];
+    const found = getDefinitionByName(group, name);
+    if (found) {
+      return { definition: found, lookupDepth: depth, owner: group };
+    }
+  }
+
+  const currentScope = scopeStack[scopeStack.length - 1];
+  const implicitField = createFieldDefinition(name, { explicit: false });
+  currentScope.children.push(implicitField);
+  return { definition: implicitField, lookupDepth: 0, owner: currentScope };
+}
+
+function parseTemplateCondition(
+  rawCondition: string,
+  scopeStack: TemplateGroupDefinition[],
+): TemplateCondition {
+  const source = rawCondition.trim().replace(/^\((.*)\)$/s, "$1").trim();
+  if (!source) {
+    throw new Error("Condition cannot be empty.");
+  }
+
+  let match = source.match(/^([a-zA-Z0-9_-]+)$/);
+  if (match) {
+    const resolved = resolveConditionReference(scopeStack, match[1]);
+    if (resolved.definition.kind === "field") {
+      ensureRenderItem(resolved.owner, { kind: "field", field: resolved.definition });
+    } else {
+      ensureRenderItem(resolved.owner, { kind: "group", group: resolved.definition });
+    }
+    return {
+      source,
+      name: match[1],
+      lookupDepth: resolved.lookupDepth,
+      definition: resolved.definition,
+      operator: "not_empty",
+    };
+  }
+
+  match = source.match(/^([a-zA-Z0-9_-]+)\s+(empty|not_empty|checked|unchecked)$/i);
+  if (match) {
+    const resolved = resolveConditionReference(scopeStack, match[1]);
+    if (resolved.definition.kind === "field") {
+      ensureRenderItem(resolved.owner, { kind: "field", field: resolved.definition });
+    } else {
+      ensureRenderItem(resolved.owner, { kind: "group", group: resolved.definition });
+    }
+    return {
+      source,
+      name: match[1],
+      lookupDepth: resolved.lookupDepth,
+      definition: resolved.definition,
+      operator: match[2].toLowerCase() as TemplateCondition["operator"],
+    };
+  }
+
+  match = source.match(/^([a-zA-Z0-9_-]+)\s+(?:is|=)\s+([\s\S]+)$/i);
+  if (match) {
+    const resolved = resolveConditionReference(scopeStack, match[1]);
+    if (resolved.definition.kind === "field") {
+      ensureRenderItem(resolved.owner, { kind: "field", field: resolved.definition });
+    } else {
+      ensureRenderItem(resolved.owner, { kind: "group", group: resolved.definition });
+    }
+    return {
+      source,
+      name: match[1],
+      lookupDepth: resolved.lookupDepth,
+      definition: resolved.definition,
+      operator: "is",
+      expectedValue: parseConditionValue(match[2]),
+    };
+  }
+
+  match = source.match(/^([a-zA-Z0-9_-]+)\s+(?:is_not|not)\s+([\s\S]+)$/i);
+  if (match) {
+    const resolved = resolveConditionReference(scopeStack, match[1]);
+    if (resolved.definition.kind === "field") {
+      ensureRenderItem(resolved.owner, { kind: "field", field: resolved.definition });
+    } else {
+      ensureRenderItem(resolved.owner, { kind: "group", group: resolved.definition });
+    }
+    return {
+      source,
+      name: match[1],
+      lookupDepth: resolved.lookupDepth,
+      definition: resolved.definition,
+      operator: "is_not",
+      expectedValue: parseConditionValue(match[2]),
+    };
+  }
+
+  throw new Error(
+    `Unsupported condition "${source}". Use forms like "field empty", "field not_empty", or "field is \"value\"".`,
+  );
+}
+
 export function parseTemplate(content: string | null): ParsedTemplate {
   if (typeof content !== "string") {
     return {
@@ -597,47 +753,59 @@ export function parseTemplate(content: string | null): ParsedTemplate {
     rootGroup.children.push(normalized);
   }
 
+  type ParseFrame =
+    | { kind: "root"; nodes: TemplateBodyNode[] }
+    | { kind: "group"; name: string; node: TemplateGroupNode; nodes: TemplateBodyNode[] }
+    | { kind: "if"; node: TemplateIfNode; nodes: TemplateBodyNode[]; inElse: boolean };
+
   const rootNodes: TemplateBodyNode[] = [];
-  const nodesStack: TemplateBodyNode[][] = [rootNodes];
+  const frameStack: ParseFrame[] = [{ kind: "root", nodes: rootNodes }];
   const scopeStack: TemplateGroupDefinition[] = [rootGroup];
-  const openGroupNodeStack: TemplateGroupNode[] = [];
+
+  const currentNodes = () => frameStack[frameStack.length - 1].nodes;
 
   let cursor = 0;
   while (cursor < body.length) {
-    const start = body.indexOf("{{", cursor);
-    if (start === -1) {
+    const token = findNextTemplateToken(body, cursor);
+
+    if (!token) {
       if (cursor < body.length) {
-        nodesStack[nodesStack.length - 1].push({
-          kind: "text",
-          text: body.slice(cursor),
-        });
+        currentNodes().push({ kind: "text", text: body.slice(cursor) });
       }
       break;
     }
 
-    if (start > cursor) {
-      nodesStack[nodesStack.length - 1].push({
-        kind: "text",
-        text: body.slice(cursor, start),
-      });
+    if (token.start > cursor) {
+      currentNodes().push({ kind: "text", text: body.slice(cursor, token.start) });
     }
 
-    const end = body.indexOf("}}", start + 2);
-    if (end === -1) {
-      nodesStack[nodesStack.length - 1].push({
-        kind: "text",
-        text: body.slice(start),
-      });
-      break;
+    if (token.kind === "field") {
+      const inner = token.inner;
+      if (NAME_RE.test(inner)) {
+        const resolved = resolveFieldReference(scopeStack, inner);
+        ensureRenderItem(resolved.owner, {
+          kind: "field",
+          field: resolved.definition,
+        });
+        currentNodes().push({
+          kind: "field-ref",
+          name: inner,
+          definition: resolved.definition,
+          lookupDepth: resolved.lookupDepth,
+        });
+      } else {
+        currentNodes().push({ kind: "text", text: body.slice(token.start, token.end) });
+      }
+      cursor = token.end;
+      continue;
     }
 
-    const inner = body.slice(start + 2, end).trim();
-    const currentScope = scopeStack[scopeStack.length - 1];
-    const groupStartMatch = inner.match(/^([a-zA-Z0-9_-]+):start$/);
-    const groupEndMatch = inner.match(/^([a-zA-Z0-9_-]+):end$/);
+    const control = token.inner;
+    const groupStartMatch = control.match(/^group\s+([a-zA-Z0-9_-]+)$/i);
 
     if (groupStartMatch) {
       const groupName = groupStartMatch[1];
+      const currentScope = scopeStack[scopeStack.length - 1];
       const childGroup = getGroupDefinitionByName(currentScope, groupName);
       if (!childGroup) {
         throw new Error(
@@ -652,55 +820,94 @@ export function parseTemplate(content: string | null): ParsedTemplate {
         definition: childGroup,
         children: [],
       };
-      nodesStack[nodesStack.length - 1].push(groupNode);
-      openGroupNodeStack.push(groupNode);
-      nodesStack.push(groupNode.children);
+      currentNodes().push(groupNode);
+      frameStack.push({ kind: "group", name: groupName, node: groupNode, nodes: groupNode.children });
       scopeStack.push(childGroup);
-      cursor = end + 2;
+      cursor = token.end;
       continue;
     }
 
-    if (groupEndMatch) {
-      const groupName = groupEndMatch[1];
-      const openGroup = openGroupNodeStack[openGroupNodeStack.length - 1];
-      if (!openGroup || openGroup.name !== groupName) {
-        throw new Error(`Unexpected group end "${groupName}".`);
+    if (/^end_group$/i.test(control)) {
+      const frame = frameStack[frameStack.length - 1];
+      if (frame.kind !== "group") {
+        throw new Error("Unexpected end_group.");
       }
-      openGroupNodeStack.pop();
-      nodesStack.pop();
+      frameStack.pop();
       scopeStack.pop();
-      cursor = end + 2;
+      cursor = token.end;
       continue;
     }
 
-    if (NAME_RE.test(inner)) {
-      const resolved = resolveFieldReference(scopeStack, inner);
-      ensureRenderItem(resolved.owner, {
-        kind: "field",
-        field: resolved.definition,
-      });
-      const fieldNode: TemplateFieldReferenceNode = {
-        kind: "field-ref",
-        name: inner,
-        definition: resolved.definition,
-        lookupDepth: resolved.lookupDepth,
+    const ifStartMatch = control.match(/^if\s+([\s\S]+)$/i);
+    if (ifStartMatch) {
+      const condition = parseTemplateCondition(ifStartMatch[1], scopeStack);
+      const ifNode: TemplateIfNode = {
+        kind: "if",
+        branches: [{ condition, children: [] }],
+        elseChildren: [],
       };
-      nodesStack[nodesStack.length - 1].push(fieldNode);
-      cursor = end + 2;
+      currentNodes().push(ifNode);
+      frameStack.push({
+        kind: "if",
+        node: ifNode,
+        nodes: ifNode.branches[0].children,
+        inElse: false,
+      });
+      cursor = token.end;
       continue;
     }
 
-    nodesStack[nodesStack.length - 1].push({
-      kind: "text",
-      text: body.slice(start, end + 2),
-    });
-    cursor = end + 2;
+    const elseIfMatch = control.match(/^else_if\s+([\s\S]+)$/i);
+    if (elseIfMatch) {
+      const frame = frameStack[frameStack.length - 1];
+      if (frame.kind !== "if") {
+        throw new Error("Unexpected else_if without an open if block.");
+      }
+      if (frame.inElse) {
+        throw new Error("else_if cannot appear after else in the same if block.");
+      }
+      const condition = parseTemplateCondition(elseIfMatch[1], scopeStack);
+      const branch = { condition, children: [] as TemplateBodyNode[] };
+      frame.node.branches.push(branch);
+      frame.nodes = branch.children;
+      cursor = token.end;
+      continue;
+    }
+
+    if (/^else$/i.test(control)) {
+      const frame = frameStack[frameStack.length - 1];
+      if (frame.kind !== "if") {
+        throw new Error("Unexpected else without an open if block.");
+      }
+      if (frame.inElse) {
+        throw new Error("Only one else block is allowed inside an if block.");
+      }
+      frame.inElse = true;
+      frame.nodes = frame.node.elseChildren;
+      cursor = token.end;
+      continue;
+    }
+
+    if (/^end_if$/i.test(control)) {
+      const frame = frameStack[frameStack.length - 1];
+      if (frame.kind !== "if") {
+        throw new Error("Unexpected end_if.");
+      }
+      frameStack.pop();
+      cursor = token.end;
+      continue;
+    }
+
+    currentNodes().push({ kind: "text", text: body.slice(token.start, token.end) });
+    cursor = token.end;
   }
 
-  if (openGroupNodeStack.length > 0) {
-    throw new Error(
-      `Group "${openGroupNodeStack[openGroupNodeStack.length - 1].name}" was not closed.`,
-    );
+  const openFrame = frameStack[frameStack.length - 1];
+  if (openFrame.kind === "group") {
+    throw new Error(`Group "${openFrame.name}" was not closed.`);
+  }
+  if (openFrame.kind === "if") {
+    throw new Error("If block was not closed.");
   }
 
   return {
@@ -777,6 +984,72 @@ function splitRepeatGroupNodes(nodes: TemplateBodyNode[]): {
   };
 }
 
+function getConditionRuntimeValue(
+  condition: TemplateCondition,
+  scopeStack: TemplateScopeState[],
+): unknown {
+  const targetScopeIndex = Math.max(
+    0,
+    scopeStack.length - 1 - condition.lookupDepth,
+  );
+  const targetScope = scopeStack[targetScopeIndex];
+
+  if (condition.definition.kind === "group") {
+    return targetScope.groups[condition.definition.name] ?? [];
+  }
+
+  return targetScope.fields[condition.definition.name] ?? "";
+}
+
+function isRuntimeValueEmpty(value: unknown): boolean {
+  if (value == null) return true;
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "boolean") return !value;
+  if (typeof value === "string") return value.trim().length === 0;
+  return false;
+}
+
+function normalizeConditionComparable(value: unknown): string | boolean {
+  if (typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.length > 0;
+  return String(value ?? "").trim();
+}
+
+function compareConditionValue(value: unknown, expectedValue: unknown): boolean {
+  const actual = normalizeConditionComparable(value);
+
+  if (typeof expectedValue === "boolean") {
+    if (typeof actual === "boolean") return actual === expectedValue;
+    return String(actual).trim().toLowerCase() === String(expectedValue);
+  }
+
+  return String(actual) === String(expectedValue ?? "");
+}
+
+function evaluateCondition(
+  condition: TemplateCondition,
+  scopeStack: TemplateScopeState[],
+): boolean {
+  const value = getConditionRuntimeValue(condition, scopeStack);
+
+  switch (condition.operator) {
+    case "empty":
+      return isRuntimeValueEmpty(value);
+    case "not_empty":
+      return !isRuntimeValueEmpty(value);
+    case "checked":
+      return String(value).trim().toLowerCase() === "true";
+    case "unchecked":
+      return String(value).trim().toLowerCase() !== "true";
+    case "is":
+      return compareConditionValue(value, condition.expectedValue);
+    case "is_not":
+      return !compareConditionValue(value, condition.expectedValue);
+    default:
+      return false;
+  }
+}
+
 function buildSegmentsFromNodes(
   nodes: TemplateBodyNode[],
   scopeStack: TemplateScopeState[],
@@ -801,6 +1074,19 @@ function buildSegmentsFromNodes(
         isUserValue: true,
         paramName: node.definition.name,
       });
+      continue;
+    }
+
+    if (node.kind === "if") {
+      const matchingBranch = node.branches.find((branch) =>
+        evaluateCondition(branch.condition, scopeStack),
+      );
+      segments.push(
+        ...buildSegmentsFromNodes(
+          matchingBranch ? matchingBranch.children : node.elseChildren,
+          scopeStack,
+        ),
+      );
       continue;
     }
 

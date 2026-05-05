@@ -160,10 +160,39 @@ export interface TemplateGroupNode {
   children: TemplateBodyNode[];
 }
 
+export type TemplateConditionOperator =
+  | "not_empty"
+  | "empty"
+  | "checked"
+  | "unchecked"
+  | "is"
+  | "is_not";
+
+export interface TemplateCondition {
+  source: string;
+  name: string;
+  lookupDepth: number;
+  definition: TemplateDefinition;
+  operator: TemplateConditionOperator;
+  expectedValue?: string | boolean;
+}
+
+export interface TemplateIfBranch {
+  condition: TemplateCondition;
+  children: TemplateBodyNode[];
+}
+
+export interface TemplateIfNode {
+  kind: "if";
+  branches: TemplateIfBranch[];
+  elseChildren: TemplateBodyNode[];
+}
+
 export type TemplateBodyNode =
   | TemplateTextNode
   | TemplateFieldReferenceNode
-  | TemplateGroupNode;
+  | TemplateGroupNode
+  | TemplateIfNode;
 
 export interface ParsedTemplate {
   metadata: Record<string, unknown>;

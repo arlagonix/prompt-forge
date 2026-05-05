@@ -148,6 +148,7 @@ export function TemplateMonacoEditor({
 
           [/^[-*_]{3,}\s*$/, "comment"],
 
+          [/\{%\s*[^%\n]+\s*%\}/, "template-control"],
           [/\{\{\s*[^{}\n]+\s*\}\}/, "variable"],
 
           [/[^\\`*_!\[{]+/, "text"],
@@ -166,6 +167,7 @@ export function TemplateMonacoEditor({
       inherit: true,
       rules: [
         { token: "variable", foreground: "000000", fontStyle: "bold" },
+        { token: "template-control", foreground: "000000", fontStyle: "bold" },
         { token: "heading", foreground: "000000", fontStyle: "bold" },
         { token: "fm-key", foreground: "000000", fontStyle: "bold" },
         { token: "fm-value", foreground: "000000" },
@@ -180,6 +182,7 @@ export function TemplateMonacoEditor({
       inherit: true,
       rules: [
         { token: "variable", foreground: "D4D4D4", fontStyle: "bold" },
+        { token: "template-control", foreground: "D4D4D4", fontStyle: "bold" },
         { token: "heading", foreground: "D4D4D4", fontStyle: "bold" },
         { token: "fm-key", foreground: "D4D4D4", fontStyle: "bold" },
         { token: "fm-value", foreground: "D4D4D4" },

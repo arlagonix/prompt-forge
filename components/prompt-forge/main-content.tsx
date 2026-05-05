@@ -513,7 +513,7 @@ function GroupEditor({
             </div>
             {showTechnicalNames && (
               <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
-                {`{{${item.group.name}:start}}`}
+                {`{% group ${item.group.name} %}`}
               </code>
             )}
           </div>

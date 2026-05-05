@@ -514,16 +514,52 @@ For declared groups:
 
 ### Group body syntax
 
-Groups are used in the body with start/end markers:
+Groups are used in the body with `{% group ... %}` / `{% end_group %}` markers:
 
 ```txt
-{{ meals:start }}
+{% group meals %}
 Date: {{date}}
 Calories: {{calories}}
-{{ meals:end }}
+{% end_group %}
 ```
 
 If a group block appears in the body but the group is not declared in frontmatter, that is a validation error.
+
+## Conditional sections
+
+Conditionals use `{% ... %}` control tags. Value placeholders still use `{{ ... }}`.
+
+```txt
+{% if context empty %}
+No context was provided.
+{% else %}
+Context:
+{{context}}
+{% end_if %}
+```
+
+Supported condition forms:
+
+- `field empty`
+- `field not_empty`
+- `field checked`
+- `field unchecked`
+- `field is "value"`
+- `field is_not "value"`
+- `field is true`
+- `field is false`
+
+Use `else_if` for multiple branches:
+
+```txt
+{% if output_format is "JSON" %}
+Return valid JSON only.
+{% else_if output_format is "Markdown" %}
+Return Markdown.
+{% else %}
+Return plain text.
+{% end_if %}
+```
 
 ### Group child fields
 
@@ -547,10 +583,10 @@ params:
 ```
 
 ```txt
-{{ meals:start }}
+{% group meals %}
 Date: {{date}}
 Calories: {{calories}}
-{{ meals:end }}
+{% end_group %}
 ```
 
 In this case, `date` and `calories` are inferred inside the `meals` scope.
@@ -619,15 +655,15 @@ params:
 Body:
 
 ```txt
-{{ days:start }}
+{% group days %}
 Date: {{date}}
 
-{{ meals:start }}
+{% group meals %}
 Meal: {{name}}
 Calories: {{calories}}
-{{ meals:end }}
+{% end_group %}
 
-{{ days:end }}
+{% end_group %}
 ```
 
 ## Scope resolution
@@ -683,16 +719,16 @@ params:
 ```txt
 Report: {{reportTitle}}
 
-{{ days:start }}
+{% group days %}
 Date: {{date}}
 
-{{ meals:start }}
+{% group meals %}
 Meal: {{name}}
 Calories: {{calories}}
 Report again: {{reportTitle}}
-{{ meals:end }}
+{% end_group %}
 
-{{ days:end }}
+{% end_group %}
 ```
 
 Inside `meals`:
@@ -755,11 +791,11 @@ params:
         label: Calories
 ---
 
-{{ meals:start }}
+{% group meals %}
 Date: {{date}}
 What I ate that day: {{description}}
 Calories: {{calories}}
-{{ meals:end }}
+{% end_group %}
 ```
 
 ### Larger nested example
@@ -815,7 +851,7 @@ Report title: {{reportTitle}}
 Introduction:
 {{intro}}
 
-{{ days:start }}
+{% group days %}
 Date: {{date}}
 Weather: {{weather}}
 
@@ -823,13 +859,13 @@ Notes:
 {{notes}}
 
 Meals for this day:
-{{ meals:start }}
+{% group meals %}
 - Meal: {{name}}
 - Calories: {{calories}}
 - Comment: {{comment}}
-{{ meals:end }}
+{% end_group %}
 
-{{ days:end }}
+{% end_group %}
 ```
 
 ## Data storage

@@ -285,19 +285,52 @@ params:
         label: Details
 ---
 
-{{ steps:start }}
+{% group steps %}
 Step: {{title}}
 {{details}}
-{{ steps:end }}`}</CodeBlock>
+{% end_group %}`}</CodeBlock>
               <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                 <li>groups must be declared in front matter</li>
                 <li>
-                  use <code>{`{{ group:start }}`}</code> and
-                  <code>{` {{ group:end }}`}</code> in the body
+                  use <code>{`{% group group_name %}`}</code> and
+                  <code>{` {% end_group %}`}</code> in the body
                 </li>
                 <li>
                   <code>repeat: true</code> lets the user add multiple instances
                 </li>
+              </ul>
+            </DocSection>
+
+            <DocSection title="Conditional sections">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Use conditionals when a section should appear only for certain
+                field values. Logic tags use <code>{`{% ... %}`}</code>; value
+                placeholders still use <code>{`{{ ... }}`}</code>.
+              </p>
+              <CodeBlock>{`{% if context empty %}
+No context was provided.
+
+{% else %}
+Context:
+{{context}}
+
+{% end_if %}`}</CodeBlock>
+              <CodeBlock>{`{% if output_format is "JSON" %}
+Return valid JSON only.
+
+{% else_if output_format is "Markdown" %}
+Return Markdown.
+
+{% else %}
+Return plain text.
+
+{% end_if %}`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li><code>field empty</code> checks for an empty value</li>
+                <li><code>field not_empty</code> checks for a filled value</li>
+                <li><code>field checked</code> and <code>field unchecked</code> are useful for checkboxes</li>
+                <li><code>field is "value"</code> checks selected/text values</li>
+                <li><code>field is_not "value"</code> checks for anything else</li>
               </ul>
             </DocSection>
 
