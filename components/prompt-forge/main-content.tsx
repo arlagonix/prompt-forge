@@ -96,6 +96,68 @@ type PreviewLinePart = {
   paramName?: string;
 };
 
+
+const PREVIEW_DEBOUNCE_MS = 250;
+const MAX_RENDERED_PREVIEW_CHARS = 30_000;
+
+
+function useDebouncedValue<T>(
+  value: T,
+  delayMs: number,
+  immediateKey: unknown,
+): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  const immediateKeyRef = useRef(immediateKey);
+
+  useEffect(() => {
+    if (immediateKeyRef.current !== immediateKey) {
+      immediateKeyRef.current = immediateKey;
+      setDebouncedValue(value);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedValue(value);
+    }, delayMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [value, delayMs, immediateKey]);
+
+  return debouncedValue;
+}
+
+function getSegmentsTextLength(segments: PromptSegment[]): number {
+  return segments.reduce((total, segment) => total + segment.text.length, 0);
+}
+
+function truncatePreviewSegments(
+  segments: PromptSegment[],
+  maxLength: number,
+): PromptSegment[] {
+  if (maxLength <= 0) return [];
+
+  const truncated: PromptSegment[] = [];
+  let remaining = maxLength;
+
+  for (const segment of segments) {
+    if (remaining <= 0) break;
+
+    if (segment.text.length <= remaining) {
+      truncated.push(segment);
+      remaining -= segment.text.length;
+      continue;
+    }
+
+    truncated.push({
+      ...segment,
+      text: segment.text.slice(0, remaining),
+    });
+    break;
+  }
+
+  return truncated;
+}
+
 function getFieldOptionGroups(
   param: TemplateFieldDefinition,
 ): ParameterOptionGroup[] {
@@ -163,11 +225,13 @@ function PromptPreview({
   preview,
   className = "",
   showHighlights = true,
+  isTruncated = false,
 }: {
   segments: PromptSegment[];
   preview: string;
   className?: string;
   showHighlights?: boolean;
+  isTruncated?: boolean;
 }) {
   if (!preview) {
     return (
@@ -181,6 +245,11 @@ function PromptPreview({
 
   return (
     <div className={className}>
+      {isTruncated && (
+        <div className="mb-4 rounded-lg border border-dashed border-border bg-background/70 px-3 py-2 text-xs text-muted-foreground">
+          Preview truncated due to large length. Copy still uses the full prompt.
+        </div>
+      )}
       <div className="font-mono text-sm leading-relaxed text-foreground">
         {lines.map((line, lineIndex) => {
           const hasContent = line.length > 0;
@@ -553,6 +622,7 @@ export function MainContent({
   const [parseError, setParseError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string>("");
   const [previewSegments, setPreviewSegments] = useState<PromptSegment[]>([]);
+  const [isPreviewTruncated, setIsPreviewTruncated] = useState(false);
   const [showTechnicalNames, setShowTechnicalNames] = useState<boolean>(true);
   const [clipboardUiState, setClipboardUiState] = useState<ClipboardUiState>(
     DEFAULT_CLIPBOARD_UI_STATE,
@@ -561,6 +631,11 @@ export function MainContent({
     useState<boolean>(true);
   const actionsMenuSuppressRestoreFocusRef = useRef(false);
   const isMobile = useIsMobile();
+  const debouncedTemplateState = useDebouncedValue(
+    templateState,
+    PREVIEW_DEBOUNCE_MS,
+    currentFile?.id ?? null,
+  );
 
   useEffect(() => {
     try {
@@ -700,21 +775,34 @@ export function MainContent({
     if (!currentFile) {
       setPreview("");
       setPreviewSegments([]);
+      setIsPreviewTruncated(false);
       return;
     }
 
-    if (parseError || !parsedTemplate || !templateState) {
+    if (parseError || !parsedTemplate || !debouncedTemplateState) {
       const fallback = currentFile.bodyContent || currentFile.content || "";
-      setPreview(fallback);
-      setPreviewSegments([{ text: fallback, isUserValue: false }]);
+      const isFallbackTruncated = fallback.length > MAX_RENDERED_PREVIEW_CHARS;
+      const visibleFallback = fallback.slice(0, MAX_RENDERED_PREVIEW_CHARS);
+      setPreview(visibleFallback);
+      setPreviewSegments([{ text: visibleFallback, isUserValue: false }]);
+      setIsPreviewTruncated(isFallbackTruncated);
       return;
     }
 
-    setPreviewSegments(
-      buildPromptSegmentsFromTemplate(parsedTemplate, templateState),
+    const nextSegments = buildPromptSegmentsFromTemplate(
+      parsedTemplate,
+      debouncedTemplateState,
     );
-    setPreview(buildPromptFromTemplate(parsedTemplate, templateState));
-  }, [currentFile, parseError, parsedTemplate, templateState]);
+    const isTruncated =
+      getSegmentsTextLength(nextSegments) > MAX_RENDERED_PREVIEW_CHARS;
+    const visibleSegments = isTruncated
+      ? truncatePreviewSegments(nextSegments, MAX_RENDERED_PREVIEW_CHARS)
+      : nextSegments;
+
+    setPreviewSegments(visibleSegments);
+    setPreview(visibleSegments.map((segment) => segment.text).join(""));
+    setIsPreviewTruncated(isTruncated);
+  }, [currentFile, debouncedTemplateState, parseError, parsedTemplate]);
 
   const updateFieldValue = useCallback(
     (path: GroupPathSegment[], fieldName: string, value: string) => {
@@ -786,18 +874,23 @@ export function MainContent({
   );
 
   const handleCopy = useCallback(async () => {
-    if (!preview) {
+    const fullPrompt =
+      currentFile && !parseError && parsedTemplate && templateState
+        ? buildPromptFromTemplate(parsedTemplate, templateState)
+        : currentFile?.bodyContent || currentFile?.content || "";
+
+    if (!fullPrompt) {
       showNotification("No content to copy", "error");
       return;
     }
 
     try {
-      await navigator.clipboard.writeText(preview);
+      await navigator.clipboard.writeText(fullPrompt);
       showNotification("Copied to clipboard!");
     } catch {
       showNotification("Failed to copy", "error");
     }
-  }, [preview, showNotification]);
+  }, [currentFile, parseError, parsedTemplate, showNotification, templateState]);
 
   const handleClear = useCallback(() => {
     if (!parsedTemplate) return;
@@ -822,6 +915,11 @@ export function MainContent({
   const hasVisibleInputs =
     parsedTemplate != null && countRenderedItems(parsedTemplate.rootGroup) > 0;
 
+  const isPreviewUpdating =
+    currentFile != null &&
+    !parseError &&
+    templateState != null &&
+    debouncedTemplateState !== templateState;
   const centeredMainContentClassName =
     !isMobile && !isPreviewOpen ? "mx-auto w-full max-w-3xl" : undefined;
 
@@ -1058,9 +1156,17 @@ export function MainContent({
                   {isMobile && isPreviewOpen && (
                     <section className="rounded-xl border border-border bg-muted/30">
                       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-                        <h2 className="text-base font-semibold text-foreground">
-                          Preview
-                        </h2>
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-base font-semibold text-foreground">
+                            Preview
+                          </h2>
+                          {isPreviewUpdating && (
+                            <Spinner
+                              className="h-3.5 w-3.5 text-muted-foreground"
+                              aria-label="Updating preview"
+                            />
+                          )}
+                        </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -1101,6 +1207,7 @@ export function MainContent({
                           preview={preview}
                           segments={previewSegments}
                           showHighlights={showPreviewHighlights}
+                          isTruncated={isPreviewTruncated}
                         />
                       </div>
                     </section>
@@ -1113,9 +1220,17 @@ export function MainContent({
           {isPreviewOpen && (
             <aside className="hidden min-w-0 min-h-0 flex-col bg-muted/30 lg:flex">
               <div className="flex items-center justify-between gap-3 border-b border-border px-6 py-4 shrink-0">
-                <h2 className="text-lg font-semibold text-foreground">
-                  Preview
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Preview
+                  </h2>
+                  {isPreviewUpdating && (
+                    <Spinner
+                      className="h-4 w-4 text-muted-foreground"
+                      aria-label="Updating preview"
+                    />
+                  )}
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -1155,6 +1270,7 @@ export function MainContent({
                     preview={preview}
                     segments={previewSegments}
                     showHighlights={showPreviewHighlights}
+                    isTruncated={isPreviewTruncated}
                   />
                 </div>
               </div>
