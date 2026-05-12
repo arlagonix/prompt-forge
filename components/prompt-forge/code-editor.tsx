@@ -60,6 +60,7 @@ export function CodeEditor({
 
   const isMobile = useIsMobile();
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+  const filenameInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const previousDocumentIdentityRef = useRef<string | null>(null);
@@ -73,6 +74,21 @@ export function CodeEditor({
     () => `${documentIdentity}:${initialContent.length}:${initialContent}`,
     [documentIdentity, initialContent],
   );
+
+  const shouldFocusNameOnOpen = isNew && showNameInput;
+
+  const focusFilenameInput = useCallback(() => {
+    const filenameInput = filenameInputRef.current;
+    if (!filenameInput) {
+      return;
+    }
+
+    filenameInput.focus();
+    filenameInput.setSelectionRange(
+      filenameInput.value.length,
+      filenameInput.value.length,
+    );
+  }, []);
 
   useEffect(() => {
     const previousIdentity = previousDocumentIdentityRef.current;
@@ -360,10 +376,22 @@ export function CodeEditor({
       }
 
       requestAnimationFrame(() => {
+        if (shouldFocusNameOnOpen) {
+          focusFilenameInput();
+          return;
+        }
+
         editor.focus();
       });
     },
-    [handleClose, isNew, requestSave, wrapCurrentSelection],
+    [
+      focusFilenameInput,
+      handleClose,
+      isNew,
+      requestSave,
+      shouldFocusNameOnOpen,
+      wrapCurrentSelection,
+    ],
   );
 
   return (
@@ -380,15 +408,8 @@ export function CodeEditor({
           onOpenAutoFocus={(e) => {
             e.preventDefault();
 
-            if (isNew && showNameInput) {
-              const filenameInput = document.getElementById("editor-filename");
-              if (filenameInput instanceof HTMLInputElement) {
-                filenameInput.focus();
-                filenameInput.setSelectionRange(
-                  filenameInput.value.length,
-                  filenameInput.value.length,
-                );
-              }
+            if (shouldFocusNameOnOpen) {
+              requestAnimationFrame(focusFilenameInput);
               return;
             }
 
@@ -429,6 +450,7 @@ export function CodeEditor({
                         Prompt name
                       </Label>
                       <Input
+                        ref={filenameInputRef}
                         id="editor-filename"
                         type="text"
                         value={newFileName}
