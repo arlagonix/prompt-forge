@@ -28,10 +28,12 @@ import type {
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
+  Check,
   ChevronDown,
   ChevronRight,
   Code,
   Copy,
+  CopyPlus,
   Download,
   EyeOff,
   FileText,
@@ -42,6 +44,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Settings,
   Trash2,
   Upload,
   X,
@@ -70,6 +73,7 @@ interface SidebarProps {
   ) => void | Promise<void>;
   onImportRoot: () => void;
   onExportRoot: () => void;
+  onOpenAutoBackup: () => void;
   onEditTemplateStarter: () => void;
   onOpenQuickConvert: () => void;
   onRenameFolder: (folderId: string, name: string) => void | Promise<void>;
@@ -80,7 +84,8 @@ interface SidebarProps {
     promptCount: number;
   }>;
   onDeleteFile: (fileId: string) => void;
-  onCopyFile: (fileId: string) => void;
+  onCopyFile: (fileId: string) => boolean | Promise<boolean> | void | Promise<void>;
+  onCloneFile: (fileId: string) => void;
   onExportFile: (fileId: string) => void;
   isLoading: boolean;
   isOpen: boolean;
@@ -121,6 +126,7 @@ export function Sidebar({
   onCreateFolder,
   onImportRoot,
   onExportRoot,
+  onOpenAutoBackup,
   onEditTemplateStarter,
   onOpenQuickConvert,
   onRenameFolder,
@@ -128,6 +134,7 @@ export function Sidebar({
   onGetFolderDeleteSummary,
   onDeleteFile,
   onCopyFile,
+  onCloneFile,
   onExportFile,
   isLoading,
   isOpen,
@@ -358,7 +365,7 @@ export function Sidebar({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreHorizontal className="h-4 w-4" />
+                    <Settings className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -380,6 +387,17 @@ export function Sidebar({
                     Export Workspace
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      rootMenuSuppressRestoreFocusRef.current = true;
+                      setTimeout(() => {
+                        onOpenAutoBackup();
+                      }, 0);
+                    }}
+                  >
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Auto backup
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
                       rootMenuSuppressRestoreFocusRef.current = true;
@@ -533,6 +551,7 @@ export function Sidebar({
                 onMoveFile={onMoveFile}
                 onDeleteFile={onDeleteFile}
                 onCopyFile={onCopyFile}
+                onCloneFile={onCloneFile}
                 onExportFile={onExportFile}
                 onCreateFile={onCreateFile}
                 onImportFolder={onImportFolder}
@@ -658,7 +677,8 @@ interface FolderContentsProps {
   onOpenTemplate: (fileId: string) => void;
   onMoveFile: (fileId: string) => void;
   onDeleteFile: (fileId: string) => void;
-  onCopyFile: (fileId: string) => void;
+  onCopyFile: (fileId: string) => boolean | Promise<boolean> | void | Promise<void>;
+  onCloneFile: (fileId: string) => void;
   onExportFile: (fileId: string) => void;
   onCreateFile: (folderId?: string) => void;
   onImportFolder: (folderId: string) => void;
@@ -707,6 +727,7 @@ function FolderContents({
   onMoveFile,
   onDeleteFile,
   onCopyFile,
+  onCloneFile,
   onExportFile,
   onCreateFile,
   onImportFolder,
@@ -758,6 +779,7 @@ function FolderContents({
             onMoveFile={onMoveFile}
             onDeleteFile={onDeleteFile}
             onCopyFile={onCopyFile}
+            onCloneFile={onCloneFile}
             onExportFile={onExportFile}
             onCreateFile={onCreateFile}
             onImportFolder={onImportFolder}
@@ -806,6 +828,7 @@ function FolderContents({
             onMove={() => onMoveFile(node.id)}
             onDelete={() => onDeleteFile(node.id)}
             onCopy={() => onCopyFile(node.id)}
+            onClone={() => onCloneFile(node.id)}
             onExport={() => onExportFile(node.id)}
             level={level}
             isDragging={
@@ -829,7 +852,8 @@ interface FolderItemProps {
   onOpenTemplate: (fileId: string) => void;
   onMoveFile: (fileId: string) => void;
   onDeleteFile: (fileId: string) => void;
-  onCopyFile: (fileId: string) => void;
+  onCopyFile: (fileId: string) => boolean | Promise<boolean> | void | Promise<void>;
+  onCloneFile: (fileId: string) => void;
   onExportFile: (fileId: string) => void;
   onCreateFile: (folderId?: string) => void;
   onImportFolder: (folderId: string) => void;
@@ -878,6 +902,7 @@ function FolderItem({
   onMoveFile,
   onDeleteFile,
   onCopyFile,
+  onCloneFile,
   onExportFile,
   onCreateFile,
   onImportFolder,
@@ -1155,6 +1180,7 @@ function FolderItem({
             onMoveFile={onMoveFile}
             onDeleteFile={onDeleteFile}
             onCopyFile={onCopyFile}
+            onCloneFile={onCloneFile}
             onExportFile={onExportFile}
             onCreateFile={onCreateFile}
             onImportFolder={onImportFolder}
@@ -1206,7 +1232,8 @@ interface FileItemProps {
   onOpenTemplate: () => void;
   onMove: () => void;
   onDelete: () => void;
-  onCopy: () => void;
+  onCopy: () => boolean | Promise<boolean> | void | Promise<void>;
+  onClone: () => void;
   onExport: () => void;
   level: number;
   isDragging: boolean;
@@ -1224,6 +1251,7 @@ function FileItem({
   onMove,
   onDelete,
   onCopy,
+  onClone,
   onExport,
   level,
   isDragging,
@@ -1231,9 +1259,27 @@ function FileItem({
   onDragEnd,
 }: FileItemProps) {
   const suppressMenuRestoreFocusRef = useRef(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const isVisible = searchQuery
     ? file.name.toLowerCase().includes(searchQuery.toLowerCase())
     : true;
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeoutId = window.setTimeout(() => {
+      setCopied(false);
+      setIsMenuOpen(false);
+    }, 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, [copied]);
+
+  const handleCopySelect = async (event: Event) => {
+    event.preventDefault();
+    const result = await onCopy();
+    if (result === false) return;
+    setCopied(true);
+  };
 
   if (!isVisible) return null;
 
@@ -1269,7 +1315,13 @@ function FileItem({
         </span>
       </button>
 
-      <DropdownMenu>
+      <DropdownMenu
+        open={isMenuOpen}
+        onOpenChange={(open) => {
+          setIsMenuOpen(open);
+          if (!open) setCopied(false);
+        }}
+      >
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -1314,9 +1366,17 @@ function FileItem({
             <Folder className="mr-2 h-4 w-4" />
             Move to…
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={onCopy}>
-            <Copy className="mr-2 h-4 w-4" />
-            Copy
+          <DropdownMenuItem onSelect={handleCopySelect}>
+            {copied ? (
+              <Check className="mr-2 h-4 w-4" />
+            ) : (
+              <Copy className="mr-2 h-4 w-4" />
+            )}
+            {copied ? "Copied" : "Copy"}
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onClone}>
+            <CopyPlus className="mr-2 h-4 w-4" />
+            Clone
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onExport}>

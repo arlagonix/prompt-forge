@@ -9,8 +9,8 @@ import {
 } from "@/components/ui/dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Copy, FileText, X } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { Check, Copy, FileText, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { MobileTemplateTextarea } from "./mobile-template-textarea";
 import { TemplateMonacoEditor } from "./template-monaco-editor";
@@ -27,6 +27,13 @@ export function TemplateModal({
   content,
 }: TemplateModalProps) {
   const isMobile = useIsMobile();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeoutId = window.setTimeout(() => setCopied(false), 1500);
+    return () => window.clearTimeout(timeoutId);
+  }, [copied]);
 
   const handleCopy = useCallback(async () => {
     if (!content) {
@@ -36,7 +43,7 @@ export function TemplateModal({
 
     try {
       await navigator.clipboard.writeText(content);
-      toast.success("Copied to clipboard!");
+      setCopied(true);
     } catch {
       toast.error("Failed to copy");
     }
@@ -83,8 +90,12 @@ export function TemplateModal({
               )}
             >
               <Button variant="outline" size="sm" onClick={handleCopy}>
-                <Copy className="mr-1.5 h-4 w-4" />
-                Copy
+                {copied ? (
+                  <Check className="mr-1.5 h-4 w-4" />
+                ) : (
+                  <Copy className="mr-1.5 h-4 w-4" />
+                )}
+                {copied ? "Copied" : "Copy"}
               </Button>
               <Button variant="outline" size="sm" onClick={onClose}>
                 <X className="mr-1.5 h-4 w-4" />

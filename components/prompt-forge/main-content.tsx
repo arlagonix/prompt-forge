@@ -75,6 +75,8 @@ import {
   ChevronsUpDown,
   Code,
   Copy,
+  CopyPlus,
+  Dice5,
   Eye,
   EyeOff,
   FileText,
@@ -85,6 +87,7 @@ import {
   Pencil,
   Plus,
   RotateCcw,
+  Settings,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -96,10 +99,8 @@ type PreviewLinePart = {
   paramName?: string;
 };
 
-
 const PREVIEW_DEBOUNCE_MS = 250;
 const MAX_RENDERED_PREVIEW_CHARS = 30_000;
-
 
 function useDebouncedValue<T>(
   value: T,
@@ -247,7 +248,8 @@ function PromptPreview({
     <div className={className}>
       {isTruncated && (
         <div className="mb-4 rounded-lg border border-dashed border-border bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-          Preview truncated due to large length. Copy still uses the full prompt.
+          Preview truncated due to large length. Copy still uses the full
+          prompt.
         </div>
       )}
       <div className="font-mono text-sm leading-relaxed text-foreground">
@@ -298,7 +300,8 @@ interface MainContentProps {
   onEditFile: () => void;
   onMoveFile: () => void;
   onDeleteFile: () => void;
-  onCopyTemplate: () => void;
+  onCopyTemplate: () => boolean | Promise<boolean> | void | Promise<void>;
+  onCloneTemplate: () => void;
   onExportFile: () => void;
   onCreateFile: () => void;
   showNotification: (message: string, type?: "success" | "error") => void;
@@ -320,7 +323,12 @@ const DEFAULT_CLIPBOARD_UI_STATE: ClipboardUiState = {
 function isClipboardImportFormatValue(
   value: unknown,
 ): value is ClipboardImportFormat {
-  return value === "html" || value === "minified" || value === "markdown" || value === "plain_text";
+  return (
+    value === "html" ||
+    value === "minified" ||
+    value === "markdown" ||
+    value === "plain_text"
+  );
 }
 
 function normalizeClipboardUiState(raw: unknown): ClipboardUiState {
@@ -605,6 +613,7 @@ export function MainContent({
   onMoveFile,
   onDeleteFile,
   onCopyTemplate,
+  onCloneTemplate,
   onExportFile,
   showNotification,
   onToggleSidebar,
@@ -629,6 +638,9 @@ export function MainContent({
   );
   const [showPreviewHighlights, setShowPreviewHighlights] =
     useState<boolean>(true);
+  const [copied, setCopied] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const [copiedTemplateSource, setCopiedTemplateSource] = useState(false);
   const actionsMenuSuppressRestoreFocusRef = useRef(false);
   const isMobile = useIsMobile();
   const debouncedTemplateState = useDebouncedValue(
@@ -886,11 +898,42 @@ export function MainContent({
 
     try {
       await navigator.clipboard.writeText(fullPrompt);
-      showNotification("Copied to clipboard!");
+      setCopied(true);
     } catch {
       showNotification("Failed to copy", "error");
     }
-  }, [currentFile, parseError, parsedTemplate, showNotification, templateState]);
+  }, [
+    currentFile,
+    parseError,
+    parsedTemplate,
+    showNotification,
+    templateState,
+  ]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timeoutId = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timeoutId);
+  }, [copied]);
+
+  useEffect(() => {
+    if (!copiedTemplateSource) return;
+    const timeoutId = window.setTimeout(() => {
+      setCopiedTemplateSource(false);
+      setIsActionsMenuOpen(false);
+    }, 1200);
+    return () => window.clearTimeout(timeoutId);
+  }, [copiedTemplateSource]);
+
+  const handleCopyTemplateSource = useCallback(
+    async (event: Event) => {
+      event.preventDefault();
+      const result = await onCopyTemplate();
+      if (result === false) return;
+      setCopiedTemplateSource(true);
+    },
+    [onCopyTemplate],
+  );
 
   const handleClear = useCallback(() => {
     if (!parsedTemplate) return;
@@ -1003,14 +1046,20 @@ export function MainContent({
                     </>
                   )}
 
-                  <DropdownMenu>
+                  <DropdownMenu
+                    open={isActionsMenuOpen}
+                    onOpenChange={(open) => {
+                      setIsActionsMenuOpen(open);
+                      if (!open) setCopiedTemplateSource(false);
+                    }}
+                  >
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-muted-foreground hover:text-foreground"
                       >
-                        <MoreHorizontal className="h-4 w-4" />
+                        <Settings className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent
@@ -1058,9 +1107,17 @@ export function MainContent({
                         <Folder className="mr-2 h-4 w-4" />
                         Move to…
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={onCopyTemplate}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy template source
+                      <DropdownMenuItem onSelect={handleCopyTemplateSource}>
+                        {copiedTemplateSource ? (
+                          <Check className="mr-2 h-4 w-4" />
+                        ) : (
+                          <Copy className="mr-2 h-4 w-4" />
+                        )}
+                        {copiedTemplateSource ? "Copied" : "Copy template source"}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={onCloneTemplate}>
+                        <CopyPlus className="mr-2 h-4 w-4" />
+                        Clone
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={onExportFile}>
                         <Upload className="mr-2 h-4 w-4" />
@@ -1141,18 +1198,6 @@ export function MainContent({
                     />
                   )}
 
-                  <div className="pt-2">
-                    <Button onClick={handleCopy} className="w-full" size="lg">
-                      <Copy className="mr-2 h-4 w-4" />
-                      Copy Prompt
-                    </Button>
-                    {!isMobile && (
-                      <p className="mt-2 text-center text-xs text-muted-foreground">
-                        <Kbd>Ctrl</Kbd> + <Kbd>Enter</Kbd> to copy
-                      </p>
-                    )}
-                  </div>
-
                   {isMobile && isPreviewOpen && (
                     <section className="rounded-xl border border-border bg-muted/30">
                       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
@@ -1214,6 +1259,29 @@ export function MainContent({
                   )}
                 </div>
               </ScrollArea>
+            </div>
+
+            <div className="shrink-0 border-t border-border bg-background">
+              <div
+                className={cn(
+                  "px-4 py-3 md:px-6 md:py-4",
+                  centeredMainContentClassName,
+                )}
+              >
+                <Button
+                  onClick={handleCopy}
+                  className="w-full"
+                  size="lg"
+                  aria-live="polite"
+                >
+                  {copied ? (
+                    <Check className="mr-2 h-4 w-4" />
+                  ) : (
+                    <Copy className="mr-2 h-4 w-4" />
+                  )}
+                  {copied ? "Copied" : "Copy Prompt"}
+                </Button>
+              </div>
             </div>
           </section>
 
@@ -1308,7 +1376,7 @@ export function MainContent({
                   size="icon"
                   className="h-8 w-8 text-muted-foreground hover:text-foreground"
                 >
-                  <MoreHorizontal className="h-4 w-4" />
+                  <Settings className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
@@ -1335,7 +1403,8 @@ export function MainContent({
                 Open a template
               </h3>
               <p className="mb-4 text-sm text-muted-foreground">
-                Choose a template from the sidebar to fill its fields, preview the rendered result, and copy the final prompt.
+                Choose a template from the sidebar to fill its fields, preview
+                the rendered result, and copy the final prompt.
               </p>
 
               <div className="mb-5 flex justify-center">
@@ -1391,6 +1460,7 @@ function ParameterField({
   const [isImportingFolder, setIsImportingFolder] = useState(false);
   const [isFolderDragActive, setIsFolderDragActive] = useState(false);
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
+  const [randomConfirmed, setRandomConfirmed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const id = `param-${param.name}`;
   const isInlineField =
@@ -1416,6 +1486,56 @@ function ParameterField({
       }
     }
   };
+
+  const randomOptions =
+    param.type === "select" || param.type === "combobox"
+      ? getFieldOptionGroups(param).flatMap((group) => group.options)
+      : [];
+  const showRandomButton =
+    param.random &&
+    (param.type === "select" || param.type === "combobox") &&
+    randomOptions.length > 0;
+
+  useEffect(() => {
+    if (!randomConfirmed) return;
+    const timeoutId = window.setTimeout(() => setRandomConfirmed(false), 900);
+    return () => window.clearTimeout(timeoutId);
+  }, [randomConfirmed]);
+
+  const handleRandomize = useCallback(() => {
+    if (randomOptions.length === 0) return;
+
+    const candidates =
+      randomOptions.length > 1
+        ? randomOptions.filter((option) => option.value !== value)
+        : randomOptions;
+    const availableOptions = candidates.length > 0 ? candidates : randomOptions;
+    const nextOption =
+      availableOptions[Math.floor(Math.random() * availableOptions.length)];
+
+    if (!nextOption) return;
+    onChange(nextOption.value);
+    setIsComboboxOpen(false);
+    setRandomConfirmed(true);
+  }, [onChange, randomOptions, value]);
+
+  const randomButton = showRandomButton ? (
+    <Button
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={handleRandomize}
+      className="shrink-0"
+      title="Pick a random value"
+      aria-label="Pick a random value"
+    >
+      {randomConfirmed ? (
+        <Check className="h-4 w-4" />
+      ) : (
+        <Dice5 className="h-4 w-4" />
+      )}
+    </Button>
+  ) : null;
 
   const isClipboardImportResultEmpty = useCallback(
     (nextValue: string) =>
@@ -1494,7 +1614,7 @@ function ParameterField({
   }, [applyImportedFolderBlocks, param.folderImport, showNotification]);
 
   const handleFolderDragOver = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
+    (e: React.DragEvent<HTMLElement>) => {
       if (!param.folderImport?.enabled || isImportingFolder) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "copy";
@@ -1504,7 +1624,7 @@ function ParameterField({
   );
 
   const handleFolderDragLeave = useCallback(
-    (e: React.DragEvent<HTMLDivElement>) => {
+    (e: React.DragEvent<HTMLElement>) => {
       if (!param.folderImport?.enabled) return;
       const nextTarget = e.relatedTarget;
       if (nextTarget instanceof Node && e.currentTarget.contains(nextTarget)) {
@@ -1516,7 +1636,7 @@ function ParameterField({
   );
 
   const handleFolderDrop = useCallback(
-    async (e: React.DragEvent<HTMLDivElement>) => {
+    async (e: React.DragEvent<HTMLElement>) => {
       if (!param.folderImport?.enabled || isImportingFolder) return;
 
       e.preventDefault();
@@ -1539,7 +1659,12 @@ function ParameterField({
         setIsImportingFolder(false);
       }
     },
-    [applyImportedFolderBlocks, isImportingFolder, param.folderImport, showNotification],
+    [
+      applyImportedFolderBlocks,
+      isImportingFolder,
+      param.folderImport,
+      showNotification,
+    ],
   );
 
   const handleTextareaPaste = useCallback(
@@ -1783,24 +1908,27 @@ function ParameterField({
     return (
       <div className={fieldContainerClassName}>
         {meta}
-        <div className="flex-1 min-w-0">
-          <Select value={value} onValueChange={onChange}>
-            <SelectTrigger className="w-full min-w-0 bg-card border-border">
-              <SelectValue placeholder="Select an option" />
-            </SelectTrigger>
-            <SelectContent>
-              {optionGroups.map((group, groupIndex) => (
-                <SelectGroup key={`${param.name}-group-${groupIndex}`}>
-                  {group.label && <SelectLabel>{group.label}</SelectLabel>}
-                  {group.options.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              ))}
-            </SelectContent>
-          </Select>
+        <div className="flex flex-1 min-w-0 gap-2">
+          <div className="min-w-0 flex-1">
+            <Select value={value} onValueChange={onChange}>
+              <SelectTrigger className="w-full min-w-0 bg-card border-border">
+                <SelectValue placeholder="Select an option" />
+              </SelectTrigger>
+              <SelectContent>
+                {optionGroups.map((group, groupIndex) => (
+                  <SelectGroup key={`${param.name}-group-${groupIndex}`}>
+                    {group.label && <SelectLabel>{group.label}</SelectLabel>}
+                    {group.options.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {randomButton}
         </div>
       </div>
     );
@@ -1813,8 +1941,9 @@ function ParameterField({
     return (
       <div className={fieldContainerClassName}>
         {meta}
-        <div className="flex-1 min-w-0">
-          <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
+        <div className="flex flex-1 min-w-0 gap-2">
+          <div className="min-w-0 flex-1">
+            <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
             <PopoverTrigger asChild>
               <Button
                 type="button"
@@ -1881,7 +2010,9 @@ function ParameterField({
                 </CommandList>
               </Command>
             </PopoverContent>
-          </Popover>
+            </Popover>
+          </div>
+          {randomButton}
         </div>
       </div>
     );

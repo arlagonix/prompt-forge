@@ -37,12 +37,6 @@ interface QuickConvertModalProps {
 
 type OutputTab = "html" | "minified" | "markdown" | "preview";
 
-const TAB_LABELS: Record<Exclude<OutputTab, "preview">, string> = {
-  html: "HTML",
-  minified: "Minified",
-  markdown: "Markdown",
-};
-
 function getClipboardIncoming(data: DataTransfer | null): string {
   const source = readClipboardSourceFromDataTransfer(data);
 
@@ -95,7 +89,7 @@ export function QuickConvertModal({
   const pasteBoxRef = useRef<HTMLDivElement | null>(null);
   const outputPanelRef = useRef<HTMLDivElement | null>(null);
   const [rawHtml, setRawHtml] = useState("");
-  const [activeTab, setActiveTab] = useState<OutputTab>("html");
+  const [activeTab, setActiveTab] = useState<OutputTab>("markdown");
   const [copied, setCopied] = useState(false);
 
   const result = useMemo(() => processClipboardHtml(rawHtml), [rawHtml]);
@@ -115,6 +109,12 @@ export function QuickConvertModal({
     const timeout = window.setTimeout(() => setCopied(false), 1500);
     return () => window.clearTimeout(timeout);
   }, [copied]);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab("markdown");
+    }
+  }, [isOpen]);
 
   const syncFromPasteBox = useCallback(() => {
     setRawHtml(pasteBoxRef.current?.innerHTML ?? "");
@@ -225,8 +225,7 @@ export function QuickConvertModal({
     }
 
     setCopied(true);
-    showNotification(`${TAB_LABELS[activeTab]} copied`);
-  }, [activeTab, showNotification]);
+  }, [activeTab]);
 
   const handleCopy = useCallback(async () => {
     const value = getCopyValue();
@@ -391,6 +390,10 @@ export function QuickConvertModal({
                 className="flex h-full min-h-0 flex-col gap-0 overflow-hidden"
               >
                 <TabsList className="mb-4 shrink-0 grid h-auto grid-cols-2 sm:grid-cols-4">
+                  <TabsTrigger value="markdown">
+                    <ScanText className="size-4" />
+                    Markdown
+                  </TabsTrigger>
                   <TabsTrigger value="html">
                     <FileCode2 className="size-4" />
                     HTML
@@ -399,10 +402,7 @@ export function QuickConvertModal({
                     <Minimize2 className="size-4" />
                     Minified
                   </TabsTrigger>
-                  <TabsTrigger value="markdown">
-                    <ScanText className="size-4" />
-                    Markdown
-                  </TabsTrigger>
+
                   <TabsTrigger value="preview">
                     <Eye className="size-4" />
                     Preview

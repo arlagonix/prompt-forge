@@ -3,18 +3,26 @@ interface FileSystemHandle {
   name: string
 }
 
+interface FileSystemWritableFileStream {
+  write(data: Blob | string | BufferSource): Promise<void>
+  close(): Promise<void>
+}
+
 interface FileSystemFileHandle extends FileSystemHandle {
   kind: "file"
   getFile(): Promise<File>
+  createWritable(): Promise<FileSystemWritableFileStream>
 }
 
 interface FileSystemDirectoryHandle extends FileSystemHandle {
   kind: "directory"
   values(): AsyncIterableIterator<FileSystemFileHandle | FileSystemDirectoryHandle>
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<FileSystemFileHandle>
+  removeEntry(name: string, options?: { recursive?: boolean }): Promise<void>
 }
 
 interface Window {
-  showDirectoryPicker(): Promise<FileSystemDirectoryHandle>
+  showDirectoryPicker(options?: { mode?: "read" | "readwrite" }): Promise<FileSystemDirectoryHandle>
 }
 
 interface File {

@@ -78,6 +78,7 @@ export interface Parameter {
   clipboardImport: ClipboardImportConfig | null;
   folderImport: FolderImportConfig | null;
   inline: boolean;
+  random: boolean;
 }
 
 export type FieldType = Parameter["type"];
@@ -123,6 +124,7 @@ export interface TemplateFieldDefinition {
   clipboardImport: ClipboardImportConfig | null;
   folderImport: FolderImportConfig | null;
   inline: boolean;
+  random: boolean;
   explicit: boolean;
 }
 

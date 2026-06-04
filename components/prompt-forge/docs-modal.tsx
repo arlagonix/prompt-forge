@@ -171,7 +171,7 @@ Constraints:
             <DocSection title="When to use front matter">
               <p className="mb-3 text-sm text-muted-foreground">
                 Add YAML front matter when you want labels, field types, choice
-                fields, clipboard import, reusable templates, or nested groups.
+                fields, random choice buttons, clipboard import, reusable templates, or nested groups.
               </p>
               <CodeBlock>{`---
 title: Blog summary
@@ -183,6 +183,7 @@ params:
   - name: audience
     type: select
     label: Audience
+    random: true
     values: [developers, managers, customers]
 ---
 
@@ -263,6 +264,23 @@ type: radio`}</CodeBlock>
                 If <code>type</code> is omitted for a declared field, it defaults
                 to <code>textarea</code>.
               </p>
+            </DocSection>
+
+            <DocSection title="Random choice fields">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Add <code>random: true</code> to <code>select</code> or
+                <code> combobox</code> fields to show a dice button that chooses
+                a random option. When more than one option exists, the current
+                value is avoided.
+              </p>
+              <CodeBlock>{`---
+params:
+  - name: tone
+    type: select
+    label: Tone
+    random: true
+    values: [Direct, Friendly, Formal]
+---`}</CodeBlock>
             </DocSection>
 
             <DocSection title="Groups and repeatable blocks">
@@ -402,9 +420,11 @@ params:
               <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
                 <li>JSON only</li>
                 <li>export types: template, folder, workspace</li>
-                <li>import is merge-only</li>
-                <li>imported nodes receive new internal IDs</li>
-                <li>duplicate names are allowed</li>
+                <li>imports merge folders with the same name in the same parent</li>
+                <li>templates and folders cannot have duplicate names in the same folder, case-insensitively</li>
+                <li>when imported templates conflict, choose Replace conflicts or Create copies once for the import</li>
+                <li>identical imported templates are skipped</li>
+                <li>created copies use names like <code>Name (1)</code>, <code>Name (2)</code>, and so on</li>
               </ul>
               <CodeBlock>{`{
   "version": 1,
@@ -414,6 +434,17 @@ params:
     "children": []
   }
 }`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Auto backup">
+              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li>Auto backup is off by default and can be enabled from the settings menu.</li>
+                <li>Choose a custom backup folder before automatic backups can be saved.</li>
+                <li>Automatic backups save full workspace JSON files after saved changes.</li>
+                <li>Backups use a 5-minute cooldown so frequent edits do not create too many files.</li>
+                <li>Only files named <code>prompt-forge-backup-*.json</code> are rotated when the maximum backup count is reached.</li>
+                <li>Imports do not trigger a new automatic backup.</li>
+              </ul>
             </DocSection>
 
             <DocSection title="Keyboard shortcuts">

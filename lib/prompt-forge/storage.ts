@@ -71,6 +71,68 @@ function transactionDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
+function normalizeEntityName(name: string): string {
+  return name.trim().toLocaleLowerCase();
+}
+
+function ensureUniquePromptName(
+  prompts: PromptRecord[],
+  folderId: string | null,
+  name: string,
+  excludeId?: string,
+): void {
+  const normalizedName = normalizeEntityName(name);
+  const duplicate = prompts.find(
+    (prompt) =>
+      prompt.folderId === folderId &&
+      prompt.id !== excludeId &&
+      normalizeEntityName(prompt.name) === normalizedName,
+  );
+
+  if (duplicate) {
+    throw new Error(
+      `A template named "${name}" already exists in this folder.`,
+    );
+  }
+}
+
+function ensureUniqueFolderName(
+  folders: FolderRecord[],
+  parentId: string | null,
+  name: string,
+  excludeId?: string,
+): void {
+  const normalizedName = normalizeEntityName(name);
+  const duplicate = folders.find(
+    (folder) =>
+      folder.parentId === parentId &&
+      folder.id !== excludeId &&
+      normalizeEntityName(folder.name) === normalizedName,
+  );
+
+  if (duplicate) {
+    throw new Error(
+      `A folder named "${name}" already exists in this folder.`,
+    );
+  }
+}
+
+export function buildUniqueCopyName(
+  baseName: string,
+  existingNames: string[],
+): string {
+  const existing = new Set(existingNames.map(normalizeEntityName));
+
+  for (let index = 1; index < Number.MAX_SAFE_INTEGER; index += 1) {
+    const candidate = `${baseName} (${index})`;
+    if (!existing.has(normalizeEntityName(candidate))) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Could not generate a unique copy name");
+}
+
 export async function openPromptForgeDb(): Promise<IDBDatabase> {
   return await new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -172,6 +234,9 @@ export async function createPrompt(
   const tx = db.transaction(PROMPTS_STORE, "readwrite");
   const store = tx.objectStore(PROMPTS_STORE);
 
+  const prompts = (await requestToPromise(store.getAll())) as PromptRecord[];
+  ensureUniquePromptName(prompts, folderId, name);
+
   const now = Date.now();
   const prompt: PromptRecord = {
     id: randomId("prompt"),
@@ -185,6 +250,24 @@ export async function createPrompt(
   store.put(prompt);
   await transactionDone(tx);
   return prompt;
+}
+
+export async function clonePrompt(id: string): Promise<PromptRecord> {
+  const existing = await getPromptById(id);
+  if (!existing) {
+    throw new Error("Prompt not found");
+  }
+
+  const prompts = await getAllPrompts();
+  const siblingNames = prompts
+    .filter((prompt) => prompt.folderId === existing.folderId)
+    .map((prompt) => prompt.name);
+
+  return await createPrompt(
+    buildUniqueCopyName(existing.name, siblingNames),
+    existing.folderId,
+    existing.content,
+  );
 }
 
 export async function updatePromptContent(
@@ -227,6 +310,9 @@ export async function renamePrompt(
   if (!existing) {
     throw new Error("Prompt not found");
   }
+
+  const prompts = (await requestToPromise(store.getAll())) as PromptRecord[];
+  ensureUniquePromptName(prompts, existing.folderId, name, id);
 
   const updated: PromptRecord = {
     ...existing,
@@ -398,6 +484,9 @@ export async function createFolder(
   const tx = db.transaction(FOLDERS_STORE, "readwrite");
   const store = tx.objectStore(FOLDERS_STORE);
 
+  const folders = (await requestToPromise(store.getAll())) as FolderRecord[];
+  ensureUniqueFolderName(folders, parentId, name);
+
   const now = Date.now();
   const folder: FolderRecord = {
     id: randomId("folder"),
@@ -427,6 +516,9 @@ export async function renameFolder(
   if (!existing) {
     throw new Error("Folder not found");
   }
+
+  const folders = (await requestToPromise(store.getAll())) as FolderRecord[];
+  ensureUniqueFolderName(folders, existing.parentId, name, id);
 
   const updated: FolderRecord = {
     ...existing,
@@ -588,6 +680,9 @@ export async function movePrompt(
     throw new Error("Prompt not found");
   }
 
+  const prompts = (await requestToPromise(store.getAll())) as PromptRecord[];
+  ensureUniquePromptName(prompts, folderId, existing.name, id);
+
   const updated: PromptRecord = {
     ...existing,
     folderId,
@@ -614,6 +709,9 @@ export async function moveFolder(
   if (!existing) {
     throw new Error("Folder not found");
   }
+
+  const folders = (await requestToPromise(store.getAll())) as FolderRecord[];
+  ensureUniqueFolderName(folders, parentId, existing.name, id);
 
   const updated: FolderRecord = {
     ...existing,

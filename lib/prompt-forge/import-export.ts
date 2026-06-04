@@ -1,4 +1,5 @@
 import {
+  buildUniqueCopyName,
   getAllFolders,
   getAllPrompts,
   openPromptForgeDb,
@@ -297,10 +298,140 @@ export function parseAndValidateImport(jsonText: string): PromptForgeExportV1 {
   }
 }
 
+export type ImportConflictResolution = "replace" | "copy";
+
+export interface ImportAnalysisResult {
+  conflictingPromptCount: number;
+  identicalPromptCount: number;
+  folderMergeCount: number;
+}
+
+export interface ImportResult extends ImportAnalysisResult {
+  importedPromptCount: number;
+  importedFolderCount: number;
+  replacedPromptCount: number;
+  copiedPromptCount: number;
+}
+
+function normalizeEntityName(name: string): string {
+  return name.trim().toLocaleLowerCase();
+}
+
+function findFolderByName(
+  folders: FolderRecord[],
+  parentId: string,
+  name: string,
+): FolderRecord | null {
+  const normalizedName = normalizeEntityName(name);
+  return (
+    folders.find(
+      (folder) =>
+        folder.parentId === parentId &&
+        normalizeEntityName(folder.name) === normalizedName,
+    ) ?? null
+  );
+}
+
+function findPromptByName(
+  prompts: PromptRecord[],
+  folderId: string,
+  name: string,
+): PromptRecord | null {
+  const normalizedName = normalizeEntityName(name);
+  return (
+    prompts.find(
+      (prompt) =>
+        prompt.folderId === folderId &&
+        normalizeEntityName(prompt.name) === normalizedName,
+    ) ?? null
+  );
+}
+
+export async function analyzeImportConflicts(
+  data: PromptForgeExportV1,
+  targetFolderId: string,
+): Promise<ImportAnalysisResult> {
+  const [folders, prompts] = await Promise.all([getAllFolders(), getAllPrompts()]);
+
+  if (!folders.some((folder) => folder.id === targetFolderId)) {
+    throw new Error("Target folder not found");
+  }
+
+  const simulatedFolders = [...folders];
+  const simulatedPrompts = [...prompts];
+  const result: ImportAnalysisResult = {
+    conflictingPromptCount: 0,
+    identicalPromptCount: 0,
+    folderMergeCount: 0,
+  };
+
+  const simulateNode = (node: ExportNode, parentId: string): void => {
+    if (node.type === "folder") {
+      const existingFolder = findFolderByName(simulatedFolders, parentId, node.name);
+      const folderId = existingFolder?.id ?? randomId("simulated_folder");
+
+      if (existingFolder) {
+        result.folderMergeCount += 1;
+      } else {
+        simulatedFolders.push({
+          id: folderId,
+          name: node.name,
+          parentId,
+          createdAt: node.createdAt ?? Date.now(),
+          updatedAt: node.updatedAt ?? Date.now(),
+        });
+      }
+
+      for (const child of node.children) {
+        simulateNode(child, folderId);
+      }
+      return;
+    }
+
+    const existingPrompt = findPromptByName(simulatedPrompts, parentId, node.name);
+    if (existingPrompt) {
+      if (existingPrompt.content === node.content) {
+        result.identicalPromptCount += 1;
+        return;
+      }
+
+      result.conflictingPromptCount += 1;
+      const siblingNames = simulatedPrompts
+        .filter((prompt) => prompt.folderId === parentId)
+        .map((prompt) => prompt.name);
+      simulatedPrompts.push({
+        id: randomId("simulated_prompt"),
+        name: buildUniqueCopyName(node.name, siblingNames),
+        folderId: parentId,
+        content: node.content,
+        createdAt: node.createdAt ?? Date.now(),
+        updatedAt: node.updatedAt ?? Date.now(),
+      });
+      return;
+    }
+
+    simulatedPrompts.push({
+      id: randomId("simulated_prompt"),
+      name: node.name,
+      folderId: parentId,
+      content: node.content,
+      createdAt: node.createdAt ?? Date.now(),
+      updatedAt: node.updatedAt ?? Date.now(),
+    });
+  };
+
+  for (const child of data.root.children) {
+    simulateNode(child, targetFolderId);
+  }
+
+  return result;
+}
+
 export async function importExportTree(
   data: PromptForgeExportV1,
   targetFolderId: string,
-): Promise<void> {
+  conflictResolution: ImportConflictResolution = "copy",
+): Promise<ImportResult> {
   const db = await openPromptForgeDb();
   const tx = db.transaction([FOLDERS_STORE, PROMPTS_STORE], "readwrite");
   const foldersStore = tx.objectStore(FOLDERS_STORE);
@@ -312,21 +443,84 @@ export async function importExportTree(
     throw new Error("Target folder not found");
   }
 
-  const importNode = (node: ExportNode, parentId: string) => {
-    const now = Date.now();
+  const folders = (await requestToPromise(foldersStore.getAll())) as FolderRecord[];
+  const prompts = (await requestToPromise(promptsStore.getAll())) as PromptRecord[];
+  const now = Date.now();
+  const result: ImportResult = {
+    conflictingPromptCount: 0,
+    identicalPromptCount: 0,
+    folderMergeCount: 0,
+    importedPromptCount: 0,
+    importedFolderCount: 0,
+    replacedPromptCount: 0,
+    copiedPromptCount: 0,
+  };
+
+  const importNode = (node: ExportNode, parentId: string): void => {
     if (node.type === "folder") {
-      const folderId = randomId("folder");
-      const folder: FolderRecord = {
-        id: folderId,
-        name: node.name,
-        parentId,
-        createdAt: node.createdAt ?? now,
-        updatedAt: node.updatedAt ?? now,
-      };
-      foldersStore.put(folder);
+      const existingFolder = findFolderByName(folders, parentId, node.name);
+      let folderId: string;
+
+      if (existingFolder) {
+        folderId = existingFolder.id;
+        result.folderMergeCount += 1;
+      } else {
+        folderId = randomId("folder");
+        const folder: FolderRecord = {
+          id: folderId,
+          name: node.name,
+          parentId,
+          createdAt: node.createdAt ?? now,
+          updatedAt: node.updatedAt ?? now,
+        };
+        folders.push(folder);
+        foldersStore.put(folder);
+        result.importedFolderCount += 1;
+      }
+
       for (const child of node.children) {
         importNode(child, folderId);
       }
+      return;
+    }
+
+    const existingPrompt = findPromptByName(prompts, parentId, node.name);
+
+    if (existingPrompt) {
+      if (existingPrompt.content === node.content) {
+        result.identicalPromptCount += 1;
+        return;
+      }
+
+      result.conflictingPromptCount += 1;
+
+      if (conflictResolution === "replace") {
+        const updated: PromptRecord = {
+          ...existingPrompt,
+          content: node.content,
+          updatedAt: node.updatedAt ?? now,
+        };
+        const index = prompts.findIndex((prompt) => prompt.id === existingPrompt.id);
+        if (index !== -1) prompts[index] = updated;
+        promptsStore.put(updated);
+        result.replacedPromptCount += 1;
+        return;
+      }
+
+      const siblingNames = prompts
+        .filter((prompt) => prompt.folderId === parentId)
+        .map((prompt) => prompt.name);
+      const prompt: PromptRecord = {
+        id: randomId("prompt"),
+        name: buildUniqueCopyName(node.name, siblingNames),
+        folderId: parentId,
+        content: node.content,
+        createdAt: node.createdAt ?? now,
+        updatedAt: node.updatedAt ?? now,
+      };
+      prompts.push(prompt);
+      promptsStore.put(prompt);
+      result.copiedPromptCount += 1;
       return;
     }
 
@@ -338,7 +532,9 @@ export async function importExportTree(
       createdAt: node.createdAt ?? now,
       updatedAt: node.updatedAt ?? now,
     };
+    prompts.push(prompt);
     promptsStore.put(prompt);
+    result.importedPromptCount += 1;
   };
 
   for (const child of data.root.children) {
@@ -346,4 +542,5 @@ export async function importExportTree(
   }
 
   await transactionDone(tx);
+  return result;
 }

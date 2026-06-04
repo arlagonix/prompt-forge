@@ -344,6 +344,7 @@ function createFieldDefinition(
     clipboardImport: options.clipboardImport ?? null,
     folderImport: options.folderImport ?? null,
     inline: Boolean(options.inline),
+    random: (type === "select" || type === "combobox") && Boolean(options.random),
     explicit: options.explicit ?? false,
   };
 }
@@ -475,6 +476,7 @@ function normalizeMetadataParam(
       name,
     ),
     inline: Boolean(item.inline),
+    random: Boolean(item.random),
     explicit: true,
   });
 }
@@ -681,7 +683,7 @@ function parseTemplateCondition(
   rawCondition: string,
   scopeStack: TemplateGroupDefinition[],
 ): TemplateCondition {
-  const source = rawCondition.trim().replace(/^\((.*)\)$/s, "$1").trim();
+  const source = rawCondition.trim().replace(/^\(([\s\S]*)\)$/, "$1").trim();
   if (!source) {
     throw new Error("Condition cannot be empty.");
   }
@@ -975,6 +977,7 @@ export function extractParameters(content: string | null): Parameter[] {
         clipboardImport: item.field.clipboardImport,
         folderImport: item.field.folderImport,
         inline: item.field.inline,
+        random: item.field.random,
       }));
   } catch {
     return [];
