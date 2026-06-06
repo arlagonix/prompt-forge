@@ -1466,6 +1466,7 @@ function ParameterField({
     param.inline &&
     (param.type === "text" ||
       param.type === "number" ||
+      param.type === "date" ||
       param.type === "select" ||
       param.type === "combobox" ||
       param.type === "checkbox" ||
@@ -1479,7 +1480,7 @@ function ParameterField({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-      if (param.type === "text" || param.type === "number") {
+      if (param.type === "text" || param.type === "number" || param.type === "date") {
         e.preventDefault();
         onCopy();
       }
@@ -1863,6 +1864,22 @@ function ParameterField({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={`Enter ${param.label.toLowerCase()}...`}
+          className="bg-card border-border flex-1 min-w-0"
+        />
+      </div>
+    );
+  }
+
+  if (param.type === "date") {
+    return (
+      <div className={fieldContainerClassName}>
+        {meta}
+        <Input
+          id={id}
+          type="date"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
           className="bg-card border-border flex-1 min-w-0"
         />
       </div>

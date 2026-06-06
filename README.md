@@ -459,6 +459,11 @@ Supported field types:
 - `textarea`
 - `text`
 - `number`
+- `date`
+- `checkbox`
+- `select`
+- `combobox`
+- `radio`
 
 Example:
 
@@ -476,6 +481,11 @@ params:
   - name: calories
     type: number
     label: Calories
+
+  - name: deadline
+    type: date
+    label: Deadline
+    default: "2026-06-06"
 ---
 ```
 

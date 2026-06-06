@@ -32,6 +32,7 @@ const FIELD_TYPES: FieldType[] = [
   "textarea",
   "text",
   "number",
+  "date",
   "checkbox",
   "select",
   "combobox",

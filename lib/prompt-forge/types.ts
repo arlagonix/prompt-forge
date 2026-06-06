@@ -66,6 +66,7 @@ export interface Parameter {
     | "textarea"
     | "text"
     | "number"
+    | "date"
     | "checkbox"
     | "select"
     | "combobox"

@@ -256,6 +256,7 @@ Audience:
               <CodeBlock>{`type: textarea
 type: text
 type: number
+type: date
 type: checkbox
 type: select
 type: combobox
