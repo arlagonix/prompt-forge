@@ -1460,7 +1460,6 @@ function ParameterField({
   const [isImportingFolder, setIsImportingFolder] = useState(false);
   const [isFolderDragActive, setIsFolderDragActive] = useState(false);
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
-  const [randomConfirmed, setRandomConfirmed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const id = `param-${param.name}`;
   const isInlineField =
@@ -1496,12 +1495,6 @@ function ParameterField({
     (param.type === "select" || param.type === "combobox") &&
     randomOptions.length > 0;
 
-  useEffect(() => {
-    if (!randomConfirmed) return;
-    const timeoutId = window.setTimeout(() => setRandomConfirmed(false), 900);
-    return () => window.clearTimeout(timeoutId);
-  }, [randomConfirmed]);
-
   const handleRandomize = useCallback(() => {
     if (randomOptions.length === 0) return;
 
@@ -1516,7 +1509,6 @@ function ParameterField({
     if (!nextOption) return;
     onChange(nextOption.value);
     setIsComboboxOpen(false);
-    setRandomConfirmed(true);
   }, [onChange, randomOptions, value]);
 
   const randomButton = showRandomButton ? (
@@ -1529,11 +1521,7 @@ function ParameterField({
       title="Pick a random value"
       aria-label="Pick a random value"
     >
-      {randomConfirmed ? (
-        <Check className="h-4 w-4" />
-      ) : (
-        <Dice5 className="h-4 w-4" />
-      )}
+      <Dice5 className="h-4 w-4" />
     </Button>
   ) : null;
 

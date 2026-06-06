@@ -38,9 +38,13 @@ import {
   type ImportResult,
 } from "@/lib/prompt-forge/import-export";
 import {
+  AUTO_BACKUP_DIRECTORY_HANDLE_KEY,
   AUTO_BACKUP_SETTINGS_KEY,
   DEFAULT_AUTO_BACKUP_SETTINGS,
   chooseAutoBackupFolder,
+  ensureAutoBackupFolderPermission,
+  getAutoBackupFolderPermission,
+  isAutoBackupDirectoryHandle,
   isAutoBackupFolderSupported,
   normalizeAutoBackupSettings,
   type AutoBackupSettings,
@@ -327,6 +331,38 @@ export default function PromptForge() {
     [],
   );
 
+  const clearAutoBackupTimer = useCallback(() => {
+    if (autoBackupTimerRef.current) {
+      clearTimeout(autoBackupTimerRef.current);
+      autoBackupTimerRef.current = null;
+    }
+  }, []);
+
+  const clearAutoBackupFolder = useCallback(async () => {
+    autoBackupDirectoryHandleRef.current = null;
+    autoBackupMissingFolderNotifiedRef.current = false;
+    setAutoBackupFolderName(null);
+    await setAppState(AUTO_BACKUP_DIRECTORY_HANDLE_KEY, null);
+  }, []);
+
+  const disableAutoBackupBecauseFolderUnavailable = useCallback(
+    async (message: string) => {
+      clearAutoBackupTimer();
+      await clearAutoBackupFolder();
+      await persistAutoBackupSettings({
+        ...autoBackupSettingsRef.current,
+        enabled: false,
+      });
+      showNotification(message, "error");
+    },
+    [
+      clearAutoBackupFolder,
+      clearAutoBackupTimer,
+      persistAutoBackupSettings,
+      showNotification,
+    ],
+  );
+
   const connectAutoBackupFolder = useCallback(async () => {
     if (!isAutoBackupFolderSupported()) {
       showNotification(
@@ -338,6 +374,7 @@ export default function PromptForge() {
 
     try {
       const handle = await chooseAutoBackupFolder();
+      await setAppState(AUTO_BACKUP_DIRECTORY_HANDLE_KEY, handle);
       autoBackupDirectoryHandleRef.current = handle;
       autoBackupMissingFolderNotifiedRef.current = false;
       setAutoBackupFolderName(handle.name);
@@ -376,11 +413,9 @@ export default function PromptForge() {
       if (!directoryHandle) {
         if (manual) {
           directoryHandle = await connectAutoBackupFolder();
-        } else if (!autoBackupMissingFolderNotifiedRef.current) {
-          autoBackupMissingFolderNotifiedRef.current = true;
-          showNotification(
-            "Auto backup is enabled, but the backup folder is not connected",
-            "error",
+        } else {
+          await disableAutoBackupBecauseFolderUnavailable(
+            "Auto backup disabled because the backup folder is not connected. Choose a folder again to enable it.",
           );
         }
       }
@@ -392,6 +427,18 @@ export default function PromptForge() {
       setIsAutoBackupSaving(true);
 
       try {
+        const hasPermission = await ensureAutoBackupFolderPermission(
+          directoryHandle,
+        );
+        if (!hasPermission) {
+          await disableAutoBackupBecauseFolderUnavailable(
+            settings.enabled
+              ? "Auto backup disabled because backup folder permission was denied. Choose a folder again to enable it."
+              : "Backup failed because backup folder permission was denied. Choose a folder again to continue.",
+          );
+          return false;
+        }
+
         const data = await exportWorkspaceTree();
         await writeAutoBackupFile({
           data,
@@ -411,9 +458,10 @@ export default function PromptForge() {
 
         return true;
       } catch (err) {
-        showNotification(
-          `Failed to save backup: ${(err as Error).message}`,
-          "error",
+        await disableAutoBackupBecauseFolderUnavailable(
+          settings.enabled
+            ? `Auto backup disabled because the backup folder is unavailable: ${(err as Error).message}`
+            : `Backup failed because the backup folder is unavailable: ${(err as Error).message}`,
         );
         return false;
       } finally {
@@ -421,7 +469,12 @@ export default function PromptForge() {
         setIsAutoBackupSaving(false);
       }
     },
-    [connectAutoBackupFolder, persistAutoBackupSettings, showNotification],
+    [
+      connectAutoBackupFolder,
+      disableAutoBackupBecauseFolderUnavailable,
+      persistAutoBackupSettings,
+      showNotification,
+    ],
   );
 
   const scheduleAutoBackup = useCallback(() => {
@@ -432,13 +485,9 @@ export default function PromptForge() {
     if (!isAutoBackupFolderSupported()) return;
 
     if (!autoBackupDirectoryHandleRef.current) {
-      if (!autoBackupMissingFolderNotifiedRef.current) {
-        autoBackupMissingFolderNotifiedRef.current = true;
-        showNotification(
-          "Auto backup is enabled, but the backup folder is not connected",
-          "error",
-        );
-      }
+      void disableAutoBackupBecauseFolderUnavailable(
+        "Auto backup disabled because the backup folder is not connected. Choose a folder again to enable it.",
+      );
       return;
     }
 
@@ -450,7 +499,7 @@ export default function PromptForge() {
       autoBackupTimerRef.current = null;
       void runAutoBackup();
     }, delay);
-  }, [runAutoBackup, showNotification]);
+  }, [disableAutoBackupBecauseFolderUnavailable, runAutoBackup]);
 
   useEffect(() => {
     autoBackupSettingsRef.current = autoBackupSettings;
@@ -465,8 +514,47 @@ export default function PromptForge() {
         const savedSettings = await getAppState<AutoBackupSettings>(
           AUTO_BACKUP_SETTINGS_KEY,
         );
+        const savedDirectoryHandle = await getAppState<FileSystemDirectoryHandle>(
+          AUTO_BACKUP_DIRECTORY_HANDLE_KEY,
+        );
         if (isCancelled) return;
-        const normalized = normalizeAutoBackupSettings(savedSettings);
+
+        let normalized = normalizeAutoBackupSettings(savedSettings);
+        const restoreFolderFailureMessage =
+          "Auto backup disabled because the saved backup folder is unavailable. Choose a folder again to enable it.";
+
+        if (
+          isAutoBackupFolderSupported() &&
+          isAutoBackupDirectoryHandle(savedDirectoryHandle)
+        ) {
+          autoBackupDirectoryHandleRef.current = savedDirectoryHandle;
+          autoBackupMissingFolderNotifiedRef.current = false;
+          setAutoBackupFolderName(savedDirectoryHandle.name);
+
+          if (normalized.enabled) {
+            const permission = await getAutoBackupFolderPermission(
+              savedDirectoryHandle,
+            );
+            if (isCancelled) return;
+
+            if (permission === "denied") {
+              normalized = { ...normalized, enabled: false };
+              await clearAutoBackupFolder();
+              await setAppState(AUTO_BACKUP_SETTINGS_KEY, normalized);
+              showNotification(
+                "Auto backup disabled because backup folder permission was denied. Choose a folder again to enable it.",
+                "error",
+              );
+            }
+          }
+        } else if (normalized.enabled) {
+          normalized = { ...normalized, enabled: false };
+          await clearAutoBackupFolder();
+          await setAppState(AUTO_BACKUP_SETTINGS_KEY, normalized);
+          showNotification(restoreFolderFailureMessage, "error");
+        }
+
+        if (isCancelled) return;
         autoBackupSettingsRef.current = normalized;
         setAutoBackupSettings(normalized);
       } catch {
@@ -477,16 +565,13 @@ export default function PromptForge() {
     return () => {
       isCancelled = true;
     };
-  }, []);
+  }, [clearAutoBackupFolder, showNotification]);
 
   useEffect(() => {
     return () => {
-      if (autoBackupTimerRef.current) {
-        clearTimeout(autoBackupTimerRef.current);
-        autoBackupTimerRef.current = null;
-      }
+      clearAutoBackupTimer();
     };
-  }, []);
+  }, [clearAutoBackupTimer]);
 
   const enableAutoBackup = useCallback(async () => {
     if (!isAutoBackupFolderSupported()) {
@@ -501,25 +586,37 @@ export default function PromptForge() {
       autoBackupDirectoryHandleRef.current ?? (await connectAutoBackupFolder());
     if (!directoryHandle) return;
 
+    const hasPermission = await ensureAutoBackupFolderPermission(
+      directoryHandle,
+    );
+    if (!hasPermission) {
+      await disableAutoBackupBecauseFolderUnavailable(
+        "Auto backup disabled because backup folder permission was denied. Choose a folder again to enable it.",
+      );
+      return;
+    }
+
     await persistAutoBackupSettings({
       ...autoBackupSettingsRef.current,
       enabled: true,
     });
     showNotification("Auto backup enabled");
-  }, [connectAutoBackupFolder, persistAutoBackupSettings, showNotification]);
+  }, [
+    connectAutoBackupFolder,
+    disableAutoBackupBecauseFolderUnavailable,
+    persistAutoBackupSettings,
+    showNotification,
+  ]);
 
   const disableAutoBackup = useCallback(async () => {
-    if (autoBackupTimerRef.current) {
-      clearTimeout(autoBackupTimerRef.current);
-      autoBackupTimerRef.current = null;
-    }
+    clearAutoBackupTimer();
 
     await persistAutoBackupSettings({
       ...autoBackupSettingsRef.current,
       enabled: false,
     });
     showNotification("Auto backup disabled");
-  }, [persistAutoBackupSettings, showNotification]);
+  }, [clearAutoBackupTimer, persistAutoBackupSettings, showNotification]);
 
   const setAutoBackupEnabled = useCallback(
     async (enabled: boolean) => {
@@ -1507,7 +1604,9 @@ export default function PromptForge() {
     : autoBackupSettings.enabled
       ? autoBackupFolderName
         ? "On"
-        : "On, folder not connected"
+        : "Disabling, folder not connected"
+      : autoBackupFolderName
+        ? "Off, folder connected"
       : "Off";
   const autoBackupLastBackupText = autoBackupSettings.lastBackupAt
     ? new Date(autoBackupSettings.lastBackupAt).toLocaleString()

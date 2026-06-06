@@ -1,6 +1,8 @@
 import type { PromptForgeExportV1 } from "@/lib/prompt-forge/types";
 
 export const AUTO_BACKUP_SETTINGS_KEY = "auto-backup-settings";
+export const AUTO_BACKUP_DIRECTORY_HANDLE_KEY =
+  "auto-backup-directory-handle";
 export const AUTO_BACKUP_FILENAME_PREFIX = "prompt-forge-backup-";
 export const AUTO_BACKUP_FILENAME_SUFFIX = ".json";
 
@@ -65,6 +67,46 @@ export async function chooseAutoBackupFolder(): Promise<FileSystemDirectoryHandl
   }
 
   return await window.showDirectoryPicker({ mode: "readwrite" });
+}
+
+export function isAutoBackupDirectoryHandle(
+  value: unknown,
+): value is FileSystemDirectoryHandle {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as Partial<FileSystemDirectoryHandle>).kind === "directory" &&
+    typeof (value as Partial<FileSystemDirectoryHandle>).name === "string" &&
+    typeof (value as FileSystemDirectoryHandle).getFileHandle === "function" &&
+    typeof (value as FileSystemDirectoryHandle).values === "function"
+  );
+}
+
+export async function getAutoBackupFolderPermission(
+  directoryHandle: FileSystemDirectoryHandle,
+): Promise<PermissionState> {
+  if (typeof directoryHandle.queryPermission !== "function") {
+    return "prompt";
+  }
+
+  return await directoryHandle.queryPermission({ mode: "readwrite" });
+}
+
+export async function ensureAutoBackupFolderPermission(
+  directoryHandle: FileSystemDirectoryHandle,
+): Promise<boolean> {
+  const currentPermission = await getAutoBackupFolderPermission(directoryHandle);
+  if (currentPermission === "granted") return true;
+  if (currentPermission === "denied") return false;
+
+  if (typeof directoryHandle.requestPermission !== "function") {
+    return true;
+  }
+
+  const nextPermission = await directoryHandle.requestPermission({
+    mode: "readwrite",
+  });
+  return nextPermission === "granted";
 }
 
 function pad(value: number): string {
