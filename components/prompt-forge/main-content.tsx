@@ -511,10 +511,7 @@ function GroupEditor({
         createInitialScopeState(item.group),
       ];
       return (
-        <div
-          key={`group-${item.group.name}`}
-          className="rounded-xl border border-border bg-card/60 p-4 space-y-4"
-        >
+        <div key={`group-${item.group.name}`} className="space-y-4">
           <div className="flex items-center gap-2 flex-wrap">
             <div className="text-sm font-semibold text-foreground">
               {item.group.label}
@@ -533,7 +530,7 @@ function GroupEditor({
             ];
             const canRemove = item.group.repeat && instances.length > 1;
             const innerClass = item.group.repeat
-              ? "rounded-lg border border-border/70 bg-background p-4 space-y-4"
+              ? "border border-border/70 bg-background p-4 space-y-4"
               : "space-y-4";
 
             return (
@@ -1113,7 +1110,9 @@ export function MainContent({
                         ) : (
                           <Copy className="mr-2 h-4 w-4" />
                         )}
-                        {copiedTemplateSource ? "Copied" : "Copy template source"}
+                        {copiedTemplateSource
+                          ? "Copied"
+                          : "Copy template source"}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={onCloneTemplate}>
                         <CopyPlus className="mr-2 h-4 w-4" />
@@ -1480,7 +1479,11 @@ function ParameterField({
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
-      if (param.type === "text" || param.type === "number" || param.type === "date") {
+      if (
+        param.type === "text" ||
+        param.type === "number" ||
+        param.type === "date"
+      ) {
         e.preventDefault();
         onCopy();
       }
@@ -1949,72 +1952,72 @@ function ParameterField({
         <div className="flex flex-1 min-w-0 gap-2">
           <div className="min-w-0 flex-1">
             <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                role="combobox"
-                aria-expanded={isComboboxOpen}
-                className="w-full min-w-0 justify-between bg-card border-border px-3 font-normal"
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={isComboboxOpen}
+                  className="w-full min-w-0 justify-between bg-card border-border px-3 font-normal"
+                >
+                  <span className="truncate text-left">
+                    {selectedOption?.label ?? "Select an option"}
+                  </span>
+                  <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                className="w-[var(--radix-popover-trigger-width)] p-0"
+                align="start"
               >
-                <span className="truncate text-left">
-                  {selectedOption?.label ?? "Select an option"}
-                </span>
-                <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              className="w-[var(--radix-popover-trigger-width)] p-0"
-              align="start"
-            >
-              <Command
-                filter={(_, search, keywords) => {
-                  const normalizedSearch = search.trim().toLowerCase();
-                  if (!normalizedSearch) return 1;
-                  return (keywords ?? []).some((keyword) =>
-                    keyword.toLowerCase().includes(normalizedSearch),
-                  )
-                    ? 1
-                    : 0;
-                }}
-              >
-                <CommandInput placeholder="Search..." />
-                <CommandList>
-                  <CommandEmpty>No results found.</CommandEmpty>
-                  {optionGroups.map((group, groupIndex) => (
-                    <CommandGroup
-                      key={`${param.name}-combobox-group-${groupIndex}`}
-                      heading={group.label ?? undefined}
-                    >
-                      {group.options.map((option) => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          keywords={[option.label]}
-                          onSelect={(selectedValue) => {
-                            onChange(selectedValue);
-                            setIsComboboxOpen(false);
-                          }}
-                          className="cursor-pointer"
-                        >
-                          <span className="min-w-0 flex-1 truncate">
-                            {option.label}
-                          </span>
-                          <Check
-                            className={cn(
-                              "size-4",
-                              value === option.value
-                                ? "opacity-100"
-                                : "opacity-0",
-                            )}
-                          />
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  ))}
-                </CommandList>
-              </Command>
-            </PopoverContent>
+                <Command
+                  filter={(_, search, keywords) => {
+                    const normalizedSearch = search.trim().toLowerCase();
+                    if (!normalizedSearch) return 1;
+                    return (keywords ?? []).some((keyword) =>
+                      keyword.toLowerCase().includes(normalizedSearch),
+                    )
+                      ? 1
+                      : 0;
+                  }}
+                >
+                  <CommandInput placeholder="Search..." />
+                  <CommandList>
+                    <CommandEmpty>No results found.</CommandEmpty>
+                    {optionGroups.map((group, groupIndex) => (
+                      <CommandGroup
+                        key={`${param.name}-combobox-group-${groupIndex}`}
+                        heading={group.label ?? undefined}
+                      >
+                        {group.options.map((option) => (
+                          <CommandItem
+                            key={option.value}
+                            value={option.value}
+                            keywords={[option.label]}
+                            onSelect={(selectedValue) => {
+                              onChange(selectedValue);
+                              setIsComboboxOpen(false);
+                            }}
+                            className="cursor-pointer"
+                          >
+                            <span className="min-w-0 flex-1 truncate">
+                              {option.label}
+                            </span>
+                            <Check
+                              className={cn(
+                                "size-4",
+                                value === option.value
+                                  ? "opacity-100"
+                                  : "opacity-0",
+                              )}
+                            />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    ))}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
             </Popover>
           </div>
           {randomButton}
