@@ -1,4 +1,3 @@
-import YAML from "yaml";
 import type {
   ClipboardImportConfig,
   ClipboardImportFormat,
@@ -10,14 +9,13 @@ import type {
   ParameterOptionGroup,
   ParsedTemplate,
   TemplateBodyNode,
-  TemplateDefinition,
-  TemplateFieldDefinition,
-  TemplateFieldReferenceNode,
-  TemplateGroupDefinition,
-  TemplateGroupNode,
-  TemplateIfNode,
   TemplateCondition,
-  TemplateRenderItem,
+  TemplateFieldDefinition,
+  TemplateFormNode,
+  TemplateGroupDefinition,
+  TemplateIfNode,
+  TemplateRepeaterDefinition,
+  TemplateRepeaterNode,
   TemplateScopeState,
 } from "./types";
 
@@ -27,7 +25,7 @@ export interface PromptSegment {
   paramName?: string;
 }
 
-const NAME_RE = /^[a-zA-Z0-9_-]+$/;
+const ID_RE = /^[a-zA-Z0-9_-]+$/;
 const FIELD_TYPES: FieldType[] = [
   "textarea",
   "text",
@@ -55,32 +53,31 @@ function isClipboardImportFormat(
 function normalizeClipboardImportConfig(
   raw: unknown,
   fieldType: FieldType,
-  fieldName: string,
+  fieldId: string,
 ): ClipboardImportConfig | null {
   if (raw == null) return null;
 
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error(
-      `Field "${fieldName}" must define clipboard_import as an object.`,
+      `Field "${fieldId}" must define clipboard_import as an object.`,
     );
   }
 
   if (fieldType !== "textarea") {
     throw new Error(
-      `Field "${fieldName}" can only use clipboard_import with textarea type.`,
+      `Field "${fieldId}" can only use clipboard_import with textarea type.`,
     );
   }
 
   const item = raw as Record<string, unknown>;
   const enabled = item.enabled == null ? true : Boolean(item.enabled);
-
   const normalizedFormats = Array.isArray(item.formats)
     ? item.formats.filter(isClipboardImportFormat)
     : [];
-  const formats = normalizedFormats.length > 0
-    ? normalizedFormats
-    : [...CLIPBOARD_IMPORT_FORMATS];
-
+  const formats =
+    normalizedFormats.length > 0
+      ? normalizedFormats
+      : [...CLIPBOARD_IMPORT_FORMATS];
   const defaultFormat = isClipboardImportFormat(item.default_format)
     ? item.default_format
     : formats[0];
@@ -130,32 +127,31 @@ function normalizeFolderImportFormats(rawFormats: unknown): string[] {
 function normalizeFolderImportConfig(
   raw: unknown,
   fieldType: FieldType,
-  fieldName: string,
+  fieldId: string,
 ): FolderImportConfig | null {
   if (raw == null) return null;
 
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     throw new Error(
-      `Field "${fieldName}" must define folder_import as an object.`,
+      `Field "${fieldId}" must define folder_import as an object.`,
     );
   }
 
   if (fieldType !== "textarea") {
     throw new Error(
-      `Field "${fieldName}" can only use folder_import with textarea type.`,
+      `Field "${fieldId}" can only use folder_import with textarea type.`,
     );
   }
 
   const item = raw as Record<string, unknown>;
-
   return {
     enabled: item.enabled == null ? true : Boolean(item.enabled),
     formats: normalizeFolderImportFormats(item.formats),
   };
 }
 
-function formatParamName(p: string): string {
-  return p.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+function formatParamName(id: string): string {
+  return id.replace(/[_-]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function isSupportedParamType(value: unknown): value is FieldType {
@@ -163,45 +159,41 @@ function isSupportedParamType(value: unknown): value is FieldType {
 }
 
 function normalizeScalarToDisplayString(value: unknown): string {
-  if (typeof value === "boolean") {
-    return value ? "True" : "False";
-  }
+  if (typeof value === "boolean") return value ? "True" : "False";
   return String(value ?? "").trim();
 }
 
-function normalizeStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map(normalizeScalarToDisplayString).filter(Boolean);
-}
-
-function normalizeOptionEntry(
-  raw: unknown,
-  fieldName: string,
-): ParameterOption {
-  if (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean") {
+function normalizeOptionEntry(raw: unknown, fieldId: string): ParameterOption {
+  if (
+    typeof raw === "string" ||
+    typeof raw === "number" ||
+    typeof raw === "boolean"
+  ) {
     const normalized = normalizeScalarToDisplayString(raw);
     if (!normalized) {
-      throw new Error(`Field "${fieldName}" contains an empty option.`);
+      throw new Error(`Field "${fieldId}" contains an empty option.`);
     }
     return { label: normalized, value: normalized };
   }
 
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
-    throw new Error(`Field "${fieldName}" contains an invalid option entry.`);
+    throw new Error(`Field "${fieldId}" contains an invalid option entry.`);
   }
 
   const item = raw as Record<string, unknown>;
   const label = typeof item.label === "string" ? item.label.trim() : "";
   if (!label) {
-    throw new Error(`Field "${fieldName}" option objects must include a non-empty label.`);
+    throw new Error(
+      `Field "${fieldId}" option objects must include a non-empty label.`,
+    );
   }
 
-  const value = item.value == null
-    ? label
-    : normalizeScalarToDisplayString(item.value);
-
+  const value =
+    item.value == null ? label : normalizeScalarToDisplayString(item.value);
   if (!value) {
-    throw new Error(`Field "${fieldName}" contains an option with an empty value.`);
+    throw new Error(
+      `Field "${fieldId}" contains an option with an empty value.`,
+    );
   }
 
   return { label, value };
@@ -209,65 +201,66 @@ function normalizeOptionEntry(
 
 function normalizeOptionGroups(
   fieldType: FieldType,
-  fieldName: string,
+  fieldId: string,
   rawValues: unknown,
   rawGroups: unknown,
 ): ParameterOptionGroup[] {
   const supportsChoiceOptions =
-    fieldType === "select" || fieldType === "combobox" || fieldType === "radio";
+    fieldType === "select" ||
+    fieldType === "combobox" ||
+    fieldType === "radio";
 
   if (rawValues != null && rawGroups != null) {
     throw new Error(
-      `Field "${fieldName}" cannot define both values and groups at the same time.`,
+      `Field "${fieldId}" cannot define both values and groups at the same time.`,
     );
   }
 
-  if (!supportsChoiceOptions) {
-    return [];
-  }
+  if (!supportsChoiceOptions) return [];
 
   const groups: ParameterOptionGroup[] = [];
 
   if (rawGroups != null) {
     if (fieldType !== "select" && fieldType !== "combobox") {
       throw new Error(
-        `Field "${fieldName}" can only use groups with select or combobox type.`,
+        `Field "${fieldId}" can only use groups with select or combobox type.`,
       );
     }
-
     if (!Array.isArray(rawGroups)) {
-      throw new Error(`Field "${fieldName}" must define groups as an array.`);
+      throw new Error(`Field "${fieldId}" must define groups as an array.`);
     }
 
     for (const rawGroup of rawGroups) {
       if (!rawGroup || typeof rawGroup !== "object" || Array.isArray(rawGroup)) {
-        throw new Error(`Field "${fieldName}" contains an invalid group entry.`);
+        throw new Error(
+          `Field "${fieldId}" contains an invalid group entry.`,
+        );
       }
-
       const group = rawGroup as Record<string, unknown>;
       const label = typeof group.label === "string" ? group.label.trim() : "";
       if (!label) {
-        throw new Error(`Field "${fieldName}" group entries must include a non-empty label.`);
+        throw new Error(
+          `Field "${fieldId}" group entries must include a non-empty label.`,
+        );
       }
-
       const rawOptions = Array.isArray(group.options) ? group.options : null;
       if (!rawOptions || rawOptions.length === 0) {
-        throw new Error(`Field "${fieldName}" group "${label}" must include a non-empty options array.`);
+        throw new Error(
+          `Field "${fieldId}" group "${label}" must include a non-empty options array.`,
+        );
       }
-
       groups.push({
         label,
-        options: rawOptions.map((option) => normalizeOptionEntry(option, fieldName)),
+        options: rawOptions.map((option) => normalizeOptionEntry(option, fieldId)),
       });
     }
   } else if (rawValues != null) {
     if (!Array.isArray(rawValues)) {
-      throw new Error(`Field "${fieldName}" must define values as an array.`);
+      throw new Error(`Field "${fieldId}" must define values as an array.`);
     }
-
     groups.push({
       label: null,
-      options: rawValues.map((option) => normalizeOptionEntry(option, fieldName)),
+      options: rawValues.map((option) => normalizeOptionEntry(option, fieldId)),
     });
   }
 
@@ -276,7 +269,9 @@ function normalizeOptionGroups(
     for (const option of group.options) {
       const key = option.value.toLowerCase();
       if (seenValues.has(key)) {
-        throw new Error(`Field "${fieldName}" contains duplicate option value "${option.value}".`);
+        throw new Error(
+          `Field "${fieldId}" contains duplicate option value "${option.value}".`,
+        );
       }
       seenValues.add(key);
     }
@@ -296,189 +291,214 @@ function defaultValueForType(
 ): string | null {
   if (rawDefaultValue != null) {
     const normalizedDefault = normalizeScalarToDisplayString(rawDefaultValue);
-
-    if ((type === "select" || type === "combobox" || type === "radio") && values.length > 0) {
+    if (
+      (type === "select" || type === "combobox" || type === "radio") &&
+      values.length > 0
+    ) {
       const matched = values.find(
         (value) => value.toLowerCase() === normalizedDefault.toLowerCase(),
       );
       return matched ?? normalizedDefault;
     }
-
     return normalizedDefault;
   }
 
   if (type === "checkbox") return "false";
-  if ((type === "select" || type === "combobox" || type === "radio") && values.length > 0) {
+  if (
+    (type === "select" || type === "combobox" || type === "radio") &&
+    values.length > 0
+  ) {
     return values[0];
   }
   return null;
 }
 
-function createFieldDefinition(
-  name: string,
-  options: Partial<TemplateFieldDefinition> = {},
-): TemplateFieldDefinition {
-  const type = isSupportedParamType(options.type) ? options.type : "textarea";
-  const optionGroups = Array.isArray(options.optionGroups)
-    ? options.optionGroups
-    : [];
-  const values = optionGroups.length > 0
-    ? flattenOptionGroups(optionGroups)
-    : normalizeStringArray(options.values);
-  return {
-    kind: "field",
-    name,
-    type,
-    label:
-      typeof options.label === "string" && options.label.trim()
-        ? options.label.trim()
-        : formatParamName(name),
-    defaultValue: defaultValueForType(type, options.defaultValue, values),
-    height:
-      typeof options.height === "number" && Number.isFinite(options.height)
-        ? options.height
-        : type === "textarea"
-          ? 4
-          : null,
-    values,
-    optionGroups,
-    clipboardImport: options.clipboardImport ?? null,
-    folderImport: options.folderImport ?? null,
-    inline: Boolean(options.inline),
-    random: (type === "select" || type === "combobox") && Boolean(options.random),
-    explicit: options.explicit ?? false,
-  };
+interface DefinitionRegistry {
+  fields: Map<string, TemplateFieldDefinition>;
+  repeaters: Map<string, TemplateRepeaterDefinition>;
+  dataIds: Set<string>;
 }
 
-function createGroupDefinition(
-  name: string,
-  options: Partial<TemplateGroupDefinition> = {},
-): TemplateGroupDefinition {
-  return {
-    kind: "group",
-    name,
-    label:
-      typeof options.label === "string" && options.label.trim()
-        ? options.label.trim()
-        : formatParamName(name),
-    repeat: Boolean(options.repeat),
-    explicit: options.explicit ?? false,
-    children: options.children ?? [],
-    renderOrder: options.renderOrder ?? [],
-  };
-}
-
-function getDefinitionByName(
-  group: TemplateGroupDefinition,
-  name: string,
-): TemplateDefinition | null {
-  return group.children.find((child) => child.name === name) ?? null;
-}
-
-function getFieldDefinitionByName(
-  group: TemplateGroupDefinition,
-  name: string,
-): TemplateFieldDefinition | null {
-  const found = getDefinitionByName(group, name);
-  return found?.kind === "field" ? found : null;
-}
-
-function getGroupDefinitionByName(
-  group: TemplateGroupDefinition,
-  name: string,
-): TemplateGroupDefinition | null {
-  const found = getDefinitionByName(group, name);
-  return found?.kind === "group" ? found : null;
-}
-
-function ensureUniqueChildName(group: TemplateGroupDefinition, name: string) {
-  if (getDefinitionByName(group, name)) {
-    throw new Error(`Duplicate name "${name}" in scope "${group.name}".`);
+function requireObject(raw: unknown, path: string): Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`${path} must be an object.`);
   }
+  return raw as Record<string, unknown>;
 }
 
-function normalizeMetadataParam(
-  raw: unknown,
-  ancestorGroupNames: string[] = [],
-): TemplateDefinition | null {
-  if (!raw || typeof raw !== "object") return null;
+function requireName(raw: unknown, path: string): string {
+  const name = typeof raw === "string" ? raw.trim() : "";
+  if (!name) throw new Error(`${path} must define a non-empty name.`);
+  return name;
+}
 
-  const item = raw as Record<string, unknown>;
-  const name = typeof item.name === "string" ? item.name.trim() : "";
-  if (!NAME_RE.test(name)) return null;
-
-  if (item.type === "group") {
-    if (ancestorGroupNames.includes(name)) {
-      throw new Error(
-        `Group name "${name}" must be unique along the nesting path.`,
-      );
-    }
-
-    const childGroup = createGroupDefinition(name, {
-      label: typeof item.label === "string" ? item.label : undefined,
-      repeat: Boolean(item.repeat),
-      explicit: true,
-      children: [],
-      renderOrder: [],
-    });
-
-    const rawChildren = Array.isArray(item.fields) ? item.fields : [];
-    for (const rawChild of rawChildren) {
-      const normalizedChild = normalizeMetadataParam(rawChild, [
-        ...ancestorGroupNames,
-        name,
-      ]);
-      if (!normalizedChild) continue;
-      ensureUniqueChildName(childGroup, normalizedChild.name);
-      childGroup.children.push(normalizedChild);
-    }
-
-    return childGroup;
-  }
-
-  const type = isSupportedParamType(item.type) ? item.type : "textarea";
-  const optionGroups = normalizeOptionGroups(type, name, item.values, item.groups);
-  const values = flattenOptionGroups(optionGroups);
-  const rawDefaultValue =
-    item.default == null
-      ? null
-      : normalizeScalarToDisplayString(item.default);
-
-  if (
-    rawDefaultValue != null &&
-    values.length > 0 &&
-    (type === "select" || type === "combobox" || type === "radio")
-  ) {
-    const hasMatch = values.some(
-      (value) => value.toLowerCase() === rawDefaultValue.toLowerCase(),
+function requireDataId(raw: unknown, path: string, registry: DefinitionRegistry): string {
+  const id = typeof raw === "string" ? raw.trim() : "";
+  if (!ID_RE.test(id)) {
+    throw new Error(
+      `${path} must define an id containing only letters, numbers, underscores, or hyphens.`,
     );
-    if (!hasMatch) {
-      throw new Error(
-        `Field "${name}" default value "${rawDefaultValue}" does not match any option value.`,
-      );
-    }
+  }
+  if (registry.dataIds.has(id)) {
+    throw new Error(`Duplicate field or repeater id "${id}".`);
+  }
+  registry.dataIds.add(id);
+  return id;
+}
+
+function normalizeFormNodes(
+  rawNodes: unknown,
+  scopeId: string | null,
+  registry: DefinitionRegistry,
+  path = "form",
+): TemplateFormNode[] {
+  if (!Array.isArray(rawNodes)) {
+    throw new Error(`${path} must be an array.`);
   }
 
-  return createFieldDefinition(name, {
-    type,
-    label: typeof item.label === "string" ? item.label : undefined,
-    defaultValue: rawDefaultValue,
-    height: typeof item.height === "number" ? item.height : undefined,
-    values,
-    optionGroups,
-    clipboardImport: normalizeClipboardImportConfig(
-      item.clipboard_import,
-      type,
-      name,
-    ),
-    folderImport: normalizeFolderImportConfig(
-      item.folder_import,
-      type,
-      name,
-    ),
-    inline: Boolean(item.inline),
-    random: Boolean(item.random),
-    explicit: true,
+  return rawNodes.map((rawNode, index) => {
+    const nodePath = `${path}[${index}]`;
+    const item = requireObject(rawNode, nodePath);
+    const type = typeof item.type === "string" ? item.type.trim() : "";
+
+    if (!type) throw new Error(`${nodePath} must define a type.`);
+
+    if (isSupportedParamType(type)) {
+      const id = requireDataId(item.id, nodePath, registry);
+      const name = requireName(item.name, `Field "${id}"`);
+      const optionGroups = normalizeOptionGroups(
+        type,
+        id,
+        item.values,
+        item.groups,
+      );
+      const values = flattenOptionGroups(optionGroups);
+      const rawDefaultValue = item.default;
+      const defaultValue = defaultValueForType(type, rawDefaultValue, values);
+
+      if (
+        defaultValue != null &&
+        values.length > 0 &&
+        (type === "select" || type === "combobox" || type === "radio") &&
+        !values.some((value) => value.toLowerCase() === defaultValue.toLowerCase())
+      ) {
+        throw new Error(
+          `Field "${id}" default value "${defaultValue}" does not match any option value.`,
+        );
+      }
+
+      const field: TemplateFieldDefinition = {
+        kind: "field",
+        id,
+        type,
+        name,
+        defaultValue,
+        height:
+          typeof item.height === "number" && Number.isFinite(item.height)
+            ? item.height
+            : type === "textarea"
+              ? 4
+              : null,
+        values,
+        optionGroups,
+        clipboardImport: normalizeClipboardImportConfig(
+          item.clipboard_import,
+          type,
+          id,
+        ),
+        folderImport: normalizeFolderImportConfig(item.folder_import, type, id),
+        inline: Boolean(item.inline),
+        random:
+          (type === "select" || type === "combobox") && Boolean(item.random),
+        scopeId,
+      };
+      registry.fields.set(id, field);
+      return field;
+    }
+
+    if (type === "group") {
+      const name =
+        typeof item.name === "string" && item.name.trim()
+          ? item.name.trim()
+          : null;
+      const description =
+        typeof item.description === "string" && item.description.trim()
+          ? item.description.trim()
+          : null;
+      const style = item.style == null ? "solid" : item.style;
+      if (style !== "solid" && style !== "dashed" && style !== "none") {
+        throw new Error(
+          `${nodePath}.style must be "solid", "dashed", or "none".`,
+        );
+      }
+      const group: TemplateGroupDefinition = {
+        kind: "group",
+        name,
+        description,
+        style,
+        children: normalizeFormNodes(
+          item.children,
+          scopeId,
+          registry,
+          `${nodePath}.children`,
+        ),
+      };
+      return group;
+    }
+
+    if (type === "header") {
+      const name =
+        typeof item.name === "string" && item.name.trim()
+          ? item.name.trim()
+          : null;
+      const description =
+        typeof item.description === "string" && item.description.trim()
+          ? item.description.trim()
+          : null;
+      if (!name && !description) {
+        throw new Error(
+          `${nodePath} must define at least one of "name" or "description".`,
+        );
+      }
+      return {
+        kind: "header",
+        name,
+        description,
+      };
+    }
+
+    if (type === "hr") {
+      const style = item.style == null ? "solid" : item.style;
+      if (style !== "solid" && style !== "dashed") {
+        throw new Error(`${nodePath}.style must be "solid" or "dashed".`);
+      }
+      return { kind: "hr", style };
+    }
+
+    if (type === "repeater") {
+      const id = requireDataId(item.id, nodePath, registry);
+      const repeater: TemplateRepeaterDefinition = {
+        kind: "repeater",
+        id,
+        name: requireName(item.name, `Repeater "${id}"`),
+        description:
+          typeof item.description === "string" && item.description.trim()
+            ? item.description.trim()
+            : null,
+        children: [],
+        scopeId,
+      };
+      registry.repeaters.set(id, repeater);
+      repeater.children = normalizeFormNodes(
+        item.children,
+        id,
+        registry,
+        `${nodePath}.children`,
+      );
+      return repeater;
+    }
+
+    throw new Error(`Unsupported form node type "${type}" at ${nodePath}.`);
   });
 }
 
@@ -505,75 +525,47 @@ export function parseFrontMatter(content: string): FrontMatterResult {
   }
 
   const rawFrontMatter = match[0];
-  const rawBody = normalized.slice(rawFrontMatter.length);
-  const metadataBlock = match[2];
+  const body = normalized.slice(rawFrontMatter.length).replace(/^\n+/, "");
+  const source = match[2].trim();
 
-  let metadata: Record<string, unknown> = {};
+  if (!source) {
+    return {
+      metadata: {},
+      body,
+      rawFrontMatter,
+      hasFrontMatter: true,
+    };
+  }
 
   try {
-    const parsed = YAML.parse(metadataBlock);
-    metadata =
-      parsed && typeof parsed === "object" && !Array.isArray(parsed)
-        ? (parsed as Record<string, unknown>)
-        : {};
-  } catch {
-    metadata = {};
-  }
-
-  return {
-    metadata,
-    body: rawBody.replace(/^\n+/, ""),
-    rawFrontMatter,
-    hasFrontMatter: true,
-  };
-}
-
-function ensureRenderItem(
-  group: TemplateGroupDefinition,
-  item: TemplateRenderItem,
-): void {
-  const exists = group.renderOrder.some((current) => {
-    if (current.kind !== item.kind) return false;
-    if (current.kind === "field" && item.kind === "field") {
-      return current.field.name === item.field.name;
+    const parsed = JSON.parse(source);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {
+        metadata: {},
+        body,
+        rawFrontMatter,
+        hasFrontMatter: true,
+        error: "Front matter must contain a JSON object.",
+      };
     }
-    if (current.kind === "group" && item.kind === "group") {
-      return current.group.name === item.group.name;
-    }
-    return false;
-  });
-
-  if (!exists) {
-    group.renderOrder.push(item);
+    return {
+      metadata: parsed as Record<string, unknown>,
+      body,
+      rawFrontMatter,
+      hasFrontMatter: true,
+    };
+  } catch (error) {
+    return {
+      metadata: {},
+      body,
+      rawFrontMatter,
+      hasFrontMatter: true,
+      error:
+        error instanceof Error
+          ? `Invalid JSON front matter: ${error.message}`
+          : "Invalid JSON front matter.",
+    };
   }
-}
-
-function resolveFieldReference(
-  scopeStack: TemplateGroupDefinition[],
-  name: string,
-): {
-  definition: TemplateFieldDefinition;
-  lookupDepth: number;
-  owner: TemplateGroupDefinition;
-} {
-  for (let depth = 0; depth < scopeStack.length; depth += 1) {
-    const group = scopeStack[scopeStack.length - 1 - depth];
-    const field = getFieldDefinitionByName(group, name);
-    if (field) {
-      return { definition: field, lookupDepth: depth, owner: group };
-    }
-  }
-
-  const currentScope = scopeStack[scopeStack.length - 1];
-  if (getGroupDefinitionByName(currentScope, name)) {
-    throw new Error(
-      `Placeholder "${name}" conflicts with group "${name}" in scope "${currentScope.name}".`,
-    );
-  }
-
-  const implicitField = createFieldDefinition(name, { explicit: false });
-  currentScope.children.push(implicitField);
-  return { definition: implicitField, lookupDepth: 0, owner: currentScope };
 }
 
 type TemplateToken =
@@ -583,14 +575,11 @@ type TemplateToken =
 function findNextTemplateToken(body: string, cursor: number): TemplateToken | null {
   const fieldStart = body.indexOf("{{", cursor);
   const controlStart = body.indexOf("{%", cursor);
-
   if (fieldStart === -1 && controlStart === -1) return null;
 
   if (controlStart !== -1 && (fieldStart === -1 || controlStart < fieldStart)) {
     const end = body.indexOf("%}", controlStart + 2);
-    if (end === -1) {
-      return null;
-    }
+    if (end === -1) return null;
     return {
       kind: "control",
       start: controlStart,
@@ -600,9 +589,7 @@ function findNextTemplateToken(body: string, cursor: number): TemplateToken | nu
   }
 
   const end = body.indexOf("}}", fieldStart + 2);
-  if (end === -1) {
-    return null;
-  }
+  if (end === -1) return null;
   return {
     kind: "field",
     start: fieldStart,
@@ -612,7 +599,7 @@ function findNextTemplateToken(body: string, cursor: number): TemplateToken | nu
 }
 
 function isStandaloneTrimmedControl(inner: string): boolean {
-  return /^(?:group\s+[a-zA-Z0-9_-]+|end_group|if\s+[\s\S]+|else_if\s+[\s\S]+|else|end_if)$/i.test(
+  return /^(?:repeat\s+[a-zA-Z0-9_-]+|end_repeat|if\s+[\s\S]+|else_if\s+[\s\S]+|else|end_if)$/i.test(
     inner.trim(),
   );
 }
@@ -634,14 +621,23 @@ function getStandaloneControlLineRange(
         ? nextLineBreak - 1
         : nextLineBreak;
   const lineEnd = nextLineBreak === -1 ? body.length : nextLineBreak + 1;
-
   const beforeToken = body.slice(lineStart, token.start);
   const afterToken = body.slice(token.end, lineContentEnd);
 
-  if (/^[ \t]*$/.test(beforeToken) && /^[ \t]*$/.test(afterToken)) {
-    return { start: lineStart, end: lineEnd };
-  }
+  return /^[ \t]*$/.test(beforeToken) && /^[ \t]*$/.test(afterToken)
+    ? { start: lineStart, end: lineEnd }
+    : null;
+}
 
+function getScopeLookupDepth(
+  targetScopeId: string | null,
+  scopeStack: Array<string | null>,
+): number | null {
+  for (let index = scopeStack.length - 1; index >= 0; index -= 1) {
+    if (scopeStack[index] === targetScopeId) {
+      return scopeStack.length - 1 - index;
+    }
+  }
   return null;
 }
 
@@ -649,93 +645,88 @@ function parseConditionValue(raw: string): string | boolean {
   const trimmed = raw.trim();
   if (/^true$/i.test(trimmed)) return true;
   if (/^false$/i.test(trimmed)) return false;
-
   const quoted = trimmed.match(/^("([\s\S]*)"|'([\s\S]*)')$/);
-  if (quoted) {
-    return quoted[2] ?? quoted[3] ?? "";
-  }
-
+  if (quoted) return quoted[2] ?? quoted[3] ?? "";
   return trimmed;
 }
 
-function resolveConditionReference(
-  scopeStack: TemplateGroupDefinition[],
-  name: string,
+function resolveConditionDefinition(
+  id: string,
+  fields: Map<string, TemplateFieldDefinition>,
+  repeaters: Map<string, TemplateRepeaterDefinition>,
+  scopeStack: Array<string | null>,
 ): {
-  definition: TemplateFieldDefinition | TemplateGroupDefinition;
+  definition: TemplateFieldDefinition | TemplateRepeaterDefinition;
   lookupDepth: number;
-  owner: TemplateGroupDefinition;
 } {
-  for (let depth = 0; depth < scopeStack.length; depth += 1) {
-    const group = scopeStack[scopeStack.length - 1 - depth];
-    const found = getDefinitionByName(group, name);
-    if (found) {
-      return { definition: found, lookupDepth: depth, owner: group };
-    }
+  const definition = fields.get(id) ?? repeaters.get(id);
+  if (!definition) {
+    throw new Error(`Condition references unknown field or repeater "${id}".`);
   }
-
-  const currentScope = scopeStack[scopeStack.length - 1];
-  const implicitField = createFieldDefinition(name, { explicit: false });
-  currentScope.children.push(implicitField);
-  return { definition: implicitField, lookupDepth: 0, owner: currentScope };
+  const lookupDepth = getScopeLookupDepth(definition.scopeId, scopeStack);
+  if (lookupDepth == null) {
+    throw new Error(
+      `"${id}" cannot be referenced outside its repeater scope.`,
+    );
+  }
+  return { definition, lookupDepth };
 }
 
 function parseTemplateCondition(
   rawCondition: string,
-  scopeStack: TemplateGroupDefinition[],
+  fields: Map<string, TemplateFieldDefinition>,
+  repeaters: Map<string, TemplateRepeaterDefinition>,
+  scopeStack: Array<string | null>,
 ): TemplateCondition {
   const source = rawCondition.trim().replace(/^\(([\s\S]*)\)$/, "$1").trim();
-  if (!source) {
-    throw new Error("Condition cannot be empty.");
-  }
+  if (!source) throw new Error("Condition cannot be empty.");
 
   let match = source.match(/^([a-zA-Z0-9_-]+)$/);
   if (match) {
-    const resolved = resolveConditionReference(scopeStack, match[1]);
-    if (resolved.definition.kind === "field") {
-      ensureRenderItem(resolved.owner, { kind: "field", field: resolved.definition });
-    } else {
-      ensureRenderItem(resolved.owner, { kind: "group", group: resolved.definition });
-    }
+    const resolved = resolveConditionDefinition(
+      match[1],
+      fields,
+      repeaters,
+      scopeStack,
+    );
     return {
       source,
-      name: match[1],
-      lookupDepth: resolved.lookupDepth,
-      definition: resolved.definition,
+      id: match[1],
+      ...resolved,
       operator: "not_empty",
     };
   }
 
-  match = source.match(/^([a-zA-Z0-9_-]+)\s+(empty|not_empty|checked|unchecked)$/i);
+  match = source.match(
+    /^([a-zA-Z0-9_-]+)\s+(empty|not_empty|checked|unchecked)$/i,
+  );
   if (match) {
-    const resolved = resolveConditionReference(scopeStack, match[1]);
-    if (resolved.definition.kind === "field") {
-      ensureRenderItem(resolved.owner, { kind: "field", field: resolved.definition });
-    } else {
-      ensureRenderItem(resolved.owner, { kind: "group", group: resolved.definition });
-    }
+    const resolved = resolveConditionDefinition(
+      match[1],
+      fields,
+      repeaters,
+      scopeStack,
+    );
     return {
       source,
-      name: match[1],
-      lookupDepth: resolved.lookupDepth,
-      definition: resolved.definition,
+      id: match[1],
+      ...resolved,
       operator: match[2].toLowerCase() as TemplateCondition["operator"],
     };
   }
 
   match = source.match(/^([a-zA-Z0-9_-]+)\s+(?:is|=)\s+([\s\S]+)$/i);
   if (match) {
-    const resolved = resolveConditionReference(scopeStack, match[1]);
-    if (resolved.definition.kind === "field") {
-      ensureRenderItem(resolved.owner, { kind: "field", field: resolved.definition });
-    } else {
-      ensureRenderItem(resolved.owner, { kind: "group", group: resolved.definition });
-    }
+    const resolved = resolveConditionDefinition(
+      match[1],
+      fields,
+      repeaters,
+      scopeStack,
+    );
     return {
       source,
-      name: match[1],
-      lookupDepth: resolved.lookupDepth,
-      definition: resolved.definition,
+      id: match[1],
+      ...resolved,
       operator: "is",
       expectedValue: parseConditionValue(match[2]),
     };
@@ -743,17 +734,16 @@ function parseTemplateCondition(
 
   match = source.match(/^([a-zA-Z0-9_-]+)\s+(?:is_not|not)\s+([\s\S]+)$/i);
   if (match) {
-    const resolved = resolveConditionReference(scopeStack, match[1]);
-    if (resolved.definition.kind === "field") {
-      ensureRenderItem(resolved.owner, { kind: "field", field: resolved.definition });
-    } else {
-      ensureRenderItem(resolved.owner, { kind: "group", group: resolved.definition });
-    }
+    const resolved = resolveConditionDefinition(
+      match[1],
+      fields,
+      repeaters,
+      scopeStack,
+    );
     return {
       source,
-      name: match[1],
-      lookupDepth: resolved.lookupDepth,
-      definition: resolved.definition,
+      id: match[1],
+      ...resolved,
       operator: "is_not",
       expectedValue: parseConditionValue(match[2]),
     };
@@ -769,110 +759,130 @@ export function parseTemplate(content: string | null): ParsedTemplate {
     return {
       metadata: {},
       body: "",
-      rootGroup: createGroupDefinition("root", { explicit: true }),
+      rootGroup: {
+        kind: "group",
+        name: null,
+        description: null,
+        style: "none",
+        children: [],
+      },
       nodes: [],
     };
   }
 
-  const { metadata, body } = parseFrontMatter(content);
-  const rootGroup = createGroupDefinition("root", {
-    label: "Root",
-    explicit: true,
-  });
+  const frontMatter = parseFrontMatter(content);
+  if (frontMatter.error) throw new Error(frontMatter.error);
 
-  const metadataParamsRaw = Array.isArray(metadata.params)
-    ? metadata.params
-    : [];
-  for (const rawParam of metadataParamsRaw) {
-    const normalized = normalizeMetadataParam(rawParam, []);
-    if (!normalized) continue;
-    ensureUniqueChildName(rootGroup, normalized.name);
-    rootGroup.children.push(normalized);
-  }
+  const registry: DefinitionRegistry = {
+    fields: new Map(),
+    repeaters: new Map(),
+    dataIds: new Set(),
+  };
+  const formRaw = frontMatter.metadata.form ?? [];
+  const rootGroup: TemplateGroupDefinition = {
+    kind: "group",
+    name: null,
+    description: null,
+    style: "none",
+    children: normalizeFormNodes(formRaw, null, registry),
+  };
 
   type ParseFrame =
     | { kind: "root"; nodes: TemplateBodyNode[] }
-    | { kind: "group"; name: string; node: TemplateGroupNode; nodes: TemplateBodyNode[] }
+    | {
+        kind: "repeater";
+        id: string;
+        node: TemplateRepeaterNode;
+        nodes: TemplateBodyNode[];
+      }
     | { kind: "if"; node: TemplateIfNode; nodes: TemplateBodyNode[]; inElse: boolean };
 
   const rootNodes: TemplateBodyNode[] = [];
   const frameStack: ParseFrame[] = [{ kind: "root", nodes: rootNodes }];
-  const scopeStack: TemplateGroupDefinition[] = [rootGroup];
-
+  const scopeStack: Array<string | null> = [null];
   const currentNodes = () => frameStack[frameStack.length - 1].nodes;
 
   let cursor = 0;
-  while (cursor < body.length) {
-    const token = findNextTemplateToken(body, cursor);
-
+  while (cursor < frontMatter.body.length) {
+    const token = findNextTemplateToken(frontMatter.body, cursor);
     if (!token) {
-      if (cursor < body.length) {
-        currentNodes().push({ kind: "text", text: body.slice(cursor) });
+      if (cursor < frontMatter.body.length) {
+        currentNodes().push({
+          kind: "text",
+          text: frontMatter.body.slice(cursor),
+        });
       }
       break;
     }
 
-    const standaloneControlLine = getStandaloneControlLineRange(body, token);
+    const standaloneControlLine = getStandaloneControlLineRange(
+      frontMatter.body,
+      token,
+    );
     const textEnd = standaloneControlLine?.start ?? token.start;
     const nextCursor = standaloneControlLine?.end ?? token.end;
 
     if (textEnd > cursor) {
-      currentNodes().push({ kind: "text", text: body.slice(cursor, textEnd) });
+      currentNodes().push({
+        kind: "text",
+        text: frontMatter.body.slice(cursor, textEnd),
+      });
     }
 
     if (token.kind === "field") {
-      const inner = token.inner;
-      if (NAME_RE.test(inner)) {
-        const resolved = resolveFieldReference(scopeStack, inner);
-        ensureRenderItem(resolved.owner, {
-          kind: "field",
-          field: resolved.definition,
-        });
+      const id = token.inner;
+      const definition = ID_RE.test(id) ? registry.fields.get(id) : undefined;
+      if (!definition) {
         currentNodes().push({
-          kind: "field-ref",
-          name: inner,
-          definition: resolved.definition,
-          lookupDepth: resolved.lookupDepth,
+          kind: "text",
+          text: frontMatter.body.slice(token.start, token.end),
         });
       } else {
-        currentNodes().push({ kind: "text", text: body.slice(token.start, token.end) });
+        const lookupDepth = getScopeLookupDepth(definition.scopeId, scopeStack);
+        if (lookupDepth == null) {
+          throw new Error(
+            `Field "${id}" cannot be referenced outside its repeater scope.`,
+          );
+        }
+        currentNodes().push({
+          kind: "field-ref",
+          id,
+          definition,
+          lookupDepth,
+        });
       }
       cursor = nextCursor;
       continue;
     }
 
     const control = token.inner;
-    const groupStartMatch = control.match(/^group\s+([a-zA-Z0-9_-]+)$/i);
-
-    if (groupStartMatch) {
-      const groupName = groupStartMatch[1];
-      const currentScope = scopeStack[scopeStack.length - 1];
-      const childGroup = getGroupDefinitionByName(currentScope, groupName);
-      if (!childGroup) {
+    const repeatStartMatch = control.match(/^repeat\s+([a-zA-Z0-9_-]+)$/i);
+    if (repeatStartMatch) {
+      const id = repeatStartMatch[1];
+      const definition = registry.repeaters.get(id);
+      if (!definition) throw new Error(`Unknown repeater "${id}".`);
+      const currentScopeId = scopeStack[scopeStack.length - 1];
+      if (definition.scopeId !== currentScopeId) {
         throw new Error(
-          `Group "${groupName}" is not declared in scope "${currentScope.name}".`,
+          `Repeater "${id}" cannot be opened outside its parent repeater scope.`,
         );
       }
-
-      ensureRenderItem(currentScope, { kind: "group", group: childGroup });
-      const groupNode: TemplateGroupNode = {
-        kind: "group",
-        name: groupName,
-        definition: childGroup,
+      const node: TemplateRepeaterNode = {
+        kind: "repeater",
+        id,
+        definition,
         children: [],
       };
-      currentNodes().push(groupNode);
-      frameStack.push({ kind: "group", name: groupName, node: groupNode, nodes: groupNode.children });
-      scopeStack.push(childGroup);
+      currentNodes().push(node);
+      frameStack.push({ kind: "repeater", id, node, nodes: node.children });
+      scopeStack.push(id);
       cursor = nextCursor;
       continue;
     }
 
-    if (/^end_group$/i.test(control)) {
+    if (/^end_repeat$/i.test(control)) {
       const frame = frameStack[frameStack.length - 1];
-      if (frame.kind !== "group") {
-        throw new Error("Unexpected end_group.");
-      }
+      if (frame.kind !== "repeater") throw new Error("Unexpected end_repeat.");
       frameStack.pop();
       scopeStack.pop();
       cursor = nextCursor;
@@ -881,17 +891,22 @@ export function parseTemplate(content: string | null): ParsedTemplate {
 
     const ifStartMatch = control.match(/^if\s+([\s\S]+)$/i);
     if (ifStartMatch) {
-      const condition = parseTemplateCondition(ifStartMatch[1], scopeStack);
-      const ifNode: TemplateIfNode = {
+      const condition = parseTemplateCondition(
+        ifStartMatch[1],
+        registry.fields,
+        registry.repeaters,
+        scopeStack,
+      );
+      const node: TemplateIfNode = {
         kind: "if",
         branches: [{ condition, children: [] }],
         elseChildren: [],
       };
-      currentNodes().push(ifNode);
+      currentNodes().push(node);
       frameStack.push({
         kind: "if",
-        node: ifNode,
-        nodes: ifNode.branches[0].children,
+        node,
+        nodes: node.branches[0].children,
         inElse: false,
       });
       cursor = nextCursor;
@@ -901,14 +916,18 @@ export function parseTemplate(content: string | null): ParsedTemplate {
     const elseIfMatch = control.match(/^else_if\s+([\s\S]+)$/i);
     if (elseIfMatch) {
       const frame = frameStack[frameStack.length - 1];
-      if (frame.kind !== "if") {
+      if (frame.kind !== "if" || frame.inElse) {
         throw new Error("Unexpected else_if without an open if block.");
       }
-      if (frame.inElse) {
-        throw new Error("else_if cannot appear after else in the same if block.");
-      }
-      const condition = parseTemplateCondition(elseIfMatch[1], scopeStack);
-      const branch = { condition, children: [] as TemplateBodyNode[] };
+      const branch = {
+        condition: parseTemplateCondition(
+          elseIfMatch[1],
+          registry.fields,
+          registry.repeaters,
+          scopeStack,
+        ),
+        children: [] as TemplateBodyNode[],
+      };
       frame.node.branches.push(branch);
       frame.nodes = branch.children;
       cursor = nextCursor;
@@ -931,95 +950,111 @@ export function parseTemplate(content: string | null): ParsedTemplate {
 
     if (/^end_if$/i.test(control)) {
       const frame = frameStack[frameStack.length - 1];
-      if (frame.kind !== "if") {
-        throw new Error("Unexpected end_if.");
-      }
+      if (frame.kind !== "if") throw new Error("Unexpected end_if.");
       frameStack.pop();
       cursor = nextCursor;
       continue;
     }
 
-    currentNodes().push({ kind: "text", text: body.slice(token.start, token.end) });
+    currentNodes().push({
+      kind: "text",
+      text: frontMatter.body.slice(token.start, token.end),
+    });
     cursor = nextCursor;
   }
 
   const openFrame = frameStack[frameStack.length - 1];
-  if (openFrame.kind === "group") {
-    throw new Error(`Group "${openFrame.name}" was not closed.`);
+  if (openFrame.kind === "repeater") {
+    throw new Error(`Repeater "${openFrame.id}" was not closed.`);
   }
-  if (openFrame.kind === "if") {
-    throw new Error("If block was not closed.");
-  }
+  if (openFrame.kind === "if") throw new Error("If block was not closed.");
 
   return {
-    metadata,
-    body,
+    metadata: frontMatter.metadata,
+    body: frontMatter.body,
     rootGroup,
     nodes: rootNodes,
   };
 }
 
+function walkFormNodes(
+  nodes: TemplateFormNode[],
+  visitor: (node: TemplateFormNode) => void,
+): void {
+  for (const node of nodes) {
+    visitor(node);
+    if (node.kind === "group" || node.kind === "repeater") {
+      walkFormNodes(node.children, visitor);
+    }
+  }
+}
+
 export function extractParameters(content: string | null): Parameter[] {
   try {
     const parsed = parseTemplate(content);
-    return parsed.rootGroup.renderOrder
-      .filter(
-        (item): item is { kind: "field"; field: TemplateFieldDefinition } =>
-          item.kind === "field",
-      )
-      .map((item) => ({
-        name: item.field.name,
-        type: item.field.type,
-        label: item.field.label,
-        defaultValue: item.field.defaultValue,
-        height: item.field.height,
-        values: item.field.values,
-        optionGroups: item.field.optionGroups,
-        clipboardImport: item.field.clipboardImport,
-        folderImport: item.field.folderImport,
-        inline: item.field.inline,
-        random: item.field.random,
-      }));
+    const parameters: Parameter[] = [];
+    walkFormNodes(parsed.rootGroup.children, (node) => {
+      if (node.kind !== "field") return;
+      parameters.push({
+        id: node.id,
+        type: node.type,
+        name: node.name,
+        defaultValue: node.defaultValue,
+        height: node.height,
+        values: node.values,
+        optionGroups: node.optionGroups,
+        clipboardImport: node.clipboardImport,
+        folderImport: node.folderImport,
+        inline: node.inline,
+        random: node.random,
+      });
+    });
+    return parameters;
   } catch {
     return [];
   }
 }
 
-export function createInitialScopeState(
-  group: TemplateGroupDefinition,
-): TemplateScopeState {
-  const fields: Record<string, string> = {};
-  const groups: Record<string, TemplateScopeState[]> = {};
-
-  for (const item of group.renderOrder) {
-    if (item.kind === "field") {
-      fields[item.field.name] = item.field.defaultValue ?? "";
+function populateInitialState(
+  nodes: TemplateFormNode[],
+  state: TemplateScopeState,
+): void {
+  for (const node of nodes) {
+    if (node.kind === "field") {
+      state.fields[node.id] = node.defaultValue ?? "";
       continue;
     }
-
-    groups[item.group.name] = [createInitialScopeState(item.group)];
+    if (node.kind === "group") {
+      populateInitialState(node.children, state);
+      continue;
+    }
+    if (node.kind === "repeater") {
+      state.repeaters[node.id] = [createInitialScopeState(node)];
+    }
   }
+}
 
-  return { fields, groups };
+export function createInitialScopeState(
+  scope: TemplateGroupDefinition | TemplateRepeaterDefinition,
+): TemplateScopeState {
+  const state: TemplateScopeState = { fields: {}, repeaters: {} };
+  populateInitialState(scope.children, state);
+  return state;
 }
 
 function hasNonEmptySegmentText(segments: PromptSegment[]): boolean {
   return segments.some((segment) => segment.text.length > 0);
 }
 
-function splitRepeatGroupNodes(nodes: TemplateBodyNode[]): {
+function splitRepeaterNodes(nodes: TemplateBodyNode[]): {
   itemNodes: TemplateBodyNode[];
   separatorText: string;
 } {
-  if (nodes.length === 0) {
-    return { itemNodes: nodes, separatorText: "" };
-  }
-
+  if (nodes.length === 0) return { itemNodes: nodes, separatorText: "" };
   const lastNode = nodes[nodes.length - 1];
   if (lastNode.kind !== "text") {
     return { itemNodes: nodes, separatorText: "" };
   }
-
   return {
     itemNodes: nodes.slice(0, -1),
     separatorText: lastNode.text,
@@ -1035,12 +1070,9 @@ function getConditionRuntimeValue(
     scopeStack.length - 1 - condition.lookupDepth,
   );
   const targetScope = scopeStack[targetScopeIndex];
-
-  if (condition.definition.kind === "group") {
-    return targetScope.groups[condition.definition.name] ?? [];
-  }
-
-  return targetScope.fields[condition.definition.name] ?? "";
+  return condition.definition.kind === "repeater"
+    ? targetScope.repeaters[condition.definition.id] ?? []
+    : targetScope.fields[condition.definition.id] ?? "";
 }
 
 function isRuntimeValueEmpty(value: unknown): boolean {
@@ -1059,12 +1091,10 @@ function normalizeConditionComparable(value: unknown): string | boolean {
 
 function compareConditionValue(value: unknown, expectedValue: unknown): boolean {
   const actual = normalizeConditionComparable(value);
-
   if (typeof expectedValue === "boolean") {
     if (typeof actual === "boolean") return actual === expectedValue;
     return String(actual).trim().toLowerCase() === String(expectedValue);
   }
-
   return String(actual) === String(expectedValue ?? "");
 }
 
@@ -1073,7 +1103,6 @@ function evaluateCondition(
   scopeStack: TemplateScopeState[],
 ): boolean {
   const value = getConditionRuntimeValue(condition, scopeStack);
-
   switch (condition.operator) {
     case "empty":
       return isRuntimeValueEmpty(value);
@@ -1110,11 +1139,10 @@ function buildSegmentsFromNodes(
         scopeStack.length - 1 - node.lookupDepth,
       );
       const targetScope = scopeStack[targetScopeIndex];
-      const value = targetScope.fields[node.definition.name] ?? "";
       segments.push({
-        text: value,
+        text: targetScope.fields[node.id] ?? "",
         isUserValue: true,
-        paramName: node.definition.name,
+        paramName: node.id,
       });
       continue;
     }
@@ -1133,13 +1161,8 @@ function buildSegmentsFromNodes(
     }
 
     const currentScope = scopeStack[scopeStack.length - 1];
-    const instances = currentScope.groups[node.definition.name] ?? [];
-    const groupSegments: PromptSegment[] = [];
-
-    const repeatParts = node.definition.repeat
-      ? splitRepeatGroupNodes(node.children)
-      : { itemNodes: node.children, separatorText: "" };
-
+    const instances = currentScope.repeaters[node.id] ?? [];
+    const repeatParts = splitRepeaterNodes(node.children);
     let renderedInstanceCount = 0;
 
     for (const instance of instances) {
@@ -1147,23 +1170,13 @@ function buildSegmentsFromNodes(
         ...scopeStack,
         instance,
       ]);
-
-      if (!hasNonEmptySegmentText(instanceSegments)) {
-        continue;
-      }
-
+      if (!hasNonEmptySegmentText(instanceSegments)) continue;
       if (renderedInstanceCount > 0 && repeatParts.separatorText.length > 0) {
-        groupSegments.push({
-          text: repeatParts.separatorText,
-          isUserValue: false,
-        });
+        segments.push({ text: repeatParts.separatorText, isUserValue: false });
       }
-
-      groupSegments.push(...instanceSegments);
+      segments.push(...instanceSegments);
       renderedInstanceCount += 1;
     }
-
-    segments.push(...groupSegments);
   }
 
   return segments;
@@ -1195,37 +1208,28 @@ export function buildPromptSegments(
   let i = 0;
 
   while (i < tmpl.length) {
-    const s = tmpl.indexOf("{{", i);
-    if (s === -1) {
-      if (i < tmpl.length) {
-        out.push({ text: tmpl.slice(i), isUserValue: false });
-      }
+    const start = tmpl.indexOf("{{", i);
+    if (start === -1) {
+      if (i < tmpl.length) out.push({ text: tmpl.slice(i), isUserValue: false });
       break;
     }
-
-    if (s > i) {
-      out.push({ text: tmpl.slice(i, s), isUserValue: false });
-    }
-
-    const e = tmpl.indexOf("}}", s + 2);
-    if (e === -1) {
-      out.push({ text: tmpl.slice(s), isUserValue: false });
+    if (start > i) out.push({ text: tmpl.slice(i, start), isUserValue: false });
+    const end = tmpl.indexOf("}}", start + 2);
+    if (end === -1) {
+      out.push({ text: tmpl.slice(start), isUserValue: false });
       break;
     }
-
-    const name = tmpl.slice(s + 2, e).trim();
-
-    if (NAME_RE.test(name) && formValues.has(name)) {
+    const id = tmpl.slice(start + 2, end).trim();
+    if (ID_RE.test(id) && formValues.has(id)) {
       out.push({
-        text: formValues.get(name) || "",
+        text: formValues.get(id) || "",
         isUserValue: true,
-        paramName: name,
+        paramName: id,
       });
     } else {
-      out.push({ text: tmpl.slice(s, e + 2), isUserValue: false });
+      out.push({ text: tmpl.slice(start, end + 2), isUserValue: false });
     }
-
-    i = e + 2;
+    i = end + 2;
   }
 
   return out;
@@ -1244,22 +1248,13 @@ export function buildPrompt(
 
 export function stripReusableFlag(content: string): string {
   if (typeof content !== "string" || !content.trim()) return content;
+  const frontMatter = parseFrontMatter(content);
+  if (!frontMatter.hasFrontMatter) return content;
+  if (frontMatter.error) throw new Error(frontMatter.error);
 
-  const { metadata, body, hasFrontMatter } = parseFrontMatter(content);
-
-  if (!hasFrontMatter) {
-    return content;
-  }
-
-  const nextMetadata = { ...metadata };
+  const nextMetadata = { ...frontMatter.metadata };
   delete nextMetadata.reusable;
+  if (Object.keys(nextMetadata).length === 0) return frontMatter.body;
 
-  const metadataKeys = Object.keys(nextMetadata);
-
-  if (metadataKeys.length === 0) {
-    return body;
-  }
-
-  const serialized = YAML.stringify(nextMetadata).trimEnd();
-  return `---\n${serialized}\n---\n\n${body}`;
+  return `---\n${JSON.stringify(nextMetadata, null, 2)}\n---\n\n${frontMatter.body}`;
 }

@@ -20,11 +20,16 @@ const DEFAULT_PROMPT_ID = "prompt-welcome";
 export const TEMPLATE_STARTER_STORAGE_KEY = "template-starter";
 
 export const DEFAULT_TEMPLATE_STARTER_CONTENT = `---
-reusable: false
-params:
-  - name: description
-    type: textarea
-    label: User input
+{
+  "reusable": false,
+  "form": [
+    {
+      "type": "textarea",
+      "id": "description",
+      "name": "User input"
+    }
+  ]
+}
 ---
 
 ## Task

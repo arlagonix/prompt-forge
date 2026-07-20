@@ -29,8 +29,8 @@ export function DocsModal({ isOpen, onClose }: DocsModalProps) {
             ? "h-[100dvh] w-screen max-w-none rounded-none border-0"
             : "max-h-[85vh] max-w-3xl",
         )}
-        onOpenAutoFocus={(e) => {
-          e.preventDefault();
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
           contentRef.current?.focus();
         }}
       >
@@ -48,404 +48,287 @@ export function DocsModal({ isOpen, onClose }: DocsModalProps) {
             tabIndex={-1}
             className="space-y-6 px-6 py-4 outline-none"
           >
-            <DocSection title="What Prompt Forge does">
+            <DocSection title="Template structure">
               <p className="mb-3 text-sm text-muted-foreground">
-                Prompt Forge stores prompts as Markdown templates. The template
-                can contain placeholders like <code>{`{{task}}`}</code>. The app
-                turns those placeholders into form fields, lets you fill them in,
-                shows the final rendered result in Preview, and lets you copy the
-                finished prompt.
-              </p>
-              <CodeBlock>{`Template source
-----------------
-Write a summary for:
-{{topic}}
-
-Audience:
-{{audience}}
-
-UI generated from the template
-------------------------------
-topic    -> input field
- audience -> input field
-
-Preview output
---------------
-Write a summary for:
-Release notes for v1.29
-
-Audience:
-Developers`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="The basic workflow">
-              <ol className="list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-                <li>Choose a template from the sidebar or create a new one.</li>
-                <li>
-                  Click <strong>Edit</strong> if you want to change the template
-                  source.
-                </li>
-                <li>
-                  Put placeholders like <code>{`{{task}}`}</code> in the body.
-                </li>
-                <li>Save the template.</li>
-                <li>Fill the generated fields in the main panel.</li>
-                <li>Review the result in <strong>Preview</strong>.</li>
-                <li>
-                  Click <strong>Copy Prompt</strong> to copy the rendered output.
-                </li>
-              </ol>
-            </DocSection>
-
-            <DocSection title="How the UI is organized">
-              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                <li>
-                  <strong>Sidebar:</strong> browse folders, create templates,
-                  move items, rename items, import, and export.
-                </li>
-                <li>
-                  <strong>Main panel:</strong> fill the fields generated from the
-                  currently selected template.
-                </li>
-                <li>
-                  <strong>Preview:</strong> shows the final rendered prompt before
-                  you copy it.
-                </li>
-                <li>
-                  <strong>Editor:</strong> used to write or change the template
-                  source.
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Important terms">
-              <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                <li>
-                  <strong>Template source:</strong> the raw Markdown file,
-                  optionally with YAML front matter.
-                </li>
-                <li>
-                  <strong>Rendered prompt:</strong> the final text after all
-                  placeholders are replaced with values.
-                </li>
-                <li>
-                  <strong>View source:</strong> opens the raw template in a
-                  read-only view.
-                </li>
-                <li>
-                  <strong>Copy template source:</strong> copies the raw template
-                  file exactly as written.
-                </li>
-                <li>
-                  <strong>Copy Prompt:</strong> copies the rendered output shown
-                  in Preview.
-                </li>
-                <li>
-                  <strong>Reusable template:</strong> a starter template that can
-                  be inserted into the editor from the picker.
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Your first template">
-              <p className="mb-3 text-sm text-muted-foreground">
-                You can start with plain Markdown and placeholders only. Front
-                matter is optional until you need richer field types or groups.
-              </p>
-              <CodeBlock>{`You are helping with the following task.
-
-Task:
-{{task}}
-
-Context:
-{{context}}
-
-Constraints:
-{{constraints}}`}</CodeBlock>
-              <p className="mt-3 text-sm text-muted-foreground">
-                This creates three fields automatically. Undeclared placeholders
-                default to textarea inputs.
-              </p>
-            </DocSection>
-
-            <DocSection title="When to use front matter">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Add YAML front matter when you want labels, field types, choice
-                fields, random choice buttons, clipboard import, reusable templates, or nested groups.
+                A template contains strict JSON between the two
+                <code> --- </code> markers and Markdown below it. The JSON
+                defines the complete form. The Markdown body only uses the
+                configured values.
               </p>
               <CodeBlock>{`---
-title: Blog summary
-params:
-  - name: topic
-    type: text
-    label: Topic
-
-  - name: audience
-    type: select
-    label: Audience
-    random: true
-    values: [developers, managers, customers]
+{
+  "form": [
+    {
+      "type": "text",
+      "id": "topic",
+      "name": "Topic"
+    }
+  ]
+}
 ---
 
-Summarize:
-{{topic}}
-
-Audience:
-{{audience}}`}</CodeBlock>
+Write about {{topic}}.`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Source vs output">
-              <p className="mb-3 text-sm text-muted-foreground">
-                A common source of confusion is that the app works with two
-                representations of the same template.
-              </p>
+            <DocSection title="Form order and field IDs">
               <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
-                <li>
-                  The <strong>source</strong> is the Markdown template that you
-                  edit.
-                </li>
-                <li>
-                  The <strong>output</strong> is the rendered prompt produced from
-                  the source and the current field values.
-                </li>
-              </ul>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Use <strong>View source</strong> when you want to inspect the
-                template itself. Use <strong>Preview</strong> and
-                <strong> Copy Prompt</strong> when you want the final result.
-              </p>
-            </DocSection>
-
-            <DocSection title="Common actions">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="text-muted-foreground">Create template</div>
-                <div>Sidebar menu → New Template</div>
-                <div className="text-muted-foreground">Edit template</div>
-                <div>Main panel menu → Edit</div>
-                <div className="text-muted-foreground">View source</div>
-                <div>Main panel menu → View source</div>
-                <div className="text-muted-foreground">Copy final prompt</div>
-                <div>Main panel → Copy Prompt</div>
-                <div className="text-muted-foreground">Copy raw source</div>
-                <div>Main panel menu → Copy template source</div>
-                <div className="text-muted-foreground">Reset field values</div>
-                <div>Main panel → Reset</div>
-                <div className="text-muted-foreground">Insert reusable starter</div>
-                <div>Editor → Insert template</div>
-                <div className="text-muted-foreground">Export template</div>
-                <div>Main panel menu → Export</div>
-              </div>
-            </DocSection>
-
-            <DocSection title="Template syntax basics">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Simple placeholders use double curly braces.
-              </p>
-              <CodeBlock>{`{{task}}
-{{audience}}
-{{tone}}`}</CodeBlock>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>undeclared placeholders are valid</li>
-                <li>undeclared placeholders default to textarea fields</li>
-                <li>field names are technical identifiers</li>
-                <li>use <code>label</code> for user-facing names</li>
+                <li>The order of nodes in <code>form</code> is the UI order.</li>
+                <li>The prompt body never creates or reorders fields.</li>
+                <li>Only fields declared in <code>form</code> appear in the UI.</li>
+                <li>Every field requires a globally unique <code>id</code>.</li>
+                <li><code>name</code> is the user-facing field label.</li>
+                <li>Use field IDs in placeholders such as <code>{`{{topic}}`}</code>.</li>
               </ul>
             </DocSection>
 
             <DocSection title="Supported field types">
-              <CodeBlock>{`type: textarea
-type: text
-type: number
-type: date
-type: checkbox
-type: select
-type: combobox
-type: radio`}</CodeBlock>
-              <p className="mt-3 text-sm text-muted-foreground">
-                If <code>type</code> is omitted for a declared field, it defaults
-                to <code>textarea</code>.
-              </p>
-            </DocSection>
-
-            <DocSection title="Random choice fields">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Add <code>random: true</code> to <code>select</code> or
-                <code> combobox</code> fields to show a dice button that chooses
-                a random option. When more than one option exists, the current
-                value is avoided.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: tone
-    type: select
-    label: Tone
-    random: true
-    values: [Direct, Friendly, Formal]
----`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Groups and repeatable blocks">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Use groups when one section contains nested fields or when users
-                should be able to add multiple repeated blocks.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: steps
-    type: group
-    label: Steps
-    repeat: true
-    fields:
-      - name: title
-        type: text
-        label: Title
-      - name: details
-        type: textarea
-        label: Details
----
-
-{% group steps %}
-Step: {{title}}
-{{details}}
-{% end_group %}`}</CodeBlock>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>groups must be declared in front matter</li>
-                <li>
-                  use <code>{`{% group group_name %}`}</code> and
-                  <code>{` {% end_group %}`}</code> in the body
-                </li>
-                <li>
-                  <code>repeat: true</code> lets the user add multiple instances
-                </li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Conditional sections">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Use conditionals when a section should appear only for certain
-                field values. Logic tags use <code>{`{% ... %}`}</code>; value
-                placeholders still use <code>{`{{ ... }}`}</code>.
-              </p>
-              <CodeBlock>{`{% if context empty %}
-No context was provided.
-
-{% else %}
-Context:
-{{context}}
-
-{% end_if %}`}</CodeBlock>
-              <CodeBlock>{`{% if output_format is "JSON" %}
-Return valid JSON only.
-
-{% else_if output_format is "Markdown" %}
-Return Markdown.
-
-{% else %}
-Return plain text.
-
-{% end_if %}`}</CodeBlock>
-              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li><code>field empty</code> checks for an empty value</li>
-                <li><code>field not_empty</code> checks for a filled value</li>
-                <li><code>field checked</code> and <code>field unchecked</code> are useful for checkboxes</li>
-                <li><code>field is "value"</code> checks selected/text values</li>
-                <li><code>field is_not "value"</code> checks for anything else</li>
-              </ul>
-            </DocSection>
-
-            <DocSection title="Reusable templates">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Set <code>reusable: true</code> in front matter if the template
-                should appear in the reusable template picker inside the editor.
-              </p>
-              <CodeBlock>{`---
-title: Role + Task starter
-reusable: true
-params:
-  - name: role
-    type: textarea
-  - name: task
-    type: textarea
----
-
-Role:
-{{role}}
-
-Task:
-{{task}}`}</CodeBlock>
-              <p className="mt-3 text-sm text-muted-foreground">
-                When inserted, the reusable template becomes the starting content
-                of the current editor and the <code>reusable: true</code> flag is
-                removed automatically.
-              </p>
-            </DocSection>
-
-            <DocSection title="Clipboard import">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Declared textarea fields can expose an <strong>Import from
-                clipboard</strong> button.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: source
-    type: textarea
-    label: Source
-    clipboard_import:
-      enabled: true
-      formats: [html, minified, markdown]
-      default_format: markdown
----`}</CodeBlock>
-            </DocSection>
-
-            <DocSection title="Folder import">
-              <p className="mb-3 text-sm text-muted-foreground">
-                Declared textarea fields can expose an <strong>Insert folder contents</strong> button and a
-                drag-and-drop area that recursively read matching files and replace the whole textarea.
-              </p>
-              <CodeBlock>{`---
-params:
-  - name: context
-    type: textarea
-    label: Context
-    folder_import:
-      enabled: true
-      formats: [.md, .txt]
----`}</CodeBlock>
-              <p className="mt-3 text-sm text-muted-foreground">
-                When <code>formats</code> is omitted it defaults to <code>[.md]</code>. Imported files are
-                sorted by relative path and rendered as <code>[File: path/to/file.md]</code> blocks.
-              </p>
-            </DocSection>
-
-            <DocSection title="Import and export">
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>JSON only</li>
-                <li>export types: template, folder, workspace</li>
-                <li>imports merge folders with the same name in the same parent</li>
-                <li>templates and folders cannot have duplicate names in the same folder, case-insensitively</li>
-                <li>when imported templates conflict, choose Replace conflicts or Create copies once for the import</li>
-                <li>identical imported templates are skipped</li>
-                <li>created copies use names like <code>Name (1)</code>, <code>Name (2)</code>, and so on</li>
-              </ul>
+              <CodeBlock>{`textarea
+text
+number
+date
+checkbox
+select
+combobox
+radio`}</CodeBlock>
               <CodeBlock>{`{
-  "version": 1,
-  "exportedAt": "2026-03-30T09:44:12.317Z",
-  "root": {
-    "type": "root",
-    "children": []
-  }
+  "type": "text",
+  "id": "quantity",
+  "name": "Quantity",
+  "default": "1",
+  "inline": true
 }`}</CodeBlock>
             </DocSection>
 
-            <DocSection title="Auto backup">
-              <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-                <li>Auto backup is off by default and can be enabled from the settings menu.</li>
-                <li>Choose a custom backup folder before automatic backups can be saved.</li>
-                <li>Automatic backups save full workspace JSON files after saved changes.</li>
-                <li>Backups use a 5-minute cooldown so frequent edits do not create too many files.</li>
-                <li>Only files named <code>prompt-forge-backup-*.json</code> are rotated when the maximum backup count is reached.</li>
-                <li>Imports do not trigger a new automatic backup.</li>
+            <DocSection title="Visual groups">
+              <p className="mb-3 text-sm text-muted-foreground">
+                A group only organizes the form visually. It does not create a
+                value scope and is never referenced in the prompt. Its
+                <code>name</code> and <code>description</code> are optional.
+              </p>
+              <CodeBlock>{`{
+  "type": "group",
+  "name": "Sale settings",
+  "description": "Configure the Auction House sale.",
+  "style": "dashed",
+  "children": [
+    {
+      "type": "text",
+      "id": "quantity",
+      "name": "Quantity",
+      "default": "1"
+    },
+    {
+      "type": "text",
+      "id": "auction_cut",
+      "name": "Auction cut",
+      "default": "5%"
+    }
+  ]
+}`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                The body still references the fields directly:
+                <code>{` {{quantity}} `}</code> and
+                <code>{` {{auction_cut}}`}</code>.
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Group styles are <code>solid</code>, <code>dashed</code>, and
+                <code>none</code>. The default is <code>solid</code>. The
+                <code>none</code> style removes only the border while preserving
+                the group background, padding, and spacing.
+              </p>
+            </DocSection>
+
+            <DocSection title="Headers and horizontal rules">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Headers and horizontal rules are visual nodes, so they do not
+                need IDs.
+              </p>
+              <CodeBlock>{`{
+  "type": "header",
+  "name": "Auction House prices",
+  "description": "Enter the current lowest buyout prices."
+},
+{
+  "type": "header",
+  "description": "This header displays descriptive text without a title."
+},
+{
+  "type": "hr"
+},
+{
+  "type": "hr",
+  "style": "dashed"
+}`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                A header must provide a name, a description, or both.
+                Horizontal rules are solid by default. Supported styles are
+                <code> solid </code> and <code> dashed</code>.
+              </p>
+            </DocSection>
+
+            <DocSection title="Choice fields">
+              <CodeBlock>{`{
+  "type": "select",
+  "id": "tone",
+  "name": "Tone",
+  "random": true,
+  "values": ["Direct", "Friendly", "Formal"]
+}`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Select and combobox fields can also use labelled option groups
+                through the <code>groups</code> property.
+              </p>
+            </DocSection>
+
+            <DocSection title="Repeaters">
+              <p className="mb-3 text-sm text-muted-foreground">
+                Repeatable data uses a separate <code>repeater</code> node. A
+                repeater has an ID because its instances are referenced in the
+                prompt. Visual groups remain non-repeatable and ID-free.
+              </p>
+              <CodeBlock>{`---
+{
+  "form": [
+    {
+      "type": "repeater",
+      "id": "materials",
+      "name": "Materials",
+      "children": [
+        {
+          "type": "text",
+          "id": "material_name",
+          "name": "Material"
+        },
+        {
+          "type": "text",
+          "id": "material_price",
+          "name": "Price"
+        }
+      ]
+    }
+  ]
+}
+---
+
+{% repeat materials %}
+- {{material_name}}: {{material_price}}
+{% end_repeat %}`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Conditional sections">
+              <CodeBlock>{`{% if context empty %}
+No context was provided.
+{% else %}
+Context: {{context}}
+{% end_if %}`}</CodeBlock>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                <li><code>field empty</code></li>
+                <li><code>field not_empty</code></li>
+                <li><code>field checked</code> / <code>field unchecked</code></li>
+                <li><code>field is "value"</code></li>
+                <li><code>field is_not "value"</code></li>
               </ul>
+            </DocSection>
+
+            <DocSection title="Clipboard and folder import">
+              <CodeBlock>{`{
+  "type": "textarea",
+  "id": "source",
+  "name": "Source",
+  "clipboard_import": {
+    "enabled": true,
+    "formats": ["html", "minified", "markdown"],
+    "default_format": "markdown"
+  },
+  "folder_import": {
+    "enabled": true,
+    "formats": [".md", ".txt"]
+  }
+}`}</CodeBlock>
+              <p className="mt-3 text-sm text-muted-foreground">
+                These options are supported only by textarea fields.
+              </p>
+            </DocSection>
+
+            <DocSection title="Reusable templates">
+              <CodeBlock>{`---
+{
+  "reusable": true,
+  "form": [
+    {
+      "type": "textarea",
+      "id": "task",
+      "name": "Task"
+    }
+  ]
+}
+---
+
+Task:
+{{task}}`}</CodeBlock>
+            </DocSection>
+
+            <DocSection title="Complete example">
+              <CodeBlock>{`---
+{
+  "form": [
+    {
+      "type": "header",
+      "name": "Frostweave Bag calculator",
+      "description": "Enter current prices and sale settings."
+    },
+    {
+      "type": "group",
+      "name": "Prices",
+      "style": "solid",
+      "children": [
+        {
+          "type": "text",
+          "id": "frostweave_bag",
+          "name": "Frostweave Bag",
+          "inline": true
+        },
+        {
+          "type": "text",
+          "id": "eternium_thread",
+          "name": "Eternium Thread",
+          "default": "2g 85s",
+          "inline": true
+        }
+      ]
+    },
+    {
+      "type": "hr",
+      "style": "dashed"
+    },
+    {
+      "type": "group",
+      "name": "Sale settings",
+      "children": [
+        {
+          "type": "text",
+          "id": "quantity",
+          "name": "Quantity",
+          "default": "1",
+          "inline": true
+        },
+        {
+          "type": "text",
+          "id": "auction_cut",
+          "name": "Auction cut",
+          "default": "5%",
+          "inline": true
+        }
+      ]
+    }
+  ]
+}
+---
+
+Frostweave Bag: {{frostweave_bag}}
+Eternium Thread: {{eternium_thread}}
+Quantity: {{quantity}}
+Auction cut: {{auction_cut}}`}</CodeBlock>
             </DocSection>
 
             <DocSection title="Keyboard shortcuts">
@@ -456,16 +339,10 @@ params:
                 <div className="font-mono">Ctrl+K</div>
                 <div className="text-muted-foreground">New template</div>
                 <div className="font-mono">Ctrl+N</div>
-                <div className="text-muted-foreground">Edit current template</div>
+                <div className="text-muted-foreground">Edit template</div>
                 <div className="font-mono">Ctrl+E</div>
-                <div className="text-muted-foreground">Insert reusable template</div>
-                <div className="font-mono">Ctrl+T</div>
                 <div className="text-muted-foreground">Copy prompt</div>
                 <div className="font-mono">Ctrl+Enter</div>
-                <div className="text-muted-foreground">Refresh folder</div>
-                <div className="font-mono">Alt+R</div>
-                <div className="text-muted-foreground">Close dialogs</div>
-                <div className="font-mono">Esc</div>
               </div>
             </DocSection>
           </div>

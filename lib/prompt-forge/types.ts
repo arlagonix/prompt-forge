@@ -61,7 +61,7 @@ export interface ParameterOptionGroup {
 }
 
 export interface Parameter {
-  name: string;
+  id: string;
   type:
     | "textarea"
     | "text"
@@ -71,7 +71,7 @@ export interface Parameter {
     | "select"
     | "combobox"
     | "radio";
-  label: string;
+  name: string;
   defaultValue: string | null;
   height: number | null;
   values: string[];
@@ -89,6 +89,7 @@ export interface FrontMatterResult {
   body: string;
   rawFrontMatter: string;
   hasFrontMatter: boolean;
+  error?: string;
 }
 
 export interface FolderRecord {
@@ -115,9 +116,9 @@ export interface AppStateRecord<T = unknown> {
 
 export interface TemplateFieldDefinition {
   kind: "field";
-  name: string;
+  id: string;
   type: FieldType;
-  label: string;
+  name: string;
   defaultValue: string | null;
   height: number | null;
   values: string[];
@@ -126,23 +127,46 @@ export interface TemplateFieldDefinition {
   folderImport: FolderImportConfig | null;
   inline: boolean;
   random: boolean;
-  explicit: boolean;
+  scopeId: string | null;
 }
 
 export interface TemplateGroupDefinition {
   kind: "group";
-  name: string;
-  label: string;
-  repeat: boolean;
-  explicit: boolean;
-  children: TemplateDefinition[];
-  renderOrder: TemplateRenderItem[];
+  name: string | null;
+  description: string | null;
+  style: "solid" | "dashed" | "none";
+  children: TemplateFormNode[];
 }
 
-export type TemplateDefinition = TemplateFieldDefinition | TemplateGroupDefinition;
-export type TemplateRenderItem =
-  | { kind: "field"; field: TemplateFieldDefinition }
-  | { kind: "group"; group: TemplateGroupDefinition };
+export interface TemplateHeaderDefinition {
+  kind: "header";
+  name: string | null;
+  description: string | null;
+}
+
+export interface TemplateHorizontalRuleDefinition {
+  kind: "hr";
+  style: "solid" | "dashed";
+}
+
+export interface TemplateRepeaterDefinition {
+  kind: "repeater";
+  id: string;
+  name: string;
+  description: string | null;
+  children: TemplateFormNode[];
+  scopeId: string | null;
+}
+
+export type TemplateFormNode =
+  | TemplateFieldDefinition
+  | TemplateGroupDefinition
+  | TemplateHeaderDefinition
+  | TemplateHorizontalRuleDefinition
+  | TemplateRepeaterDefinition;
+
+// Kept as an alias because the main renderer treats config nodes as render items.
+export type TemplateRenderItem = TemplateFormNode;
 
 export interface TemplateTextNode {
   kind: "text";
@@ -151,15 +175,15 @@ export interface TemplateTextNode {
 
 export interface TemplateFieldReferenceNode {
   kind: "field-ref";
-  name: string;
+  id: string;
   lookupDepth: number;
   definition: TemplateFieldDefinition;
 }
 
-export interface TemplateGroupNode {
-  kind: "group";
-  name: string;
-  definition: TemplateGroupDefinition;
+export interface TemplateRepeaterNode {
+  kind: "repeater";
+  id: string;
+  definition: TemplateRepeaterDefinition;
   children: TemplateBodyNode[];
 }
 
@@ -173,9 +197,9 @@ export type TemplateConditionOperator =
 
 export interface TemplateCondition {
   source: string;
-  name: string;
+  id: string;
   lookupDepth: number;
-  definition: TemplateDefinition;
+  definition: TemplateFieldDefinition | TemplateRepeaterDefinition;
   operator: TemplateConditionOperator;
   expectedValue?: string | boolean;
 }
@@ -194,7 +218,7 @@ export interface TemplateIfNode {
 export type TemplateBodyNode =
   | TemplateTextNode
   | TemplateFieldReferenceNode
-  | TemplateGroupNode
+  | TemplateRepeaterNode
   | TemplateIfNode;
 
 export interface ParsedTemplate {
@@ -206,7 +230,7 @@ export interface ParsedTemplate {
 
 export interface TemplateScopeState {
   fields: Record<string, string>;
-  groups: Record<string, TemplateScopeState[]>;
+  repeaters: Record<string, TemplateScopeState[]>;
 }
 
 export interface ExportRootNode {

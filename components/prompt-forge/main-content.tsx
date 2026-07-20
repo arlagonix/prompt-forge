@@ -64,8 +64,9 @@ import type {
   ParsedFile,
   ParsedTemplate,
   TemplateFieldDefinition,
+  TemplateFormNode,
   TemplateGroupDefinition,
-  TemplateRenderItem,
+  TemplateRepeaterDefinition,
   TemplateScopeState,
 } from "@/lib/prompt-forge/types";
 import { cn } from "@/lib/utils";
@@ -311,7 +312,7 @@ interface MainContentProps {
   isPreviewOpen: boolean;
 }
 
-type GroupPathSegment = { groupName: string; index: number };
+type RepeaterPathSegment = { repeaterId: string; index: number };
 type ClipboardUiState = {
   clipboardFormats: Record<string, ClipboardImportFormat>;
 };
@@ -345,70 +346,74 @@ function normalizeClipboardUiState(raw: unknown): ClipboardUiState {
 }
 
 function buildScopePathKey(
-  path: GroupPathSegment[],
-  fieldName: string,
+  path: RepeaterPathSegment[],
+  fieldId: string,
 ): string {
-  if (path.length === 0) return `root/${fieldName}`;
+  if (path.length === 0) return `root/${fieldId}`;
 
   return `${path
-    .map((segment) => `${segment.groupName}[${segment.index}]`)
-    .join("/")}/${fieldName}`;
+    .map((segment) => `${segment.repeaterId}[${segment.index}]`)
+    .join("/")}/${fieldId}`;
 }
 
 function cloneScopeState(state: TemplateScopeState): TemplateScopeState {
   return {
     fields: { ...state.fields },
-    groups: Object.fromEntries(
-      Object.entries(state.groups).map(([name, instances]) => [
-        name,
+    repeaters: Object.fromEntries(
+      Object.entries(state.repeaters).map(([id, instances]) => [
+        id,
         instances.map(cloneScopeState),
       ]),
     ),
   };
 }
 
+function normalizeLoadedNodes(
+  nodes: TemplateFormNode[],
+  raw: { fields?: Record<string, unknown>; repeaters?: Record<string, unknown> },
+  state: TemplateScopeState,
+): void {
+  for (const node of nodes) {
+    if (node.kind === "field") {
+      const rawValue = raw.fields?.[node.id];
+      if (rawValue != null) state.fields[node.id] = String(rawValue);
+      continue;
+    }
+
+    if (node.kind === "group") {
+      normalizeLoadedNodes(node.children, raw, state);
+      continue;
+    }
+
+    if (node.kind !== "repeater") continue;
+
+    const rawInstances = raw.repeaters?.[node.id];
+    const instances = Array.isArray(rawInstances) ? rawInstances : [];
+    state.repeaters[node.id] =
+      instances.length > 0
+        ? instances.map((instance) => normalizeLoadedScopeState(node, instance))
+        : [createInitialScopeState(node)];
+  }
+}
+
 function normalizeLoadedScopeState(
-  group: TemplateGroupDefinition,
+  scope: TemplateGroupDefinition | TemplateRepeaterDefinition,
   raw: unknown,
 ): TemplateScopeState {
-  const base = createInitialScopeState(group);
+  const base = createInitialScopeState(scope);
   if (!raw || typeof raw !== "object") return base;
 
   const item = raw as {
     fields?: Record<string, unknown>;
-    groups?: Record<string, unknown>;
+    repeaters?: Record<string, unknown>;
   };
-
-  for (const renderItem of group.renderOrder) {
-    if (renderItem.kind === "field") {
-      const rawValue = item.fields?.[renderItem.field.name];
-      base.fields[renderItem.field.name] =
-        rawValue == null
-          ? base.fields[renderItem.field.name]
-          : String(rawValue);
-      continue;
-    }
-
-    const rawInstances = item.groups?.[renderItem.group.name];
-    const instances = Array.isArray(rawInstances) ? rawInstances : [];
-    const normalized =
-      instances.length > 0
-        ? instances.map((instance) =>
-            normalizeLoadedScopeState(renderItem.group, instance),
-          )
-        : [createInitialScopeState(renderItem.group)];
-
-    base.groups[renderItem.group.name] = renderItem.group.repeat
-      ? normalized
-      : [normalized[0]];
-  }
-
+  normalizeLoadedNodes(scope.children, item, base);
   return base;
 }
 
 function updateScopeAtPath(
   rootState: TemplateScopeState,
-  path: GroupPathSegment[],
+  path: RepeaterPathSegment[],
   updater: (scope: TemplateScopeState) => TemplateScopeState,
 ): TemplateScopeState {
   if (path.length === 0) {
@@ -420,42 +425,42 @@ function updateScopeAtPath(
 
   for (let i = 0; i < path.length - 1; i += 1) {
     const segment = path[i];
-    current = current.groups[segment.groupName][segment.index];
+    current = current.repeaters[segment.repeaterId][segment.index];
   }
 
   const last = path[path.length - 1];
-  current.groups[last.groupName][last.index] = updater(
-    cloneScopeState(current.groups[last.groupName][last.index]),
+  current.repeaters[last.repeaterId][last.index] = updater(
+    cloneScopeState(current.repeaters[last.repeaterId][last.index]),
   );
 
   return nextRoot;
 }
 
 function countRenderedItems(group: TemplateGroupDefinition): number {
-  return group.renderOrder.length;
+  return group.children.length;
 }
 
-interface GroupEditorProps {
+interface FormEditorProps {
   clipboardFormats: Record<string, ClipboardImportFormat>;
   onClipboardFormatChange: (
     pathKey: string,
     format: ClipboardImportFormat,
   ) => void;
-  group: TemplateGroupDefinition;
+  nodes: TemplateFormNode[];
   state: TemplateScopeState;
-  path: GroupPathSegment[];
+  path: RepeaterPathSegment[];
   onFieldChange: (
-    path: GroupPathSegment[],
-    fieldName: string,
+    path: RepeaterPathSegment[],
+    fieldId: string,
     value: string,
   ) => void;
-  onAddGroupInstance: (
-    path: GroupPathSegment[],
-    group: TemplateGroupDefinition,
+  onAddRepeaterInstance: (
+    path: RepeaterPathSegment[],
+    repeater: TemplateRepeaterDefinition,
   ) => void;
-  onRemoveGroupInstance: (
-    path: GroupPathSegment[],
-    groupName: string,
+  onRemoveRepeaterInstance: (
+    path: RepeaterPathSegment[],
+    repeaterId: string,
     index: number,
   ) => void;
   onCopy: () => void;
@@ -463,93 +468,170 @@ interface GroupEditorProps {
   showNotification: (message: string, type?: "success" | "error") => void;
 }
 
-function GroupEditor({
-  group,
+function FormEditor({
+  nodes,
   state,
   path,
   onFieldChange,
-  onAddGroupInstance,
-  onRemoveGroupInstance,
+  onAddRepeaterInstance,
+  onRemoveRepeaterInstance,
   onCopy,
   showTechnicalNames,
   clipboardFormats,
   onClipboardFormatChange,
   showNotification,
-}: GroupEditorProps) {
-  const renderItem = useCallback(
-    (item: TemplateRenderItem) => {
-      if (item.kind === "field") {
-        return (
-          <ParameterField
-            key={`field-${item.field.name}`}
-            param={item.field}
-            pathKey={buildScopePathKey(path, item.field.name)}
-            clipboardFormat={
-              item.field.clipboardImport?.formats.includes(
-                clipboardFormats[buildScopePathKey(path, item.field.name)] ??
-                  item.field.clipboardImport?.defaultFormat ??
-                  "markdown",
-              )
-                ? (clipboardFormats[buildScopePathKey(path, item.field.name)] ??
-                  item.field.clipboardImport?.defaultFormat ??
-                  "markdown")
-                : (item.field.clipboardImport?.defaultFormat ?? "markdown")
-            }
-            onClipboardFormatChange={onClipboardFormatChange}
-            value={
-              state.fields[item.field.name] ?? item.field.defaultValue ?? ""
-            }
-            onChange={(value) => onFieldChange(path, item.field.name, value)}
-            onCopy={onCopy}
-            showTechnicalNames={showTechnicalNames}
-            showNotification={showNotification}
-          />
-        );
-      }
+}: FormEditorProps) {
+  return (
+    <div className="space-y-6">
+      {nodes.map((node, nodeIndex) => {
+        if (node.kind === "field") {
+          const pathKey = buildScopePathKey(path, node.id);
+          const clipboardFormat =
+            clipboardFormats[pathKey] ??
+            node.clipboardImport?.defaultFormat ??
+            "markdown";
 
-      const instances = state.groups[item.group.name] ?? [
-        createInitialScopeState(item.group),
-      ];
-      return (
-        <div key={`group-${item.group.name}`} className="space-y-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="text-sm font-semibold text-foreground">
-              {item.group.label}
+          return (
+            <ParameterField
+              key={`field-${node.id}`}
+              param={node}
+              pathKey={pathKey}
+              clipboardFormat={
+                node.clipboardImport?.formats.includes(clipboardFormat)
+                  ? clipboardFormat
+                  : (node.clipboardImport?.defaultFormat ?? "markdown")
+              }
+              onClipboardFormatChange={onClipboardFormatChange}
+              value={state.fields[node.id] ?? node.defaultValue ?? ""}
+              onChange={(value) => onFieldChange(path, node.id, value)}
+              onCopy={onCopy}
+              showTechnicalNames={showTechnicalNames}
+              showNotification={showNotification}
+            />
+          );
+        }
+
+        if (node.kind === "header") {
+          return (
+            <header key={`header-${nodeIndex}`} className="space-y-1">
+              {node.name && (
+                <h2 className="text-base font-semibold text-foreground">
+                  {node.name}
+                </h2>
+              )}
+              {node.description && (
+                <p className="text-sm text-muted-foreground">
+                  {node.description}
+                </p>
+              )}
+            </header>
+          );
+        }
+
+        if (node.kind === "hr") {
+          return (
+            <div key={`hr-${nodeIndex}`} className="py-1">
+              <hr
+                className={cn(
+                  "m-0 border-0 border-t border-border",
+                  node.style === "dashed" && "border-dashed",
+                )}
+              />
             </div>
-            {showTechnicalNames && (
-              <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
-                {`{% group ${item.group.name} %}`}
-              </code>
-            )}
-          </div>
+          );
+        }
 
-          {instances.map((instanceState, index) => {
-            const instancePath = [
-              ...path,
-              { groupName: item.group.name, index },
-            ];
-            const canRemove = item.group.repeat && instances.length > 1;
-            const innerClass = item.group.repeat
-              ? "border border-border/70 bg-background p-4 space-y-4"
-              : "space-y-4";
+        if (node.kind === "group") {
+          return (
+            <section
+              key={`group-${nodeIndex}`}
+              className={cn(
+                "space-y-4 rounded-lg bg-card/30 p-4",
+                node.style !== "none" && "border border-border/70",
+                node.style === "dashed" && "border-dashed",
+              )}
+            >
+              {(node.name || node.description) && (
+                <div className="space-y-1">
+                  {node.name && (
+                    <h3 className="text-sm font-semibold text-foreground">
+                      {node.name}
+                    </h3>
+                  )}
+                  {node.description && (
+                    <p className="text-sm text-muted-foreground">
+                      {node.description}
+                    </p>
+                  )}
+                </div>
+              )}
+              <FormEditor
+                nodes={node.children}
+                state={state}
+                path={path}
+                onFieldChange={onFieldChange}
+                onAddRepeaterInstance={onAddRepeaterInstance}
+                onRemoveRepeaterInstance={onRemoveRepeaterInstance}
+                onCopy={onCopy}
+                showTechnicalNames={showTechnicalNames}
+                clipboardFormats={clipboardFormats}
+                onClipboardFormatChange={onClipboardFormatChange}
+                showNotification={showNotification}
+              />
+            </section>
+          );
+        }
 
-            return (
-              <div key={`${item.group.name}-${index}`} className={innerClass}>
-                <GroupEditor
-                  group={item.group}
-                  state={instanceState}
-                  path={instancePath}
-                  onFieldChange={onFieldChange}
-                  onAddGroupInstance={onAddGroupInstance}
-                  onRemoveGroupInstance={onRemoveGroupInstance}
-                  onCopy={onCopy}
-                  showTechnicalNames={showTechnicalNames}
-                  clipboardFormats={clipboardFormats}
-                  onClipboardFormatChange={onClipboardFormatChange}
-                  showNotification={showNotification}
-                />
+        const instances = state.repeaters[node.id] ?? [
+          createInitialScopeState(node),
+        ];
 
-                {item.group.repeat && (
+        return (
+          <section key={`repeater-${node.id}`} className="space-y-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-semibold text-foreground">
+                  {node.name}
+                </h3>
+                {showTechnicalNames && (
+                  <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
+                    {`{% repeat ${node.id} %}`}
+                  </code>
+                )}
+              </div>
+              {node.description && (
+                <p className="text-sm text-muted-foreground">
+                  {node.description}
+                </p>
+              )}
+            </div>
+
+            {instances.map((instanceState, index) => {
+              const instancePath = [
+                ...path,
+                { repeaterId: node.id, index },
+              ];
+              const canRemove = instances.length > 1;
+
+              return (
+                <div
+                  key={`${node.id}-${index}`}
+                  className="space-y-4 border border-border/70 bg-background p-4"
+                >
+                  <FormEditor
+                    nodes={node.children}
+                    state={instanceState}
+                    path={instancePath}
+                    onFieldChange={onFieldChange}
+                    onAddRepeaterInstance={onAddRepeaterInstance}
+                    onRemoveRepeaterInstance={onRemoveRepeaterInstance}
+                    onCopy={onCopy}
+                    showTechnicalNames={showTechnicalNames}
+                    clipboardFormats={clipboardFormats}
+                    onClipboardFormatChange={onClipboardFormatChange}
+                    showNotification={showNotification}
+                  />
+
                   <Button
                     type="button"
                     variant="outline"
@@ -557,47 +639,30 @@ function GroupEditor({
                     className="w-full"
                     disabled={!canRemove}
                     onClick={() =>
-                      onRemoveGroupInstance(path, item.group.name, index)
+                      onRemoveRepeaterInstance(path, node.id, index)
                     }
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
                     Remove
                   </Button>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
 
-          {item.group.repeat && (
             <Button
               type="button"
               variant="outline"
               className="w-full"
-              onClick={() => onAddGroupInstance(path, item.group)}
+              onClick={() => onAddRepeaterInstance(path, node)}
             >
               <Plus className="h-4 w-4 mr-2" />
               Add
             </Button>
-          )}
-        </div>
-      );
-    },
-    [
-      onAddGroupInstance,
-      onCopy,
-      onFieldChange,
-      onRemoveGroupInstance,
-      path,
-      showTechnicalNames,
-      state.fields,
-      state.groups,
-      clipboardFormats,
-      onClipboardFormatChange,
-      showNotification,
-    ],
+          </section>
+        );
+      })}
+    </div>
   );
-
-  return <div className="space-y-6">{group.renderOrder.map(renderItem)}</div>;
 }
 
 export function MainContent({
@@ -814,14 +879,14 @@ export function MainContent({
   }, [currentFile, debouncedTemplateState, parseError, parsedTemplate]);
 
   const updateFieldValue = useCallback(
-    (path: GroupPathSegment[], fieldName: string, value: string) => {
+    (path: RepeaterPathSegment[], fieldId: string, value: string) => {
       setTemplateState((prev) => {
         if (!prev) return prev;
         return updateScopeAtPath(prev, path, (scope) => ({
           ...scope,
           fields: {
             ...scope.fields,
-            [fieldName]: value,
+            [fieldId]: value,
           },
         }));
       });
@@ -829,17 +894,17 @@ export function MainContent({
     [],
   );
 
-  const addGroupInstance = useCallback(
-    (path: GroupPathSegment[], group: TemplateGroupDefinition) => {
+  const addRepeaterInstance = useCallback(
+    (path: RepeaterPathSegment[], repeater: TemplateRepeaterDefinition) => {
       setTemplateState((prev) => {
         if (!prev) return prev;
         return updateScopeAtPath(prev, path, (scope) => ({
           ...scope,
-          groups: {
-            ...scope.groups,
-            [group.name]: [
-              ...(scope.groups[group.name] ?? []),
-              createInitialScopeState(group),
+          repeaters: {
+            ...scope.repeaters,
+            [repeater.id]: [
+              ...(scope.repeaters[repeater.id] ?? []),
+              createInitialScopeState(repeater),
             ],
           },
         }));
@@ -848,18 +913,18 @@ export function MainContent({
     [],
   );
 
-  const removeGroupInstance = useCallback(
-    (path: GroupPathSegment[], groupName: string, index: number) => {
+  const removeRepeaterInstance = useCallback(
+    (path: RepeaterPathSegment[], repeaterId: string, index: number) => {
       setTemplateState((prev) => {
         if (!prev) return prev;
         return updateScopeAtPath(prev, path, (scope) => {
-          const current = scope.groups[groupName] ?? [];
+          const current = scope.repeaters[repeaterId] ?? [];
           if (current.length <= 1) return scope;
           return {
             ...scope,
-            groups: {
-              ...scope.groups,
-              [groupName]: current.filter(
+            repeaters: {
+              ...scope.repeaters,
+              [repeaterId]: current.filter(
                 (_, currentIndex) => currentIndex !== index,
               ),
             },
@@ -1182,13 +1247,13 @@ export function MainContent({
                       as-is.
                     </p>
                   ) : (
-                    <GroupEditor
-                      group={parsedTemplate.rootGroup}
+                    <FormEditor
+                      nodes={parsedTemplate.rootGroup.children}
                       state={templateState}
                       path={[]}
                       onFieldChange={updateFieldValue}
-                      onAddGroupInstance={addGroupInstance}
-                      onRemoveGroupInstance={removeGroupInstance}
+                      onAddRepeaterInstance={addRepeaterInstance}
+                      onRemoveRepeaterInstance={removeRepeaterInstance}
                       onCopy={handleCopy}
                       showTechnicalNames={showTechnicalNames}
                       clipboardFormats={clipboardUiState.clipboardFormats}
@@ -1460,7 +1525,7 @@ function ParameterField({
   const [isFolderDragActive, setIsFolderDragActive] = useState(false);
   const [isComboboxOpen, setIsComboboxOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const id = `param-${param.name}`;
+  const id = `param-${param.id}`;
   const isInlineField =
     param.inline &&
     (param.type === "text" ||
@@ -1716,11 +1781,11 @@ function ParameterField({
   const meta = (
     <div className={fieldLabelClassName}>
       <Label htmlFor={id} className="text-sm font-medium text-foreground">
-        {param.label}
+        {param.name}
       </Label>
       {showTechnicalNames && (
         <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
-          {`{{${param.name}}}`}
+          {`{{${param.id}}}`}
         </code>
       )}
     </div>
@@ -1734,11 +1799,11 @@ function ParameterField({
       <div className="space-y-2">
         <div className="flex items-center gap-2 flex-wrap">
           <Label htmlFor={id} className="text-sm font-medium text-foreground">
-            {param.label}
+            {param.name}
           </Label>
           {showTechnicalNames && (
             <code className="px-1.5 py-0.5 rounded bg-secondary text-xs font-mono text-muted-foreground">
-              {`{{${param.name}}}`}
+              {`{{${param.id}}}`}
             </code>
           )}
         </div>
@@ -1749,7 +1814,7 @@ function ParameterField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onPaste={handleTextareaPaste}
-          placeholder={`Enter ${param.label.toLowerCase()}...`}
+          placeholder="Enter value"
           rows={param.height ?? 4}
           className="bg-card border-border resize-y min-h-[100px]"
           style={{
@@ -1849,7 +1914,7 @@ function ParameterField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={`Enter ${param.label.toLowerCase()}...`}
+          placeholder="Enter value"
           className="bg-card border-border flex-1 min-w-0"
         />
       </div>
@@ -1866,7 +1931,7 @@ function ParameterField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={`Enter ${param.label.toLowerCase()}...`}
+          placeholder="Enter value"
           className="bg-card border-border flex-1 min-w-0"
         />
       </div>
@@ -1924,7 +1989,7 @@ function ParameterField({
               </SelectTrigger>
               <SelectContent>
                 {optionGroups.map((group, groupIndex) => (
-                  <SelectGroup key={`${param.name}-group-${groupIndex}`}>
+                  <SelectGroup key={`${param.id}-group-${groupIndex}`}>
                     {group.label && <SelectLabel>{group.label}</SelectLabel>}
                     {group.options.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
@@ -1986,7 +2051,7 @@ function ParameterField({
                     <CommandEmpty>No results found.</CommandEmpty>
                     {optionGroups.map((group, groupIndex) => (
                       <CommandGroup
-                        key={`${param.name}-combobox-group-${groupIndex}`}
+                        key={`${param.id}-combobox-group-${groupIndex}`}
                         heading={group.label ?? undefined}
                       >
                         {group.options.map((option) => (

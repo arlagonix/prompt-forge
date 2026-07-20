@@ -101,27 +101,12 @@ export function TemplateMonacoEditor({
 
         frontmatter: [
           [/^---\s*$/, { token: "keyword", next: "@markdown" }],
-          [/#.*$/, "comment"],
-
-          [/^(\s*)([a-zA-Z0-9_-]+)(\s*:)/, ["", "fm-key", "fm-colon"]],
-          [
-            /^(\s*-\s+)([a-zA-Z0-9_-]+)(\s*:)/,
-            ["fm-punctuation", "fm-key", "fm-colon"],
-          ],
-
-          [/\s*-\s+/, "fm-punctuation"],
-          [/[{}\[\]]/, "fm-punctuation"],
-          [/,/, "fm-punctuation"],
-          [/:/, "fm-colon"],
-
-          [/\b\d+(\.\d+)?\b/, "fm-value"],
-          [/\b(true|false|null)\b/, "fm-value"],
-
+          [/"([^"\\]|\\.)*"(?=\s*:)/, "fm-key"],
           [/"([^"\\]|\\.)*"/, "fm-value"],
-          [/'([^'\\]|\\.)*'/, "fm-value"],
-          [/https?:\/\/\S+/, "fm-value"],
-
-          [/[a-zA-Z_][\w.-]*/, "fm-value"],
+          [/-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/, "fm-value"],
+          [/\b(?:true|false|null)\b/, "fm-value"],
+          [/[{}\[\],]/, "fm-punctuation"],
+          [/:/, "fm-colon"],
           [/\s+/, ""],
         ],
 
